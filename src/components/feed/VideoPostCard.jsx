@@ -1,0 +1,306 @@
+import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useApp } from '../../context/AppContext';
+import { 
+  Heart, 
+  MessageCircle, 
+  Share2, 
+  Bookmark, 
+  MoreVertical, 
+  Check, 
+  Plus, 
+  Music, 
+  Volume2, 
+  VolumeX, 
+  Play, 
+  Pause 
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CommentSheet } from './CommentSheet';
+import { ShareSheet } from './ShareSheet';
+import { ReportModal } from './ReportModal';
+
+export const VideoPostCard = ({ post }) => {
+  const navigate = useNavigate();
+  const { toggleLikePost, toggleSavePost, toggleFollowCreator } = useApp();
+
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(true);
+  const [showHeartBurst, setShowHeartBurst] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
+
+  const videoRef = useRef(null);
+  const lastTapRef = useRef(0);
+
+  const handleVideoClick = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      // Double Tap Like!
+      if (!post.isLiked) {
+        toggleLikePost(post.id);
+      }
+      setShowHeartBurst(true);
+      setTimeout(() => setShowHeartBurst(false), 900);
+    } else {
+      // Single tap: toggle play / pause
+      if (videoRef.current) {
+        if (isPlaying) {
+          videoRef.current.pause();
+          setIsPlaying(false);
+        } else {
+          videoRef.current.play().catch(() => {});
+          setIsPlaying(true);
+        }
+      } else {
+        setIsPlaying(!isPlaying);
+      }
+    }
+    lastTapRef.current = now;
+  };
+
+  const formatNumber = (num) => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num;
+  };
+
+  return (
+    <article className="relative w-full aspect-[9/16] max-h-[720px] bg-black overflow-hidden select-none border-b border-white/10 sm:rounded-3xl sm:mb-4 sm:border sm:border-white/10 shadow-2xl">
+      {/* Video / Media Player */}
+      <div 
+        className="absolute inset-0 z-0 cursor-pointer flex items-center justify-center bg-black"
+        onClick={handleVideoClick}
+      >
+        {post.mediaType === 'video' && post.mediaUrl ? (
+          <video
+            ref={videoRef}
+            src={post.mediaUrl}
+            poster={post.posterUrl}
+            className="w-full h-full object-cover"
+            playsInline
+            loop
+            autoPlay
+            muted={isMuted}
+          />
+        ) : (
+          <img
+            src={post.posterUrl || post.mediaUrl}
+            alt={post.title}
+            className="w-full h-full object-cover"
+          />
+        )}
+
+        {/* Dark Vignette Gradient Overlays */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/90 pointer-events-none" />
+
+        {/* Center Pause/Play overlay indicator when paused */}
+        {!isPlaying && (
+          <div className="absolute z-10 w-16 h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white/90 border border-white/20 pointer-events-none">
+            <Play className="w-8 h-8 fill-current ml-1" />
+          </div>
+        )}
+
+        {/* Double Tap Heart Burst Animation */}
+        <AnimatePresence>
+          {showHeartBurst && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1.3, opacity: 1 }}
+              exit={{ scale: 1.8, opacity: 0 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              className="absolute z-20 pointer-events-none text-pink-500 drop-shadow-[0_0_25px_rgba(255,0,122,0.8)]"
+            >
+              <Heart className="w-24 h-24 fill-current stroke-white stroke-[1.5]" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Top Controls Overlay (Mute toggle) */}
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        {post.mediaType === 'video' && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMuted(!isMuted);
+              if (videoRef.current) videoRef.current.muted = !isMuted;
+            }}
+            className="p-2 rounded-full bg-black/50 backdrop-blur-md text-white border border-white/10 hover:bg-black/70 transition"
+          >
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-pink-400" />}
+          </button>
+        )}
+      </div>
+
+      {/* Bottom Content Info (Creator, Caption, Audio) */}
+      <div className="absolute bottom-4 left-3 right-16 z-20 text-left pointer-events-auto space-y-2">
+        {/* Creator Handle, Badge & Follow Button */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => navigate(`/creator/${post.creator.username}`)}
+            className="flex items-center gap-1.5 group"
+          >
+            <span className="font-extrabold text-sm text-white drop-shadow-md group-hover:underline">
+              @{post.creator.username}
+            </span>
+            {post.creator.isVerified && (
+              <span className="w-4 h-4 rounded-full bg-[#0070f3] flex items-center justify-center text-white text-[10px] font-bold">
+                ✓
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => toggleFollowCreator(post.creator.username)}
+            className={`px-3 py-1 rounded-full text-xs font-bold transition shadow-sm ${
+              post.isFollowing
+                ? 'bg-white/20 backdrop-blur-md text-white border border-white/20'
+                : 'bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white hover:opacity-90 active:scale-95'
+            }`}
+          >
+            {post.isFollowing ? 'Following' : 'Follow'}
+          </button>
+        </div>
+
+        {/* Caption */}
+        <div className="text-xs text-white/95 leading-snug drop-shadow-sm">
+          <p className={captionExpanded ? '' : 'line-clamp-2'}>
+            {post.caption}
+          </p>
+          {post.caption.length > 70 && (
+            <button
+              onClick={() => setCaptionExpanded(!captionExpanded)}
+              className="text-gray-300 font-bold hover:text-white mt-0.5 inline-block text-[11px]"
+            >
+              {captionExpanded ? 'less' : '...more'}
+            </button>
+          )}
+        </div>
+
+        {/* Audio Track Badge */}
+        <div className="flex items-center gap-2 pt-0.5">
+          <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 max-w-[240px]">
+            <Music className="w-3 h-3 text-pink-400 shrink-0 animate-spin" style={{ animationDuration: '6s' }} />
+            <span className="text-[11px] text-gray-200 font-medium truncate">
+              {post.audioTitle || 'Original Audio'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side Vertical Floating Action Bar (Like Screen 3) */}
+      <div className="absolute bottom-6 right-2 z-20 flex flex-col items-center gap-4 text-white pointer-events-auto">
+        {/* Creator Avatar with Follow Plus Badge */}
+        <div className="relative mb-1">
+          <div 
+            onClick={() => navigate(`/creator/${post.creator.username}`)}
+            className="w-11 h-11 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 cursor-pointer shadow-lg"
+          >
+            <img
+              src={post.creator.avatar}
+              alt={post.creator.name}
+              className="w-full h-full rounded-full object-cover border border-black"
+            />
+          </div>
+          {!post.isFollowing && (
+            <button
+              onClick={() => toggleFollowCreator(post.creator.username)}
+              className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] flex items-center justify-center text-white shadow-md hover:scale-110 transition-transform"
+            >
+              <Plus className="w-3 h-3 stroke-[3]" />
+            </button>
+          )}
+        </div>
+
+        {/* Like Button */}
+        <button
+          onClick={() => toggleLikePost(post.id)}
+          className="flex flex-col items-center gap-1 group active:scale-75 transition-transform"
+        >
+          <div className={`p-2 rounded-full transition ${
+            post.isLiked ? 'text-[#ff007a]' : 'text-white drop-shadow-md group-hover:text-pink-300'
+          }`}>
+            <Heart className={`w-7 h-7 transition-all ${post.isLiked ? 'fill-current scale-110 drop-shadow-[0_0_10px_rgba(255,0,122,0.6)]' : 'stroke-[2]'}`} />
+          </div>
+          <span className="text-[11px] font-bold drop-shadow">
+            {formatNumber(post.likesCount)}
+          </span>
+        </button>
+
+        {/* Comment Button */}
+        <button
+          onClick={() => setShowComments(true)}
+          className="flex flex-col items-center gap-1 group active:scale-75 transition-transform"
+        >
+          <div className="p-2 rounded-full text-white drop-shadow-md group-hover:text-pink-300">
+            <MessageCircle className="w-7 h-7 stroke-[2]" />
+          </div>
+          <span className="text-[11px] font-bold drop-shadow">
+            {formatNumber(post.commentsCount)}
+          </span>
+        </button>
+
+        {/* Share Button */}
+        <button
+          onClick={() => setShowShare(true)}
+          className="flex flex-col items-center gap-1 group active:scale-75 transition-transform"
+        >
+          <div className="p-2 rounded-full text-white drop-shadow-md group-hover:text-pink-300">
+            <Share2 className="w-7 h-7 stroke-[2]" />
+          </div>
+          <span className="text-[11px] font-bold drop-shadow">
+            {formatNumber(post.sharesCount)}
+          </span>
+        </button>
+
+        {/* Bookmark Save Button */}
+        <button
+          onClick={() => toggleSavePost(post.id)}
+          className="flex flex-col items-center gap-1 group active:scale-75 transition-transform"
+        >
+          <div className={`p-2 rounded-full transition ${
+            post.isSaved ? 'text-amber-400' : 'text-white drop-shadow-md group-hover:text-amber-300'
+          }`}>
+            <Bookmark className={`w-6 h-6 ${post.isSaved ? 'fill-current' : 'stroke-[2]'}`} />
+          </div>
+          <span className="text-[11px] font-bold drop-shadow">
+            {formatNumber(post.savesCount)}
+          </span>
+        </button>
+
+        {/* More Actions / Video Actions (Screen 8) */}
+        <button
+          onClick={() => setShowShare(true)}
+          className="p-1.5 rounded-full text-white/80 hover:text-white transition"
+        >
+          <MoreVertical className="w-5 h-5 drop-shadow" />
+        </button>
+      </div>
+
+      {/* Sheets & Modals */}
+      <CommentSheet
+        post={post}
+        isOpen={showComments}
+        onClose={() => setShowComments(false)}
+      />
+
+      <ShareSheet
+        post={post}
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
+        onOpenReport={() => setShowReport(true)}
+      />
+
+      <ReportModal
+        post={post}
+        isOpen={showReport}
+        onClose={() => setShowReport(false)}
+      />
+    </article>
+  );
+};
