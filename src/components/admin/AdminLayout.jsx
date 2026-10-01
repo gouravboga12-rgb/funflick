@@ -16,15 +16,18 @@ import {
   Bell, 
   Smartphone,
   ShieldCheck,
-  Search
+  Search,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { adminPayouts, pendingApprovals, showToast } = useApp();
+  const { adminPayouts, pendingApprovals, showToast, theme, setTheme } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const isLight = theme === 'light';
   const pendingPayoutCount = adminPayouts.filter(p => p.status === 'Partially Paid').length;
 
   const navLinks = [
@@ -41,9 +44,9 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#080512] text-white flex flex-col md:flex-row select-none">
+    <div className={`min-h-screen ${isLight ? 'bg-[#f8fafc] text-slate-900 light' : 'bg-[#080512] text-white dark'} flex flex-col md:flex-row select-none transition-colors`}>
       {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-[#0d081f] border-r border-white/5 shrink-0 min-h-screen p-4 justify-between">
+      <aside className={`hidden md:flex flex-col w-64 ${isLight ? 'bg-white border-r border-slate-200' : 'bg-[#0d081f] border-r border-white/5'} shrink-0 min-h-screen p-4 justify-between transition-colors`}>
         <div className="space-y-6">
           {/* Brand */}
           <div 
@@ -52,10 +55,10 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
           >
             <img src="/brand/funflick-logo.png" alt="FunFlick" className="w-8 h-8 rounded-xl object-contain shadow" />
             <div>
-              <span className="font-extrabold text-lg text-white font-heading">
+              <span className={`font-extrabold text-lg ${isLight ? 'text-slate-900' : 'text-white'} font-heading`}>
                 fun<span className="text-[#ff007a]">flick</span>
               </span>
-              <span className="text-[10px] text-gray-400 block -mt-1 font-semibold">Admin Center</span>
+              <span className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-gray-400'} block -mt-1 font-semibold`}>Admin Center</span>
             </div>
           </div>
 
@@ -71,12 +74,16 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
                   onClick={() => navigate(link.path)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition ${
                     isActive
-                      ? 'bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-pink-300 border border-pink-500/30'
-                      : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                      ? (isLight 
+                          ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md shadow-pink-500/20' 
+                          : 'bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-pink-300 border border-pink-500/30')
+                      : (isLight 
+                          ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' 
+                          : 'text-gray-400 hover:bg-white/5 hover:text-white')
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-pink-400' : 'text-gray-400'}`} />
+                    <Icon className={`w-4 h-4 ${isActive ? (isLight ? 'text-white' : 'text-pink-400') : (isLight ? 'text-slate-500' : 'text-gray-400')}`} />
                     <span>{link.label}</span>
                   </div>
 
@@ -92,10 +99,14 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
         </div>
 
         {/* Bottom User Area Switcher */}
-        <div className="pt-4 border-t border-white/10 space-y-2">
+        <div className={`pt-4 border-t ${isLight ? 'border-slate-200' : 'border-white/10'} space-y-2`}>
           <button
             onClick={() => navigate('/')}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 text-xs font-bold text-gray-300 hover:text-white border border-white/5 transition"
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl ${
+              isLight 
+                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200' 
+                : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border-white/5'
+            } text-xs font-bold border transition`}
           >
             <Smartphone className="w-4 h-4 text-pink-400" />
             <span>Open User App</span>
@@ -106,29 +117,52 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
       {/* Main Admin Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
-        <header className="sticky top-0 z-30 bg-[#0d081f]/90 backdrop-blur-md px-5 py-3 border-b border-white/5 flex items-center justify-between">
+        <header className={`sticky top-0 z-30 ${
+          isLight ? 'bg-white/95 border-b border-slate-200' : 'bg-[#0d081f]/90 border-b border-white/5'
+        } backdrop-blur-md px-5 py-3 flex items-center justify-between transition-colors`}>
           <div className="flex items-center gap-3">
             {/* Mobile Menu Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-1.5 rounded-xl bg-white/5 text-gray-300 hover:text-white"
+              className={`md:hidden p-1.5 rounded-xl ${
+                isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-white/5 text-gray-300 hover:text-white'
+              }`}
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-base font-extrabold text-white font-heading">
+            <h1 className={`text-base font-extrabold ${isLight ? 'text-slate-900' : 'text-white'} font-heading`}>
               {title}
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+          <div className="flex items-center gap-2.5">
+            {/* Quick Theme Switcher */}
+            <button
+              onClick={() => {
+                const nextTheme = isLight ? 'dark' : 'light';
+                setTheme(nextTheme);
+                showToast(nextTheme === 'light' ? '☀️ Switched to Light Theme' : '🌙 Switched to Dark Theme', 'info');
+              }}
+              className={`p-2 rounded-xl transition ${
+                isLight 
+                  ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200' 
+                  : 'bg-white/5 text-gray-300 hover:text-white border border-white/5'
+              }`}
+              title={`Switch to ${isLight ? 'Dark' : 'Light'} Mode`}
+            >
+              {isLight ? <Moon className="w-4 h-4 text-purple-600" /> : <Sun className="w-4 h-4 text-amber-400" />}
+            </button>
+
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Super Administrator</span>
             </span>
 
             <button
               onClick={() => showToast('No new critical system alerts.', 'info')}
-              className="p-2 rounded-xl bg-white/5 text-gray-300 hover:text-white relative"
+              className={`p-2 rounded-xl ${
+                isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-white/5 text-gray-300 hover:text-white'
+              } relative`}
             >
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-pink-500" />

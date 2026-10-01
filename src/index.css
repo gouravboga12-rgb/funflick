@@ -193,9 +193,10 @@ html.light .glass-card-hover:hover {
   box-shadow: 0 10px 25px -5px rgba(255, 0, 122, 0.12) !important;
 }
 
-/* Nested cards & elevated containers */
+/* Nested cards, tables & elevated containers in Light Mode */
 .light .bg-\[\#110b24\],
 .light .bg-\[\#120c26\],
+.light .bg-\[\#120c27\],
 .light .bg-\[\#130d29\],
 .light .bg-\[\#130f24\],
 .light .bg-\[\#140d2d\],
@@ -203,8 +204,10 @@ html.light .glass-card-hover:hover {
 .light .bg-\[\#150f2c\],
 .light .bg-\[\#160f33\],
 .light .bg-\[\#181035\],
+.light .bg-\[\#181135\],
 .light .bg-\[\#191238\],
 .light .bg-\[\#1a1235\],
+.light .bg-\[\#1b1236\],
 .light .bg-\[\#1b1433\],
 .light .bg-\[\#1b1434\],
 .light .bg-\[\#1f1545\],
@@ -212,19 +215,62 @@ html.light .glass-card-hover:hover {
 .light .bg-\[\#22183d\],
 .light .bg-\[\#251b45\] {
   background-color: #ffffff !important;
-  border-color: rgba(0, 0, 0, 0.08) !important;
-  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.04);
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Desk, Policy & Highlight Banners in Light Mode */
+.light [class*="from-purple-950"],
+.light [class*="from-pink-950"],
+.light [class*="from-emerald-950"],
+.light [class*="from-\[\#1c1238\]"] {
+  background-image: linear-gradient(135deg, #fdf2f8 0%, #faf5ff 50%, #f0fdf4 100%) !important;
+  background-color: #ffffff !important;
+  border-color: rgba(255, 0, 122, 0.25) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04) !important;
 }
 
 /* Inputs & Form controls in Light Mode */
 .light .bg-\[\#18122c\],
 .light .bg-\[\#18122f\],
+.light .bg-\[\#140e2b\],
 .light input.bg-\[\#18122c\],
 .light input.bg-\[\#18122f\],
+.light input.bg-\[\#140e2b\],
 .light select.bg-\[\#18122c\],
 .light textarea.bg-\[\#18122c\] {
-  background-color: #f1f5f9 !important;
+  background-color: #ffffff !important;
   border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Tables in Light Mode (Admin Payouts, Users, Subscribers) */
+.light table {
+  color: #0f172a !important;
+}
+.light thead,
+.light thead.bg-\[\#181135\],
+.light thead th {
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  border-color: #e2e8f0 !important;
+}
+.light tbody {
+  background-color: #ffffff !important;
+}
+.light tbody tr {
+  background-color: #ffffff !important;
+  border-color: #f1f5f9 !important;
+}
+.light tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+.light tbody td {
+  color: #0f172a !important;
+  border-color: #f1f5f9 !important;
+}
+.light tbody td .text-white,
+.light tbody td span.text-white {
   color: #0f172a !important;
 }
 
@@ -245,6 +291,17 @@ html.light .glass-card-hover:hover {
   background-color: rgba(0, 0, 0, 0.1) !important;
 }
 
+/* Action buttons in cards (Inspect, Reject, Edit, Dismiss) */
+.light button.bg-white\/5 {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #334155 !important;
+}
+.light button.bg-white\/5:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
 /* Delicate border overrides */
 .light .border-white\/5,
 .light .border-white\/10,
@@ -253,7 +310,7 @@ html.light .glass-card-hover:hover {
   border-color: rgba(0, 0, 0, 0.08) !important;
 }
 
-/* Text adaptations in light mode */
+/* High-contrast text adaptations in light mode */
 .light .text-gray-100,
 .light .text-gray-200 {
   color: #1e293b !important;
@@ -267,6 +324,32 @@ html.light .glass-card-hover:hover {
 .light .text-gray-500 {
   color: #94a3b8 !important;
 }
+.light .text-pink-300 {
+  color: #db2777 !important;
+}
+.light .text-pink-400 {
+  color: #db2777 !important;
+}
+.light .text-purple-300,
+.light .text-purple-400 {
+  color: #7c3aed !important;
+}
+.light .text-emerald-300 {
+  color: #059669 !important;
+}
+.light .text-emerald-400 {
+  color: #059669 !important;
+}
+.light .text-amber-300,
+.light .text-amber-400 {
+  color: #b45309 !important;
+}
+.light .text-yellow-400 {
+  color: #b45309 !important;
+}
+.light .text-blue-400 {
+  color: #2563eb !important;
+}
 
 /* Primary text on light surfaces */
 .light h1.text-white,
@@ -276,8 +359,50 @@ html.light .glass-card-hover:hover {
 .light h5.text-white,
 .light h6.text-white,
 .light p.text-white,
-.light span.text-white:not([class*="bg-"]):not(article *):not([class*="aspect-[9/16]"] *):not(button *) {
+.light span.text-white:not([class*="bg-"]):not(article *):not([class*="aspect-[9/16]"] *):not(button *):not([class*="badge"]) {
   color: #0f172a !important;
+}
+
+/* Buttons with white text retain bright crisp white */
+.light button.bg-gradient-to-r,
+.light button.bg-gradient-to-r *,
+.light button.bg-emerald-600,
+.light button.bg-emerald-600 *,
+.light button.bg-pink-600,
+.light button.bg-pink-600 *,
+.light button.bg-red-600,
+.light button.bg-red-600 *,
+.light .bg-funflick-btn,
+.light .bg-funflick-btn *,
+.light .bg-funflick-pill,
+.light .bg-funflick-pill * {
+  color: #ffffff !important;
+}
+
+/* High-contrast status badges in light mode */
+.light .bg-amber-500\/10,
+.light .bg-amber-500\/20 {
+  background-color: #fef3c7 !important;
+  border-color: #fde68a !important;
+  color: #92400e !important;
+}
+.light .bg-emerald-500\/10,
+.light .bg-emerald-500\/20 {
+  background-color: #d1fae5 !important;
+  border-color: #a7f3d0 !important;
+  color: #065f46 !important;
+}
+.light .bg-pink-500\/10,
+.light .bg-pink-500\/20 {
+  background-color: #fce7f3 !important;
+  border-color: #fbcfe8 !important;
+  color: #9d174d !important;
+}
+.light .bg-blue-500\/10,
+.light .bg-blue-500\/20 {
+  background-color: #dbeafe !important;
+  border-color: #bfdbfe !important;
+  color: #1e40af !important;
 }
 
 /* Modal backdrop in light mode */
