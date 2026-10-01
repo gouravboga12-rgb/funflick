@@ -342,6 +342,30 @@ export const AppProvider = ({ children }) => {
     showToast('🚀 Your post has been published live to FunFlick!', 'success');
   };
 
+  // Delete a User Post (Instagram-Style Post Deletion)
+  const deleteUserPost = (postId) => {
+    setPosts(prev => prev.filter(p => p.id !== postId));
+    setUserSubmissions(prev => prev.filter(s => s.id !== postId && s.title !== postId));
+    setPendingApprovals(prev => prev.filter(a => a.id !== postId));
+    setCreatorVideos(prev => prev.filter(cv => cv.id !== postId));
+    setCurrentUser(prev => ({
+      ...prev,
+      stats: {
+        ...prev.stats,
+        posts: Math.max(0, (prev.stats?.posts || 1) - 1)
+      }
+    }));
+    showToast('🗑️ Post deleted successfully!', 'info');
+  };
+
+  // Delete / withdraw submission from Influencer Hub
+  const deleteUserSubmission = (submissionId) => {
+    setUserSubmissions(prev => prev.filter(s => s.id !== submissionId));
+    setPendingApprovals(prev => prev.filter(a => a.id !== submissionId));
+    setPosts(prev => prev.filter(p => p.id !== submissionId));
+    showToast('🗑️ Submission removed from your library', 'info');
+  };
+
   // Publish a new Story
   const publishNewStory = (storyData) => {
     const newStoryItem = {
@@ -888,6 +912,8 @@ export const AppProvider = ({ children }) => {
         purchasePublishingSubscription,
         toggleUserSubscriptionStatus,
         publishNewPost,
+        deleteUserPost,
+        deleteUserSubmission,
         publishNewStory,
         publishNewVideo,
         submitVideoForVerification,

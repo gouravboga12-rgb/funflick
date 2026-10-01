@@ -13,7 +13,13 @@ import {
   Volume2, 
   VolumeX, 
   Play, 
-  Pause 
+  Pause,
+  Trash2,
+  Pin,
+  MessageSquareOff,
+  Copy,
+  AlertTriangle,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CommentSheet } from './CommentSheet';
@@ -22,7 +28,7 @@ import { ReportModal } from './ReportModal';
 
 export const VideoPostCard = ({ post }) => {
   const navigate = useNavigate();
-  const { toggleLikePost, toggleSavePost, toggleFollowCreator } = useApp();
+  const { toggleLikePost, toggleSavePost, toggleFollowCreator, deleteUserPost, currentUser, showToast } = useApp();
 
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -30,6 +36,8 @@ export const VideoPostCard = ({ post }) => {
   const [showComments, setShowComments] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
 
   const videoRef = useRef(null);
@@ -275,8 +283,9 @@ export const VideoPostCard = ({ post }) => {
 
         {/* More Actions / Video Actions (Screen 8) */}
         <button
-          onClick={() => setShowShare(true)}
-          className="p-1.5 rounded-full text-white/80 hover:text-white transition"
+          onClick={() => setShowOptionsMenu(true)}
+          className="p-1.5 rounded-full text-white/80 hover:text-white transition active:scale-90"
+          title="Post Options"
         >
           <MoreVertical className="w-5 h-5 drop-shadow" />
         </button>
@@ -301,6 +310,166 @@ export const VideoPostCard = ({ post }) => {
         isOpen={showReport}
         onClose={() => setShowReport(false)}
       />
+
+      {/* Instagram-Style Post Options Action Sheet */}
+      <AnimatePresence>
+        {showOptionsMenu && (
+          <div 
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setShowOptionsMenu(false)}
+          >
+            <motion.div
+              initial={{ y: 150, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 150, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="w-full max-w-sm bg-[#160f30] border border-white/10 rounded-t-[32px] sm:rounded-3xl p-4 space-y-2 shadow-2xl text-left"
+            >
+              <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-3" />
+
+              {/* If Own Post: Instagram Delete & Management Options */}
+              {post.creator?.username === currentUser.username ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowOptionsMenu(false);
+                      setShowDeleteConfirm(true);
+                    }}
+                    className="w-full p-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center gap-2.5 transition"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-400" />
+                    <span>Delete Post / Reel</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowOptionsMenu(false);
+                      showToast('Post pinned to your profile! 📌');
+                    }}
+                    className="w-full p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs flex items-center gap-2.5 transition"
+                  >
+                    <Pin className="w-4 h-4 text-pink-400" />
+                    <span>Pin to your profile</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowOptionsMenu(false);
+                      showToast('Commenting turned off for this post');
+                    }}
+                    className="w-full p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs flex items-center gap-2.5 transition"
+                  >
+                    <MessageSquareOff className="w-4 h-4 text-gray-400" />
+                    <span>Turn off commenting</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowOptionsMenu(false);
+                      setShowReport(true);
+                    }}
+                    className="w-full p-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center gap-2.5 transition"
+                  >
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <span>Report post</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowOptionsMenu(false);
+                      showToast('We will show fewer posts like this', 'info');
+                    }}
+                    className="w-full p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-300 font-semibold text-xs flex items-center gap-2.5 transition"
+                  >
+                    <EyeOff className="w-4 h-4 text-gray-400" />
+                    <span>Not interested</span>
+                  </button>
+                </>
+              )}
+
+              <button
+                onClick={() => {
+                  setShowOptionsMenu(false);
+                  setShowShare(true);
+                }}
+                className="w-full p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs flex items-center gap-2.5 transition"
+              >
+                <Share2 className="w-4 h-4 text-purple-400" />
+                <span>Share to...</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowOptionsMenu(false);
+                  try {
+                    navigator.clipboard?.writeText(window.location.href);
+                    showToast('Link copied to clipboard! 📋');
+                  } catch (e) {}
+                }}
+                className="w-full p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs flex items-center gap-2.5 transition"
+              >
+                <Copy className="w-4 h-4 text-blue-400" />
+                <span>Copy link</span>
+              </button>
+
+              <button
+                onClick={() => setShowOptionsMenu(false)}
+                className="w-full p-3 rounded-2xl bg-white/10 hover:bg-white/15 text-gray-400 hover:text-white font-bold text-xs text-center transition mt-2"
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal (Instagram Style) */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-xs bg-[#160f30] border border-rose-500/40 rounded-3xl p-5 text-center space-y-3 shadow-2xl"
+            >
+              <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+                <Trash2 className="w-6 h-6" />
+              </div>
+
+              <div>
+                <h4 className="font-extrabold text-white text-base font-heading">
+                  Delete Post?
+                </h4>
+                <p className="text-xs text-gray-300 mt-1">
+                  Are you sure you want to delete this post? This cannot be undone.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={() => {
+                    deleteUserPost(post.id);
+                    setShowDeleteConfirm(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 text-white font-bold text-xs shadow-md shadow-rose-500/20 active:scale-95 transition"
+                >
+                  Delete
+                </button>
+
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="w-full py-2 rounded-xl bg-white/10 hover:bg-white/15 text-gray-300 font-semibold text-xs transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </article>
   );
 };

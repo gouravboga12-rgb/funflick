@@ -21,7 +21,7 @@ export const MyContentScreen = () => {
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'Posts';
 
-  const { posts, creatorVideos, showToast } = useApp();
+  const { posts, creatorVideos, deleteUserPost, showToast } = useApp();
   const [activeTab, setActiveTab] = useState(
     initialTab === 'liked' ? 'Liked' : initialTab === 'saved' ? 'Saved' : 'Posts'
   );
@@ -29,7 +29,9 @@ export const MyContentScreen = () => {
   const tabs = ['Posts', 'Videos', 'Stories', 'Drafts', 'Liked', 'Saved'];
 
   const handleDelete = (id) => {
-    showToast('Item moved to trash', 'info');
+    if (window.confirm('Delete this post permanently from FunFlick?')) {
+      deleteUserPost(id);
+    }
   };
 
   return (

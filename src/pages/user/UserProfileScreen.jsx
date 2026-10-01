@@ -30,7 +30,8 @@ import {
   DollarSign,
   Award,
   Zap,
-  Info
+  Info,
+  Trash2
 } from 'lucide-react';
 
 export const UserProfileScreen = () => {
@@ -41,6 +42,8 @@ export const UserProfileScreen = () => {
   const { 
     currentUser, 
     userSubmissions, 
+    deleteUserSubmission,
+    deleteUserPost,
     setSubscriptionGateModalOpen, 
     setCreateModalOpen,
     showToast 
@@ -477,23 +480,38 @@ export const UserProfileScreen = () => {
                       key={item.id} 
                       className="p-3.5 rounded-2xl bg-[#130d29] border border-white/5 space-y-2.5 hover:border-pink-500/30 transition shadow-md"
                     >
-                      <div className="flex items-start gap-3">
-                        <img 
-                          src={item.thumbnail} 
-                          alt={item.title} 
-                          className="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0" 
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-xs font-bold text-white font-heading line-clamp-1">
-                            {item.title}
-                          </h4>
-                          <span className="text-[10px] text-pink-300 block mt-0.5">
-                            {item.category} · {item.date}
-                          </span>
-                          <span className="text-[10px] text-gray-400 block mt-0.5">
-                            Views: <strong className="text-white">{item.views}</strong> · Likes: {item.likes}
-                          </span>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <img 
+                            src={item.thumbnail} 
+                            alt={item.title} 
+                            className="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0" 
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-xs font-bold text-white font-heading line-clamp-1">
+                              {item.title}
+                            </h4>
+                            <span className="text-[10px] text-pink-300 block mt-0.5">
+                              {item.category} · {item.date}
+                            </span>
+                            <span className="text-[10px] text-gray-400 block mt-0.5">
+                              Views: <strong className="text-white">{item.views}</strong> · Likes: {item.likes}
+                            </span>
+                          </div>
                         </div>
+
+                        {/* Delete / Withdraw Button */}
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete "${item.title}"? This will permanently remove it from your profile and platform feed.`)) {
+                              deleteUserSubmission(item.id);
+                            }
+                          }}
+                          className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 border border-white/5 transition shrink-0"
+                          title="Delete submission"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
 
                       {/* Admin Status Badge */}
