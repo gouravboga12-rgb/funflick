@@ -9,10 +9,12 @@ export const SubscriptionGateModal = () => {
   const { 
     subscriptionGateModalOpen, 
     setSubscriptionGateModalOpen, 
-    purchasePublishingSubscription 
+    purchasePublishingSubscription,
+    publishingPlans = PUBLISHING_PLANS
   } = useApp();
 
-  const [selectedPlanId, setSelectedPlanId] = useState('monthly');
+  const activePlans = (publishingPlans && publishingPlans.length > 0) ? publishingPlans : PUBLISHING_PLANS;
+  const [selectedPlanId, setSelectedPlanId] = useState(() => activePlans[0]?.id || 'monthly');
   const [processing, setProcessing] = useState(false);
 
   if (!subscriptionGateModalOpen) return null;
@@ -71,7 +73,7 @@ export const SubscriptionGateModal = () => {
 
         {/* Plan Cards */}
         <div className="mt-4 space-y-2.5">
-          {PUBLISHING_PLANS.map(plan => {
+          {activePlans.map(plan => {
             const isSelected = selectedPlanId === plan.id;
             return (
               <div

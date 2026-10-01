@@ -32,7 +32,7 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
     { label: 'Users', icon: Users, path: '/admin/users' },
     { label: 'Creators', icon: Video, path: '/admin/creators' },
     { label: 'Content Moderation', icon: Video, path: '/admin/content', badge: pendingApprovals.length },
-    { label: 'Subscriptions', icon: Crown, path: '/admin/subscriptions' },
+    { label: 'Manage Subscriptions', icon: Crown, path: '/admin/manage-subscriptions' },
     { label: 'Creator Payouts', icon: DollarSign, path: '/admin/payouts', badge: pendingPayoutCount },
     { label: 'Revenue Analytics', icon: BarChart3, path: '/admin/revenue' },
     { label: 'Reports', icon: Flag, path: '/admin/reports', badge: '2' },
@@ -62,7 +62,8 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
           {/* Nav Items */}
           <nav className="space-y-1">
             {navLinks.map(link => {
-              const isActive = location.pathname === link.path;
+              const isActive = location.pathname === link.path || 
+                (link.path === '/admin/manage-subscriptions' && location.pathname === '/admin/subscriptions');
               const Icon = link.icon;
               return (
                 <button

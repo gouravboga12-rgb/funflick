@@ -89,6 +89,12 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : INITIAL_PAYOUTS;
   });
 
+  // Global Publishing Subscription Plans (Admin Managed & Globally Synced)
+  const [publishingPlans, setPublishingPlans] = useState(() => {
+    const saved = localStorage.getItem('funflick_publishing_plans');
+    return saved ? JSON.parse(saved) : PUBLISHING_PLANS;
+  });
+
   // Admin pending video approvals
   const [pendingApprovals, setPendingApprovals] = useState(ADMIN_PENDING_APPROVALS);
 
@@ -117,6 +123,10 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('funflick_submissions', JSON.stringify(userSubmissions));
   }, [userSubmissions]);
+
+  useEffect(() => {
+    localStorage.setItem('funflick_publishing_plans', JSON.stringify(publishingPlans));
+  }, [publishingPlans]);
 
   // Toast helper
   const showToast = (message, type = 'success') => {
@@ -212,7 +222,7 @@ export const AppProvider = ({ children }) => {
 
   // FunFlick Platform Publishing Subscription Purchase
   const purchasePublishingSubscription = (planId) => {
-    const plan = PUBLISHING_PLANS.find(p => p.id === planId) || PUBLISHING_PLANS[1];
+    const plan = publishingPlans.find(p => p.id === planId) || publishingPlans[0] || PUBLISHING_PLANS[1];
     setCurrentUser(prev => ({
       ...prev,
       hasPublishingSubscription: true,
@@ -236,6 +246,50 @@ export const AppProvider = ({ children }) => {
 
     setSubscriptionGateModalOpen(false);
     showToast(`🎉 Publishing Unlocked! Welcome to FunFlick Creator Suite (${plan.name} Plan)`, 'success');
+  };
+
+  // Admin: Update an existing plan globally
+  const updatePublishingPlan = (updatedPlan) => {
+    setPublishingPlans(prev => prev.map(p => {
+      if (p.id === updatedPlan.id) {
+        return {
+          ...p,
+          ...updatedPlan,
+          price: Number(updatedPlan.price),
+          formattedPrice: `₹${Number(updatedPlan.price).toLocaleString()}`
+        };
+      }
+      return p;
+    }));
+    showToast(`✅ Plan "${updatedPlan.name}" updated globally across user side!`, 'success');
+  };
+
+  // Admin: Add a new custom plan
+  const addPublishingPlan = (newPlan) => {
+    const planId = newPlan.id || 'plan_' + Date.now();
+    const formatted = {
+      ...newPlan,
+      id: planId,
+      price: Number(newPlan.price),
+      formattedPrice: `₹${Number(newPlan.price).toLocaleString()}`,
+      popular: !!newPlan.popular,
+      features: Array.isArray(newPlan.features) ? newPlan.features : ['Unlimited video uploads', 'Creator studio tools']
+    };
+    setPublishingPlans(prev => [...prev, formatted]);
+    showToast(`🎉 New plan "${newPlan.name}" added to user subscription plans!`, 'success');
+  };
+
+  // Admin: Delete a plan
+  const deletePublishingPlan = (planId) => {
+    setPublishingPlans(prev => prev.filter(p => p.id !== planId));
+    showToast('Plan removed from user-side pricing.', 'info');
+  };
+
+  // Admin: Reset plans to default
+  const resetPublishingPlansToDefault = () => {
+    setPublishingPlans(PUBLISHING_PLANS);
+    localStorage.removeItem('funflick_publishing_plans');
+    showToast('Publishing plans reset to default factory values!', 'info');
   };
 
   // Toggle user subscription for quick testing in prototype demo
@@ -689,6 +743,11 @@ export const AppProvider = ({ children }) => {
         sendMessage,
         processAdminPayout,
         handlePendingApproval,
+        publishingPlans,
+        updatePublishingPlan,
+        addPublishingPlan,
+        deletePublishingPlan,
+        resetPublishingPlansToDefault,
         resetDemoData
       }}
     >

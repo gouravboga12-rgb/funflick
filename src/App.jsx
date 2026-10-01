@@ -106,6 +106,7 @@ function AppRoutes() {
           <Route path="/admin/creators" element={<AdminCreatorsScreen />} />
           <Route path="/admin/content" element={<AdminContentScreen />} />
           <Route path="/admin/subscriptions" element={<AdminSubscriptionsScreen />} />
+          <Route path="/admin/manage-subscriptions" element={<AdminSubscriptionsScreen />} />
           <Route path="/admin/payouts" element={<AdminPayoutsScreen />} />
           <Route path="/admin/revenue" element={<AdminRevenueScreen />} />
           <Route path="/admin/reports" element={<AdminReportsScreen />} />

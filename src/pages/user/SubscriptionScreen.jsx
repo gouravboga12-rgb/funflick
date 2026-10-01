@@ -18,8 +18,9 @@ import confetti from 'canvas-confetti';
 
 export const SubscriptionScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, purchasePublishingSubscription } = useApp();
-  const [selectedPlanId, setSelectedPlanId] = useState('monthly');
+  const { currentUser, purchasePublishingSubscription, publishingPlans = PUBLISHING_PLANS } = useApp();
+  const activePlans = (publishingPlans && publishingPlans.length > 0) ? publishingPlans : PUBLISHING_PLANS;
+  const [selectedPlanId, setSelectedPlanId] = useState(() => activePlans[0]?.id || 'monthly');
   const [processing, setProcessing] = useState(false);
 
   const handlePurchase = () => {
@@ -86,7 +87,7 @@ export const SubscriptionScreen = () => {
 
         {/* Plan Cards Grid */}
         <div className="space-y-3">
-          {PUBLISHING_PLANS.map(plan => {
+          {activePlans.map(plan => {
             const isSelected = selectedPlanId === plan.id;
             return (
               <div
