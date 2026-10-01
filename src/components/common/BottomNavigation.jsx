@@ -10,8 +10,11 @@ export const BottomNavigation = () => {
     currentUser, 
     conversations,
     setSubscriptionGateModalOpen,
-    setCreateModalOpen
+    setCreateModalOpen,
+    theme
   } = useApp();
+
+  const isLight = theme === 'light';
 
   const currentPath = location.pathname;
   const unreadMessages = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
@@ -34,7 +37,11 @@ export const BottomNavigation = () => {
   ];
 
   return (
-    <nav className="sticky bottom-0 z-30 w-full bg-[#0a0616]/95 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 transition-all">
+    <nav className={`sticky bottom-0 z-30 w-full ${
+      isLight 
+        ? 'bg-white/95 border-t border-slate-200/80 shadow-[0_-4px_16px_rgba(0,0,0,0.04)]' 
+        : 'bg-[#0a0616]/95 border-t border-white/10'
+    } backdrop-blur-xl px-2 py-1.5 transition-all`}>
       <div className="flex items-center justify-around">
         {navItems.map((item, idx) => {
           if (item.isCreate) {
@@ -46,7 +53,7 @@ export const BottomNavigation = () => {
                 aria-label="Create Post, Video or Story"
               >
                 <div className="w-12 h-10 rounded-2xl bg-gradient-to-tr from-[#ff007a] via-[#ff4b2b] to-[#7928ca] p-[1.5px] shadow-lg shadow-pink-500/25 group-hover:scale-105 active:scale-95 transition-transform flex items-center justify-center">
-                  <div className="w-full h-full bg-[#0c081a]/40 rounded-[14px] flex items-center justify-center backdrop-blur-sm">
+                  <div className={`w-full h-full ${isLight ? 'bg-white/60' : 'bg-[#0c081a]/40'} rounded-[14px] flex items-center justify-center backdrop-blur-sm`}>
                     <Plus className="w-6 h-6 text-white stroke-[2.5]" />
                   </div>
                 </div>
@@ -68,7 +75,7 @@ export const BottomNavigation = () => {
                   <div className={`w-6 h-6 rounded-full p-[1.5px] transition ${
                     isActive 
                       ? 'bg-gradient-to-r from-pink-500 to-purple-500 shadow-sm shadow-pink-500/30' 
-                      : 'border border-gray-600'
+                      : (isLight ? 'border border-slate-300' : 'border border-gray-600')
                   }`}>
                     <img 
                       src={currentUser.avatar} 
@@ -81,7 +88,7 @@ export const BottomNavigation = () => {
                     className={`w-5 h-5 transition-transform group-hover:scale-110 ${
                       isActive 
                         ? 'text-[#ff007a] stroke-[2.5]' 
-                        : 'text-gray-400 group-hover:text-gray-200 stroke-[1.8]'
+                        : (isLight ? 'text-slate-500 group-hover:text-slate-900 stroke-[1.8]' : 'text-gray-400 group-hover:text-gray-200 stroke-[1.8]')
                     }`} 
                   />
                 )}
@@ -94,7 +101,9 @@ export const BottomNavigation = () => {
               </div>
 
               <span className={`text-[10px] mt-1 transition-colors ${
-                isActive ? 'text-white font-bold' : 'text-gray-400 group-hover:text-gray-200'
+                isActive 
+                  ? (isLight ? 'text-[#ff007a] font-extrabold' : 'text-white font-bold') 
+                  : (isLight ? 'text-slate-500 group-hover:text-slate-900' : 'text-gray-400 group-hover:text-gray-200')
               }`}>
                 {item.label}
               </span>

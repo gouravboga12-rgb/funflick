@@ -15,13 +15,18 @@ export const AppHeader = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { notifications, conversations } = useApp();
+  const { notifications, conversations, theme } = useApp();
 
+  const isLight = theme === 'light';
   const unreadNotifs = notifications.filter(n => n.unread).length;
   const unreadMessages = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
 
   return (
-    <header className="sticky top-0 z-30 bg-[#090614]/95 backdrop-blur-md border-b border-white/5 transition-all">
+    <header className={`sticky top-0 z-30 ${
+      isLight 
+        ? 'bg-white/95 border-b border-slate-200/80 shadow-sm' 
+        : 'bg-[#090614]/95 border-b border-white/5'
+    } backdrop-blur-md transition-all`}>
       <div className="px-4 py-2.5 flex items-center justify-between gap-3">
         {/* If tabs are present (like Screen 3 Home Feed) */}
         {tabs ? (
@@ -37,13 +42,13 @@ export const AppHeader = ({
                 alt="FunFlick" 
                 className="w-7 h-7 rounded-xl object-contain shadow-md drop-shadow"
               />
-              <span className="font-extrabold text-lg tracking-tight text-white font-heading">
+              <span className={`font-extrabold text-lg tracking-tight ${isLight ? 'text-slate-900' : 'text-white'} font-heading`}>
                 fun<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca]">flick</span>
               </span>
             </div>
 
             {/* Vertical separator */}
-            <span className="h-4 w-[1px] bg-white/10 shrink-0" />
+            <span className={`h-4 w-[1px] ${isLight ? 'bg-slate-200' : 'bg-white/10'} shrink-0`} />
 
             {/* Navigation Tabs (Screen 3: For You, Trending, Latest) */}
             <div className="flex items-center gap-3.5 text-xs font-semibold overflow-x-auto no-scrollbar py-1">
@@ -53,8 +58,8 @@ export const AppHeader = ({
                   onClick={() => onTabChange && onTabChange(tab)}
                   className={`relative py-1 whitespace-nowrap transition ${
                     activeTab === tab 
-                      ? 'text-white font-extrabold text-sm' 
-                      : 'text-gray-400 hover:text-gray-200 font-medium'
+                      ? (isLight ? 'text-slate-900 font-extrabold text-sm' : 'text-white font-extrabold text-sm')
+                      : (isLight ? 'text-slate-500 hover:text-slate-900 font-medium' : 'text-gray-400 hover:text-gray-200 font-medium')
                   }`}
                 >
                   {tab}
@@ -71,7 +76,11 @@ export const AppHeader = ({
             {showBack && (
               <button
                 onClick={() => navigate(-1)}
-                className="p-1.5 -ml-1 rounded-full text-gray-300 hover:text-white hover:bg-white/10 transition"
+                className={`p-1.5 -ml-1 rounded-full ${
+                  isLight 
+                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' 
+                    : 'text-gray-300 hover:text-white hover:bg-white/10'
+                } transition`}
                 aria-label="Back"
               >
                 <ChevronLeft className="w-6 h-6" />
@@ -88,12 +97,12 @@ export const AppHeader = ({
                   alt="FunFlick" 
                   className="w-7 h-7 rounded-lg object-contain shadow-sm"
                 />
-                <span className="font-extrabold text-xl tracking-tight text-white font-heading">
+                <span className={`font-extrabold text-xl tracking-tight ${isLight ? 'text-slate-900' : 'text-white'} font-heading`}>
                   fun<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca]">flick</span>
                 </span>
               </div>
             ) : title ? (
-              <h1 className="text-base font-bold text-white tracking-tight font-heading truncate">
+              <h1 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'} tracking-tight font-heading truncate`}>
                 {title}
               </h1>
             ) : null}
@@ -105,7 +114,11 @@ export const AppHeader = ({
           {searchIcon && (
             <button
               onClick={() => navigate('/discover')}
-              className="p-1.5 rounded-full text-gray-300 hover:text-white hover:bg-white/10 transition"
+              className={`p-1.5 rounded-full ${
+                isLight 
+                  ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' 
+                  : 'text-gray-300 hover:text-white hover:bg-white/10'
+              } transition`}
               aria-label="Search"
             >
               <Search className="w-5 h-5" />
@@ -119,7 +132,11 @@ export const AppHeader = ({
               {/* Notifications Icon with Badge */}
               <button
                 onClick={() => navigate('/notifications')}
-                className="relative p-1.5 rounded-full text-gray-300 hover:text-white hover:bg-white/10 transition"
+                className={`relative p-1.5 rounded-full ${
+                  isLight 
+                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' 
+                    : 'text-gray-300 hover:text-white hover:bg-white/10'
+                } transition`}
                 aria-label="Notifications"
               >
                 <Bell className="w-5 h-5" />
@@ -131,7 +148,11 @@ export const AppHeader = ({
               {/* Messages Icon with Badge */}
               <button
                 onClick={() => navigate('/messages')}
-                className="relative p-1.5 rounded-full text-gray-300 hover:text-white hover:bg-white/10 transition"
+                className={`relative p-1.5 rounded-full ${
+                  isLight 
+                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' 
+                    : 'text-gray-300 hover:text-white hover:bg-white/10'
+                } transition`}
                 aria-label="Messages"
               >
                 <MessageCircle className="w-5 h-5" />

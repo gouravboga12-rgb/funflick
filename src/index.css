@@ -112,3 +112,193 @@
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 16px);
 }
+
+/* =========================================================
+   LIGHT THEME DESIGN SYSTEM & GLOBAL COMPATIBILITY
+   ========================================================= */
+
+html.light,
+.light {
+  color-scheme: light;
+  --bg-dark: #f8fafc;
+  --card-dark: #ffffff;
+}
+
+html.light body {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+/* Light Theme Scrollbars */
+html.light ::-webkit-scrollbar-track,
+.light ::-webkit-scrollbar-track {
+  background: #e2e8f0;
+}
+html.light ::-webkit-scrollbar-thumb,
+.light ::-webkit-scrollbar-thumb {
+  background: rgba(255, 0, 122, 0.4);
+}
+
+/* Base Light Text System */
+.light h1, .light h2, .light h3, .light h4, .light h5, .light h6,
+html.light h1, html.light h2, html.light h3, html.light h4, html.light h5, html.light h6 {
+  color: #0f172a !important;
+}
+
+/* Light background overrides for dark page container classes */
+.light .bg-\[\#090514\],
+.light .bg-\[\#080511\],
+.light .bg-\[\#06040d\],
+.light .bg-\[\#07040d\],
+.light .bg-\[\#080512\],
+.light .bg-\[\#0a0616\],
+.light .bg-\[\#0c081a\],
+.light .bg-\[\#0d081f\],
+.light .bg-\[\#090614\] {
+  background-color: #f8fafc !important;
+}
+
+/* Frosted Sticky Top Headers & Navbars in Light Mode */
+.light .bg-\[\#090514\]\/90,
+.light .bg-\[\#090514\]\/95,
+.light .bg-\[\#090614\]\/95,
+.light .bg-\[\#0a0616\]\/95,
+.light .bg-\[\#0d081f\]\/90 {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Glass & Card overrides */
+.light .glass-panel,
+html.light .glass-panel {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+.light .glass-card,
+html.light .glass-card {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.07) !important;
+  box-shadow: 0 2px 12px -2px rgba(0, 0, 0, 0.04);
+}
+
+.light .glass-card-hover:hover,
+html.light .glass-card-hover:hover {
+  background: #ffffff !important;
+  border-color: rgba(255, 0, 122, 0.35) !important;
+  box-shadow: 0 10px 25px -5px rgba(255, 0, 122, 0.12) !important;
+}
+
+/* Nested cards & elevated containers */
+.light .bg-\[\#110b24\],
+.light .bg-\[\#120c26\],
+.light .bg-\[\#130d29\],
+.light .bg-\[\#130f24\],
+.light .bg-\[\#140d2d\],
+.light .bg-\[\#140e2b\],
+.light .bg-\[\#150f2c\],
+.light .bg-\[\#160f33\],
+.light .bg-\[\#181035\],
+.light .bg-\[\#191238\],
+.light .bg-\[\#1a1235\],
+.light .bg-\[\#1b1433\],
+.light .bg-\[\#1b1434\],
+.light .bg-\[\#1f1545\],
+.light .bg-\[\#1f1638\],
+.light .bg-\[\#22183d\],
+.light .bg-\[\#251b45\] {
+  background-color: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.04);
+}
+
+/* Inputs & Form controls in Light Mode */
+.light .bg-\[\#18122c\],
+.light .bg-\[\#18122f\],
+.light input.bg-\[\#18122c\],
+.light input.bg-\[\#18122f\],
+.light select.bg-\[\#18122c\],
+.light textarea.bg-\[\#18122c\] {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Soft translucent cards */
+.light .bg-white\/5 {
+  background-color: rgba(0, 0, 0, 0.035) !important;
+}
+.light .bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+.light .hover\:bg-white\/5:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+.light .hover\:bg-white\/10:hover {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+.light .hover\:bg-white\/15:hover {
+  background-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Delicate border overrides */
+.light .border-white\/5,
+.light .border-white\/10,
+.light .border-white\/15,
+.light .border-white\/20 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Text adaptations in light mode */
+.light .text-gray-100,
+.light .text-gray-200 {
+  color: #1e293b !important;
+}
+.light .text-gray-300 {
+  color: #334155 !important;
+}
+.light .text-gray-400 {
+  color: #64748b !important;
+}
+.light .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+/* Primary text on light surfaces */
+.light h1.text-white,
+.light h2.text-white,
+.light h3.text-white,
+.light h4.text-white,
+.light h5.text-white,
+.light h6.text-white,
+.light p.text-white,
+.light span.text-white:not([class*="bg-"]):not(article *):not([class*="aspect-[9/16]"] *):not(button *) {
+  color: #0f172a !important;
+}
+
+/* Modal backdrop in light mode */
+.light .bg-black\/80,
+.light .bg-black\/70 {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+}
+
+/* Story rings seen in light mode */
+.light .story-ring-seen {
+  background: #cbd5e1;
+}
+
+/* Admin Center support in light mode */
+.light aside.bg-\[\#0d081f\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+.light aside .text-gray-300 {
+  color: #475569 !important;
+}
+.light aside .hover\:text-white:hover {
+  color: #0f172a !important;
+}

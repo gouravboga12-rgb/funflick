@@ -107,6 +107,29 @@ export const AppProvider = ({ children }) => {
   // Active Story Viewer Modal
   const [activeStoryGroup, setActiveStoryGroup] = useState(null);
 
+  // App Theme state ('dark' | 'light')
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('funflick_theme');
+    return saved === 'light' ? 'light' : 'dark';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('funflick_theme', theme);
+    if (theme === 'light') {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+  };
+
   // Save to localStorage when state changes
   useEffect(() => {
     localStorage.setItem('funflick_user', JSON.stringify(currentUser));
@@ -928,7 +951,10 @@ export const AppProvider = ({ children }) => {
         addPublishingPlan,
         deletePublishingPlan,
         resetPublishingPlansToDefault,
-        resetDemoData
+        resetDemoData,
+        theme,
+        setTheme,
+        toggleTheme
       }}
     >
       {children}

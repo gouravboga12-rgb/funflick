@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useApp } from './context/AppContext';
 import { FloatingNavButton } from './components/common/FloatingNavButton';
 import { PhoneFrame } from './components/common/PhoneFrame';
 import { ToastContainer } from './components/common/Toast';
@@ -55,11 +55,14 @@ const MobileAppWrapper = ({ children }) => {
 
 function AppRoutes() {
   const location = useLocation();
+  const { theme } = useApp();
   const isAdmin = location.pathname.startsWith('/admin');
   const isCreatorStudio = location.pathname.startsWith('/creator') && location.pathname !== '/creator/pavani_official' && !location.pathname.startsWith('/creator/c');
 
+  const isLight = theme === 'light';
+
   return (
-    <div className="min-h-screen bg-[#07040d] text-white flex flex-col font-sans">
+    <div className={`min-h-screen ${isLight ? 'bg-slate-100 text-slate-900 light' : 'bg-[#07040d] text-white dark'} flex flex-col font-sans transition-colors duration-200`}>
       {/* Discreet Floating Prototype Navigation Button */}
       <FloatingNavButton />
 
