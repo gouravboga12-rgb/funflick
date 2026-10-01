@@ -51,15 +51,36 @@ export const DiscoverScreen = () => {
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#090514] min-h-full select-none">
-      {/* Top Search Bar (Screen 4) */}
-      <div className="sticky top-0 z-30 bg-[#090514]/95 backdrop-blur-md px-4 py-3 border-b border-white/5">
+      {/* Top Header with Prominent FunFlick Branding */}
+      <div className="sticky top-0 z-30 bg-[#090514]/95 backdrop-blur-md px-4 pt-3 pb-2.5 border-b border-white/5 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div 
+            onClick={() => navigate('/')} 
+            className="flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+            title="FunFlick: Comedy. Entertainment. Always On!"
+          >
+            <img 
+              src="/brand/funflick-logo.png" 
+              alt="FunFlick" 
+              className="w-7 h-7 rounded-xl object-contain shadow-md drop-shadow" 
+            />
+            <span className="font-extrabold text-lg tracking-tight text-white font-heading">
+              fun<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca]">flick</span>
+            </span>
+          </div>
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+            Discover
+          </span>
+        </div>
+
+        {/* Search Input */}
         <div className="relative flex items-center">
           <Search className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search videos, creators, hashtags..."
+            placeholder="Search comedy videos, creators, hashtags..."
             className="w-full bg-[#18122c] text-white placeholder-gray-400 text-xs pl-10 pr-9 py-2.5 rounded-full border border-white/10 focus:outline-none focus:border-pink-500 shadow-inner transition"
           />
           {searchQuery && (

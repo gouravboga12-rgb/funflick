@@ -22,25 +22,31 @@ export const AppHeader = ({
 
   return (
     <header className="sticky top-0 z-30 bg-[#090614]/95 backdrop-blur-md border-b border-white/5 transition-all">
-      <div className="px-4 py-2.5 flex items-center justify-between gap-2">
+      <div className="px-4 py-2.5 flex items-center justify-between gap-3">
         {/* If tabs are present (like Screen 3 Home Feed) */}
         {tabs ? (
-          <div className="flex items-center gap-4 select-none min-w-0">
-            {/* Clean Mini Brand Icon on Home */}
+          <div className="flex items-center gap-3 select-none min-w-0">
+            {/* Prominent FunFlick Company Brand & Logo */}
             <div 
               onClick={() => navigate('/')}
-              className="cursor-pointer shrink-0 hover:scale-105 transition-transform"
-              title="FunFlick Home"
+              className="flex items-center gap-1.5 cursor-pointer shrink-0 hover:scale-105 active:scale-95 transition-transform"
+              title="FunFlick: Comedy. Entertainment. Always On!"
             >
               <img 
                 src="/brand/funflick-logo.png" 
                 alt="FunFlick" 
-                className="w-6 h-6 rounded-lg object-contain shadow-sm"
+                className="w-7 h-7 rounded-xl object-contain shadow-md drop-shadow"
               />
+              <span className="font-extrabold text-lg tracking-tight text-white font-heading">
+                fun<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca]">flick</span>
+              </span>
             </div>
 
+            {/* Vertical separator */}
+            <span className="h-4 w-[1px] bg-white/10 shrink-0" />
+
             {/* Navigation Tabs (Screen 3: For You, Trending, Latest) */}
-            <div className="flex items-center gap-4 text-xs font-semibold overflow-x-auto no-scrollbar py-1">
+            <div className="flex items-center gap-3.5 text-xs font-semibold overflow-x-auto no-scrollbar py-1">
               {tabs.map(tab => (
                 <button
                   key={tab}

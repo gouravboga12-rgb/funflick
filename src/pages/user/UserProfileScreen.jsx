@@ -121,22 +121,40 @@ export const UserProfileScreen = () => {
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#090514] min-h-full select-none">
-      {/* Top Header */}
+      {/* Top Header with Prominent FunFlick Branding */}
       <div className="sticky top-0 z-30 bg-[#090514]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-white/5">
-        <button onClick={() => navigate(-1)} className="p-1 -ml-1 text-gray-300 hover:text-white">
-          <ChevronLeft className="w-6 h-6" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate(-1)} className="p-1 -ml-1 text-gray-300 hover:text-white">
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <div 
+            onClick={() => navigate('/')} 
+            className="flex items-center gap-1.5 cursor-pointer hover:opacity-90 active:scale-95 transition"
+            title="FunFlick: Comedy. Entertainment. Always On!"
+          >
+            <img 
+              src="/brand/funflick-logo.png" 
+              alt="FunFlick" 
+              className="w-7 h-7 rounded-xl object-contain shadow-md drop-shadow" 
+            />
+            <span className="text-base font-extrabold text-white font-heading">
+              fun<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca]">flick</span>
+            </span>
+          </div>
+        </div>
+
         <div className="text-center">
-          <span className="text-sm font-bold text-white font-heading block">
+          <span className="text-xs font-bold text-white font-heading block leading-tight">
             {currentUser.name}
           </span>
           <span className="text-[10px] text-pink-400 font-medium">
-            Unified Account (Viewer & Influencer)
+            @{currentUser.username}
           </span>
         </div>
+
         <button 
           onClick={() => setIsSettingsModalOpen(true)}
-          className="p-1.5 text-gray-300 hover:text-white"
+          className="p-1.5 text-gray-300 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 transition"
           title="Account Settings"
         >
           <Settings className="w-5 h-5" />
@@ -176,6 +194,12 @@ export const UserProfileScreen = () => {
             <p className="text-xs text-gray-300 mt-1 max-w-xs mx-auto leading-relaxed">
               {currentUser.bio}
             </p>
+
+            {/* Official Company Affiliation Badge */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-pink-500/15 via-purple-500/10 to-amber-500/15 border border-pink-500/30 text-[10px] font-bold text-pink-300 shadow-sm mt-1">
+              <img src="/brand/funflick-logo.png" alt="FunFlick" className="w-3.5 h-3.5 object-contain" />
+              <span>FunFlick Creator & Entertainment Network</span>
+            </div>
           </div>
 
           {/* Stats Bar */}
@@ -576,6 +600,49 @@ export const UserProfileScreen = () => {
             </div>
           </div>
         )}
+
+        {/* ======================================================== */}
+        {/* OFFICIAL FUNFLICK COMPANY FOOTER & BRANDING              */}
+        {/* ======================================================== */}
+        <div className="pt-6 pb-6 border-t border-white/5 flex flex-col items-center text-center space-y-2.5 select-none opacity-90">
+          <div 
+            onClick={() => navigate('/')} 
+            className="flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+          >
+            <img 
+              src="/brand/funflick-logo.png" 
+              alt="FunFlick" 
+              className="w-8 h-8 rounded-xl object-contain shadow-lg shadow-pink-500/25" 
+            />
+            <div className="text-left">
+              <span className="font-extrabold text-lg text-white font-heading block leading-none">
+                fun<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca]">flick</span>
+              </span>
+              <span className="text-[9px] text-gray-400 font-medium tracking-tight">
+                Comedy. Entertainment. Always On!
+              </span>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-gray-400 max-w-xs leading-relaxed">
+            FunFlick Media & Entertainment Technologies Pvt. Ltd.<br />
+            Connecting Viewers, Comedy Creators & Viral Entertainment 🇮🇳
+          </p>
+
+          <div className="flex items-center gap-2.5 text-[10px] text-pink-400 font-medium pt-0.5">
+            <span onClick={() => showToast('FunFlick Entertainment Platform', 'info')} className="hover:underline cursor-pointer">About FunFlick</span>
+            <span className="text-gray-600">•</span>
+            <span onClick={() => showToast('Creator Community Guidelines', 'info')} className="hover:underline cursor-pointer">Guidelines</span>
+            <span className="text-gray-600">•</span>
+            <span onClick={() => showToast('Privacy Policy', 'info')} className="hover:underline cursor-pointer">Privacy</span>
+            <span className="text-gray-600">•</span>
+            <span onClick={() => showToast('Terms of Service', 'info')} className="hover:underline cursor-pointer">Terms</span>
+          </div>
+
+          <span className="text-[9px] text-gray-500 font-mono">
+            FunFlick Platform v2.4.0 · Always On Entertainment
+          </span>
+        </div>
 
       </div>
 
