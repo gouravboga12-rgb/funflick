@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { DollarSign, TrendingUp, ArrowDownRight, ArrowUpRight, BarChart3, PieChart } from 'lucide-react';
 
 export const AdminRevenueScreen = () => {
   const [period, setPeriod] = useState('Monthly');
+  const { theme } = useApp();
+  const isLight = theme === 'light';
 
   const monthlyBreakdown = [
     { source: 'Monthly Publishing Plan (₹199)', amount: '₹6,368', percentage: '51%' },
@@ -15,16 +18,16 @@ export const AdminRevenueScreen = () => {
     <AdminLayout title="Platform Revenue & Margins">
       {/* Top Filter */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400 font-semibold">Accounting Period: 2026 Fiscal Q3</span>
-        <div className="flex items-center gap-1 bg-[#140e2b] p-1 rounded-2xl border border-white/10 text-xs">
+        <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-gray-400'} font-semibold`}>Accounting Period: 2026 Fiscal Q3</span>
+        <div className={`flex items-center gap-1 ${isLight ? 'bg-slate-100 border-slate-200' : 'bg-[#140e2b] border-white/10'} p-1 rounded-2xl border text-xs`}>
           {['Daily', 'Weekly', 'Monthly', 'Yearly'].map(p => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
               className={`px-3 py-1 rounded-xl font-semibold transition ${
                 period === p
-                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-sm'
+                  : (isLight ? 'text-slate-600 hover:text-slate-900' : 'text-gray-400 hover:text-white')
               }`}
             >
               {p}
@@ -37,29 +40,29 @@ export const AdminRevenueScreen = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-5 rounded-3xl bg-[#130d29] border border-emerald-500/20 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">Total Subscription Revenue</span>
-            <ArrowDownRight className="w-4 h-4 text-emerald-400" />
+            <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>Total Subscription Revenue</span>
+            <ArrowDownRight className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="text-2xl font-extrabold text-white font-heading">₹12,450</div>
-          <span className="text-[10px] text-emerald-400 font-bold">+18.5% vs previous month</span>
+          <div className={`text-2xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'} font-heading`}>₹12,450</div>
+          <span className="text-[10px] text-emerald-500 font-bold">+18.5% vs previous month</span>
         </div>
 
         <div className="p-5 rounded-3xl bg-[#130d29] border border-amber-500/20 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">Creator Disbursements</span>
-            <ArrowUpRight className="w-4 h-4 text-amber-400" />
+            <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>Creator Disbursements</span>
+            <ArrowUpRight className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="text-2xl font-extrabold text-white font-heading">₹5,800</div>
-          <span className="text-[10px] text-amber-400 font-bold">Paid to verified creators</span>
+          <div className={`text-2xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'} font-heading`}>₹5,800</div>
+          <span className="text-[10px] text-amber-500 font-bold">Paid to verified creators</span>
         </div>
 
         <div className="p-5 rounded-3xl bg-[#130d29] border border-pink-500/20 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">Net Platform Gross Profit</span>
-            <TrendingUp className="w-4 h-4 text-pink-400" />
+            <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>Net Platform Gross Profit</span>
+            <TrendingUp className="w-4 h-4 text-pink-500" />
           </div>
-          <div className="text-2xl font-extrabold text-pink-400 font-heading">₹6,650</div>
-          <span className="text-[10px] text-white/80 font-bold">53.4% Net Margin</span>
+          <div className="text-2xl font-extrabold text-pink-500 font-heading">₹6,650</div>
+          <span className={`text-[10px] ${isLight ? 'text-slate-700' : 'text-white/80'} font-bold`}>53.4% Net Margin</span>
         </div>
       </div>
 

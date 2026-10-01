@@ -359,7 +359,24 @@ html.light .glass-card-hover:hover {
 .light h5.text-white,
 .light h6.text-white,
 .light p.text-white,
-.light span.text-white:not([class*="bg-"]):not(article *):not([class*="aspect-[9/16]"] *):not(button *):not([class*="badge"]) {
+.light span.text-white:not(button *):not([class*="bg-gradient-"]):not([class*="bg-pink-600"]):not([class*="bg-emerald-600"]):not(article *):not([class*="aspect-[9/16]"] *),
+.light div.text-white:not(button *):not([class*="bg-gradient-"]):not([class*="bg-pink-600"]):not([class*="bg-emerald-600"]):not(article *):not([class*="aspect-[9/16]"] *) {
+  color: #0f172a !important;
+}
+
+/* KPI numbers and headings in pastel cards */
+.light [class*="rounded-3xl"] div.font-heading,
+.light [class*="rounded-2xl"] div.font-heading,
+.light [class*="border"] div.font-heading,
+.light [class*="/10"] div.font-heading,
+.light [class*="/20"] div.font-heading {
+  color: #0f172a !important;
+}
+
+/* Floating Navigation / Prototype Directory Drawer in Light Mode */
+.light .bg-\[\#0e0920\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
   color: #0f172a !important;
 }
 

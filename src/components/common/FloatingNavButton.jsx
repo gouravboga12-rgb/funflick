@@ -19,7 +19,8 @@ export const FloatingNavButton = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, toggleUserSubscriptionStatus, resetDemoData } = useApp();
+  const { currentUser, toggleUserSubscriptionStatus, resetDemoData, theme } = useApp();
+  const isLight = theme === 'light';
 
   const sections = [
     {
@@ -83,7 +84,7 @@ export const FloatingNavButton = () => {
       <AnimatePresence>
         {isOpen && (
           <div 
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex justify-end"
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end"
             onClick={() => setIsOpen(false)}
           >
             <motion.div
@@ -91,36 +92,46 @@ export const FloatingNavButton = () => {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-              className="w-full max-w-sm bg-[#0e0920] border-l border-white/10 h-full flex flex-col justify-between p-5 shadow-2xl overflow-hidden"
+              className={`w-full max-w-sm ${
+                isLight 
+                  ? 'bg-white border-l border-slate-200 text-slate-900 shadow-2xl' 
+                  : 'bg-[#0e0920] border-l border-white/10 text-white shadow-2xl'
+              } h-full flex flex-col justify-between p-5 overflow-hidden transition-colors`}
               onClick={e => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+              <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-200' : 'border-white/10'} shrink-0`}>
                 <div className="flex items-center gap-2">
-                  <img src="/brand/funflick-logo.png" alt="FunFlick" className="w-6 h-6 rounded-lg object-contain" />
+                  <img src="/brand/funflick-logo.png" alt="FunFlick" className="w-6 h-6 rounded-lg object-contain shadow-sm" />
                   <div>
-                    <h3 className="text-sm font-extrabold text-white font-heading">
+                    <h3 className={`text-sm font-extrabold ${isLight ? 'text-slate-900' : 'text-white'} font-heading`}>
                       Prototype Directory
                     </h3>
-                    <p className="text-[10px] text-pink-300">Quick Jump to Any Page</p>
+                    <p className={`text-[10px] ${isLight ? 'text-pink-600 font-semibold' : 'text-pink-300'}`}>Quick Jump to Any Page</p>
                   </div>
                 </div>
 
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1.5 rounded-full bg-white/10 text-gray-300 hover:text-white"
+                  className={`p-1.5 rounded-full ${
+                    isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-white/10 text-gray-300 hover:text-white'
+                  }`}
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Quick Section Switchers: Unified User App & Admin */}
-              <div className="py-3 border-b border-white/10 shrink-0 space-y-2">
+              <div className={`py-3 border-b ${isLight ? 'border-slate-200' : 'border-white/10'} shrink-0 space-y-2`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <span className={`text-[10px] font-bold ${isLight ? 'text-slate-500' : 'text-gray-400'} uppercase tracking-wider`}>
                     Platform Portals
                   </span>
-                  <span className="text-[9px] text-pink-300 font-semibold bg-pink-500/10 px-2 py-0.5 rounded-full border border-pink-500/20">
+                  <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
+                    isLight 
+                      ? 'bg-pink-50 text-pink-700 border-pink-200' 
+                      : 'bg-pink-500/10 text-pink-300 border-pink-500/20'
+                  }`}>
                     Unified Account System
                   </span>
                 </div>
@@ -134,7 +145,7 @@ export const FloatingNavButton = () => {
                     className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition ${
                       !location.pathname.startsWith('/admin')
                         ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md'
-                        : 'bg-white/5 text-gray-300 hover:bg-white/10'
+                        : (isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200' : 'bg-white/5 text-gray-300 hover:bg-white/10')
                     }`}
                   >
                     <Smartphone className="w-4 h-4" />
@@ -149,7 +160,7 @@ export const FloatingNavButton = () => {
                     className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition ${
                       location.pathname.startsWith('/admin')
                         ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md'
-                        : 'bg-white/5 text-gray-300 hover:bg-white/10'
+                        : (isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200' : 'bg-white/5 text-gray-300 hover:bg-white/10')
                     }`}
                   >
                     <ShieldCheck className="w-4 h-4" />
@@ -162,15 +173,15 @@ export const FloatingNavButton = () => {
                   onClick={toggleUserSubscriptionStatus}
                   className={`w-full py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-between transition ${
                     currentUser.hasPublishingSubscription
-                      ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
-                      : 'bg-amber-950/60 border-amber-500/40 text-amber-300'
+                      ? (isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300')
+                      : (isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-950/60 border-amber-500/40 text-amber-300')
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
                     {currentUser.hasPublishingSubscription ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <CheckCircle2 className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
                     ) : (
-                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      <Lock className={`w-3.5 h-3.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
                     )}
                     <span>Publishing Plan:</span>
                   </div>
@@ -184,7 +195,7 @@ export const FloatingNavButton = () => {
               <div className="flex-1 overflow-y-auto no-scrollbar py-3 space-y-4">
                 {sections.map(sec => (
                   <div key={sec.title} className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                    <span className={`text-[10px] font-bold ${isLight ? 'text-slate-500' : 'text-gray-400'} uppercase tracking-wider block`}>
                       {sec.title}
                     </span>
                     <div className="space-y-1">
@@ -199,17 +210,23 @@ export const FloatingNavButton = () => {
                             }}
                             className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition ${
                               isActive
-                                ? 'bg-pink-500/20 text-pink-300 font-bold border border-pink-500/30'
-                                : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                                ? (isLight 
+                                    ? 'bg-pink-50 text-pink-600 font-bold border border-pink-200 shadow-sm' 
+                                    : 'bg-pink-500/20 text-pink-300 font-bold border border-pink-500/30')
+                                : (isLight 
+                                    ? 'text-slate-700 hover:bg-slate-100 hover:text-slate-900' 
+                                    : 'text-gray-300 hover:bg-white/5 hover:text-white')
                             }`}
                           >
                             <div className="flex items-center gap-2 truncate">
-                              <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center text-[10px] font-mono text-purple-300 shrink-0">
+                              <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-mono shrink-0 ${
+                                isLight ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-white/10 text-purple-300'
+                              }`}>
                                 {link.num}
                               </span>
                               <span className="truncate">{link.name}</span>
                             </div>
-                            <ChevronRight className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                            <ChevronRight className={`w-3.5 h-3.5 ${isLight ? 'text-slate-400' : 'text-gray-500'} shrink-0`} />
                           </button>
                         );
                       })}
@@ -219,15 +236,15 @@ export const FloatingNavButton = () => {
               </div>
 
               {/* Footer */}
-              <div className="pt-3 border-t border-white/10 shrink-0 flex items-center justify-between text-xs">
+              <div className={`pt-3 border-t ${isLight ? 'border-slate-200' : 'border-white/10'} shrink-0 flex items-center justify-between text-xs`}>
                 <button
                   onClick={resetDemoData}
-                  className="flex items-center gap-1 text-gray-400 hover:text-rose-400 text-xs transition"
+                  className={`flex items-center gap-1 ${isLight ? 'text-slate-500 hover:text-rose-600' : 'text-gray-400 hover:text-rose-400'} text-xs transition`}
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Reset Data</span>
                 </button>
-                <span className="text-[10px] text-gray-500">FunFlick Prototype</span>
+                <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-gray-500'}`}>FunFlick Prototype</span>
               </div>
             </motion.div>
           </div>

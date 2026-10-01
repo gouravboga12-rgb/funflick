@@ -21,24 +21,25 @@ import {
 
 export const AdminDashboardScreen = () => {
   const navigate = useNavigate();
-  const { pendingApprovals, handlePendingApproval, showToast } = useApp();
+  const { pendingApprovals, handlePendingApproval, showToast, theme } = useApp();
+  const isLight = theme === 'light';
 
   const kpis = [
-    { title: 'Users', value: ADMIN_STATS.totalUsers, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20', path: '/admin/users' },
-    { title: 'Creators', value: ADMIN_STATS.totalCreators, icon: Video, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20', path: '/admin/creators' },
-    { title: 'Videos', value: ADMIN_STATS.totalVideos, icon: Play, color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20', path: '/admin/content' },
-    { title: 'Subscriptions', value: ADMIN_STATS.activeSubscriptions, icon: Crown, color: 'text-pink-400', bg: 'bg-pink-500/10 border-pink-500/20', path: '/admin/subscriptions' },
-    { title: 'Total Revenue', value: ADMIN_STATS.subscriptionRevenue, icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20', path: '/admin/revenue' },
-    { title: 'Creator Payments', value: ADMIN_STATS.creatorPayments, icon: ArrowUpRight, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20', path: '/admin/payouts' },
-    { title: 'Pending Approvals', value: ADMIN_STATS.pendingApprovals, icon: Clock, color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20', path: '/admin/content' },
-    { title: 'Reported Content', value: ADMIN_STATS.reportedContent, icon: Flag, color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20', path: '/admin/reports' },
+    { title: 'Users', value: ADMIN_STATS.totalUsers, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/25', path: '/admin/users' },
+    { title: 'Creators', value: ADMIN_STATS.totalCreators, icon: Video, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/25', path: '/admin/creators' },
+    { title: 'Videos', value: ADMIN_STATS.totalVideos, icon: Play, color: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/25', path: '/admin/content' },
+    { title: 'Subscriptions', value: ADMIN_STATS.activeSubscriptions, icon: Crown, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/25', path: '/admin/subscriptions' },
+    { title: 'Total Revenue', value: ADMIN_STATS.subscriptionRevenue, icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/25', path: '/admin/revenue' },
+    { title: 'Creator Payments', value: ADMIN_STATS.creatorPayments, icon: ArrowUpRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/25', path: '/admin/payouts' },
+    { title: 'Pending Approvals', value: ADMIN_STATS.pendingApprovals, icon: Clock, color: 'text-amber-500', bg: 'bg-yellow-500/10 border-yellow-500/25', path: '/admin/content' },
+    { title: 'Reported Content', value: ADMIN_STATS.reportedContent, icon: Flag, color: 'text-rose-500', bg: 'bg-rose-500/10 border-rose-500/25', path: '/admin/reports' },
   ];
 
   return (
     <AdminLayout title="Admin Control Center">
       {/* 8 Platform KPI Cards Grid (Screen 12) */}
       <div>
-        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+        <h2 className={`text-xs font-bold ${isLight ? 'text-slate-600' : 'text-gray-400'} uppercase tracking-wider mb-3`}>
           Platform Overview Metrics
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -48,13 +49,15 @@ export const AdminDashboardScreen = () => {
               <div
                 key={kpi.title}
                 onClick={() => navigate(kpi.path)}
-                className={`p-4 rounded-3xl border ${kpi.bg} cursor-pointer hover:scale-[1.02] transition-transform space-y-1.5`}
+                className={`p-4 rounded-3xl border ${kpi.bg} cursor-pointer hover:scale-[1.02] transition-transform space-y-1.5 ${
+                  isLight ? 'shadow-sm' : ''
+                }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400 font-medium">{kpi.title}</span>
+                  <span className={`text-xs ${isLight ? 'text-slate-700 font-bold' : 'text-gray-400 font-medium'}`}>{kpi.title}</span>
                   <Icon className={`w-4 h-4 ${kpi.color}`} />
                 </div>
-                <div className="text-lg md:text-xl font-extrabold text-white font-heading">
+                <div className={`text-lg md:text-xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'} font-heading`}>
                   {kpi.value}
                 </div>
               </div>
