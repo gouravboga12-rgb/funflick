@@ -8,12 +8,16 @@ import { CreateChooserModal } from '../../components/user/create/CreateChooserMo
 import { 
   Search, 
   Flame, 
-  Smile, 
-  Film, 
-  Music, 
+  Laugh, 
+  Clapperboard, 
+  Music2, 
+  Mic2, 
+  Zap, 
   Sparkles, 
-  Mic, 
-  Globe, 
+  Languages, 
+  Globe,
+  Film,
+  Smile,
   Play, 
   ChevronRight,
   TrendingUp,
@@ -27,16 +31,30 @@ export const DiscoverScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Trending');
 
-  const getCategoryIcon = (iconName) => {
+  const getCategoryIcon = (iconName, isSelected, catColor) => {
+    const iconClass = isSelected 
+      ? "w-6 h-6 text-white drop-shadow-md stroke-[2.2] transition-transform duration-200 scale-110" 
+      : "w-6 h-6 stroke-[2] transition-transform duration-200 group-hover:scale-110";
+
     switch (iconName) {
-      case 'Flame': return <Flame className="w-5 h-5 text-amber-400" />;
-      case 'Smile': return <Smile className="w-5 h-5 text-pink-400" />;
-      case 'Film': return <Film className="w-5 h-5 text-purple-400" />;
-      case 'Music': return <Music className="w-5 h-5 text-blue-400" />;
-      case 'Mic': return <Mic className="w-5 h-5 text-yellow-400" />;
-      case 'Sparkles': return <Sparkles className="w-5 h-5 text-emerald-400" />;
-      case 'Globe': return <Globe className="w-5 h-5 text-violet-400" />;
-      default: return <Sparkles className="w-5 h-5 text-pink-400" />;
+      case 'Flame': 
+        return <Flame className={`${iconClass} ${isSelected ? 'text-white' : 'text-amber-400'}`} />;
+      case 'Laugh': 
+        return <Laugh className={`${iconClass} ${isSelected ? 'text-white' : 'text-pink-400'}`} />;
+      case 'Clapperboard': 
+        return <Clapperboard className={`${iconClass} ${isSelected ? 'text-white' : 'text-purple-400'}`} />;
+      case 'Music2': 
+        return <Music2 className={`${iconClass} ${isSelected ? 'text-white' : 'text-cyan-400'}`} />;
+      case 'Mic2': 
+        return <Mic2 className={`${iconClass} ${isSelected ? 'text-white' : 'text-yellow-400'}`} />;
+      case 'Zap': 
+        return <Zap className={`${iconClass} ${isSelected ? 'text-white' : 'text-emerald-400 fill-emerald-400/20'}`} />;
+      case 'Sparkles': 
+        return <Sparkles className={`${iconClass} ${isSelected ? 'text-white' : 'text-fuchsia-400'}`} />;
+      case 'Languages': 
+        return <Languages className={`${iconClass} ${isSelected ? 'text-white' : 'text-violet-400'}`} />;
+      default: 
+        return <Sparkles className={`${iconClass} ${isSelected ? 'text-white' : 'text-pink-400'}`} />;
     }
   };
 
@@ -126,26 +144,56 @@ export const DiscoverScreen = () => {
           </div>
         )}
 
-        {/* Categories Row (Screen 4) */}
-        <div>
-          <div className="flex items-center justify-between gap-3 overflow-x-auto no-scrollbar py-1">
+        {/* Categories Row (Screen 4) - Rich, Vibrant, Glossy Interactive Category Icons */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+              <span>Explore Categories</span>
+            </span>
+            <span className="text-[10px] text-pink-400/80 font-medium">
+              Swipe to explore →
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-2 px-1 scroll-smooth">
             {DISCOVER_CATEGORIES.map(cat => {
               const isSelected = selectedCategory === cat.name;
               return (
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.name)}
-                  className="flex flex-col items-center gap-1.5 min-w-[64px] group"
+                  className="flex flex-col items-center gap-2 min-w-[70px] shrink-0 group focus:outline-none transition-transform duration-200 active:scale-95"
                 >
-                  <div className={`w-13 h-13 rounded-2xl flex items-center justify-center transition-all ${
+                  {/* Icon Card Box */}
+                  <div className={`relative w-[60px] h-[60px] rounded-2xl flex items-center justify-center transition-all duration-300 ${
                     isSelected
-                      ? 'bg-gradient-to-tr from-pink-500 to-purple-600 shadow-lg shadow-pink-500/25 scale-105 border-2 border-white/30'
-                      : 'bg-[#18122c] border border-white/10 group-hover:border-pink-500/40'
+                      ? `bg-gradient-to-tr ${cat.color} shadow-xl shadow-pink-500/35 scale-105 border-2 border-white/50 ring-4 ${cat.activeRing || 'ring-pink-500/30'}`
+                      : `${cat.bg || 'bg-[#18122c]'} border ${cat.border || 'border-white/10'} hover:border-white/30 hover:scale-105 shadow-md shadow-black/40 backdrop-blur-sm group-hover:shadow-pink-500/10`
                   }`}>
-                    {getCategoryIcon(cat.icon)}
+                    {/* Glowing background halo */}
+                    <div className={`absolute inset-0 rounded-2xl transition-opacity duration-300 ${
+                      isSelected 
+                        ? 'opacity-40 bg-white/20 blur-sm' 
+                        : 'opacity-0 group-hover:opacity-100 bg-white/5'
+                    }`} />
+
+                    {/* Category Icon */}
+                    <div className="relative z-10">
+                      {getCategoryIcon(cat.icon, isSelected, cat.color)}
+                    </div>
+
+                    {/* Small Corner Emoji Badge */}
+                    <span className="absolute -bottom-1 -right-1 text-[11px] filter drop-shadow">
+                      {cat.emoji}
+                    </span>
                   </div>
-                  <span className={`text-[11px] font-medium transition-colors ${
-                    isSelected ? 'text-white font-bold' : 'text-gray-400 group-hover:text-gray-200'
+
+                  {/* Category Name */}
+                  <span className={`text-[11px] tracking-tight transition-all duration-200 text-center whitespace-nowrap ${
+                    isSelected 
+                      ? 'text-white font-extrabold font-heading scale-105 drop-shadow' 
+                      : 'text-gray-300 font-medium group-hover:text-white'
                   }`}>
                     {cat.name}
                   </span>

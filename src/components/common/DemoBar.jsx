@@ -32,14 +32,15 @@ export const DemoBar = () => {
     { num: '3', name: 'Home / Video Feed', path: '/' },
     { num: '4', name: 'Discover / Categories', path: '/discover' },
     { num: '5', name: 'Influencer Profile', path: '/creator/pavani_official' },
-    { num: '6', name: 'User Profile (Srilatha)', path: '/profile' },
+    { num: '6', name: 'User Profile & Influencer Hub', path: '/profile?tab=influencer' },
     { num: '7', name: 'Creator Fan Subscription', path: '/creator/pavani_official?subscribe=true' },
     { num: '8', name: 'Reels Vertical Feed', path: '/reels' },
-    { num: '9', name: 'Creator Dashboard', path: '/creator/dashboard' },
-    { num: '10', name: 'Creator Videos Management', path: '/creator/videos' },
-    { num: '11', name: 'Creator Earnings & Payout', path: '/creator/earnings' },
-    { num: '12', name: 'Admin Control Panel', path: '/admin' },
-    { num: '★', name: 'Publishing Plan Gate', path: '/subscription' },
+    { num: '9', name: 'Influencer Analytics (User Hub)', path: '/creator/dashboard' },
+    { num: '10', name: 'Influencer Video Manager', path: '/creator/videos' },
+    { num: '11', name: 'Influencer Earnings & Payout', path: '/creator/earnings' },
+    { num: '12', name: 'Admin Control Center', path: '/admin' },
+    { num: '★', name: 'Admin Manage Subscriptions', path: '/admin/manage-subscriptions' },
+    { num: '★', name: 'Publishing Plan Gate (User App)', path: '/subscription' },
     { num: '★', name: 'Wallet & Cashout', path: '/wallet' },
     { num: '★', name: 'Upload Post / Video Flow', path: '/create' },
     { num: '★', name: 'Direct Messages & Chat', path: '/messages' },
@@ -65,42 +66,31 @@ export const DemoBar = () => {
           </span>
         </div>
 
-        {/* Platform View Modes */}
+        {/* Platform View Modes: Unified User App (Viewer + Influencer) & Admin Panel */}
         <div className="flex items-center bg-[#18122f] p-1 rounded-xl border border-white/10 shadow-inner">
           <button
             onClick={() => navigate('/')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-semibold transition-all ${
-              isUserArea 
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-semibold transition-all ${
+              !isAdminArea 
                 ? 'bg-gradient-to-r from-[#ff007a] to-[#7928ca] text-white shadow-md' 
                 : 'text-gray-400 hover:text-white'
             }`}
+            title="Unified account for viewing and creating content"
           >
             <Smartphone className="w-3.5 h-3.5" />
-            <span>User App</span>
-          </button>
-
-          <button
-            onClick={() => navigate('/creator/dashboard')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-semibold transition-all ${
-              isCreatorStudio 
-                ? 'bg-gradient-to-r from-[#ff007a] to-[#7928ca] text-white shadow-md' 
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <Video className="w-3.5 h-3.5" />
-            <span>Creator Studio</span>
+            <span>User App (Viewer & Influencer)</span>
           </button>
 
           <button
             onClick={() => navigate('/admin')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-semibold transition-all ${
               isAdminArea 
                 ? 'bg-gradient-to-r from-[#ff007a] to-[#7928ca] text-white shadow-md' 
                 : 'text-gray-400 hover:text-white'
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Admin Panel</span>
+            <span>Admin Center</span>
           </button>
         </div>
 

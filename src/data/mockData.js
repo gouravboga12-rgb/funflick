@@ -481,14 +481,14 @@ export const INITIAL_POSTS = [
 
 // Discover Categories
 export const DISCOVER_CATEGORIES = [
-  { id: 'cat_all', name: 'Trending', icon: 'Flame', color: 'from-amber-500 to-red-600' },
-  { id: 'cat_comedy', name: 'Comedy', icon: 'Smile', color: 'from-pink-500 to-rose-600' },
-  { id: 'cat_entertainment', name: 'Entertainment', icon: 'Film', color: 'from-purple-500 to-indigo-600' },
-  { id: 'cat_dance', name: 'Dance', icon: 'Music', color: 'from-blue-500 to-cyan-500' },
-  { id: 'cat_standup', name: 'Stand-up', icon: 'Mic', color: 'from-yellow-400 to-orange-500' },
-  { id: 'cat_memes', name: 'Memes', icon: 'Sparkles', color: 'from-emerald-400 to-teal-600' },
-  { id: 'cat_lifestyle', name: 'Lifestyle', icon: 'Heart', color: 'from-fuchsia-500 to-pink-500' },
-  { id: 'cat_regional', name: 'Regional Comedy', icon: 'Globe', color: 'from-violet-600 to-purple-800' }
+  { id: 'cat_all', name: 'Trending', icon: 'Flame', emoji: '🔥', color: 'from-amber-500 via-orange-500 to-red-600', activeRing: 'ring-orange-500/50', border: 'border-amber-500/40', bg: 'bg-amber-500/10' },
+  { id: 'cat_comedy', name: 'Comedy', icon: 'Laugh', emoji: '😂', color: 'from-pink-500 via-rose-500 to-red-500', activeRing: 'ring-pink-500/50', border: 'border-pink-500/40', bg: 'bg-pink-500/10' },
+  { id: 'cat_entertainment', name: 'Entertainment', icon: 'Clapperboard', emoji: '🎬', color: 'from-purple-600 via-violet-600 to-indigo-600', activeRing: 'ring-purple-500/50', border: 'border-purple-500/40', bg: 'bg-purple-500/10' },
+  { id: 'cat_dance', name: 'Dance', icon: 'Music2', emoji: '💃', color: 'from-cyan-400 via-blue-500 to-indigo-600', activeRing: 'ring-cyan-500/50', border: 'border-cyan-500/40', bg: 'bg-cyan-500/10' },
+  { id: 'cat_standup', name: 'Stand-up', icon: 'Mic2', emoji: '🎙️', color: 'from-amber-400 via-yellow-500 to-orange-500', activeRing: 'ring-yellow-500/50', border: 'border-yellow-500/40', bg: 'bg-yellow-500/10' },
+  { id: 'cat_memes', name: 'Memes', icon: 'Zap', emoji: '🤪', color: 'from-emerald-400 via-teal-500 to-cyan-500', activeRing: 'ring-emerald-500/50', border: 'border-emerald-500/40', bg: 'bg-emerald-500/10' },
+  { id: 'cat_lifestyle', name: 'Lifestyle', icon: 'Sparkles', emoji: '✨', color: 'from-fuchsia-500 via-pink-500 to-rose-400', activeRing: 'ring-fuchsia-500/50', border: 'border-fuchsia-500/40', bg: 'bg-fuchsia-500/10' },
+  { id: 'cat_regional', name: 'Regional', fullName: 'Regional Comedy', icon: 'Languages', emoji: '🇮🇳', color: 'from-violet-600 via-purple-600 to-indigo-700', activeRing: 'ring-violet-500/50', border: 'border-violet-500/40', bg: 'bg-violet-500/10' }
 ];
 
 // Trending Now Discover Cards

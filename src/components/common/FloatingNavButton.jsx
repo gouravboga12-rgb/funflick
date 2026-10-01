@@ -33,10 +33,10 @@ export const FloatingNavButton = () => {
         { num: '6', name: 'User Profile & Influencer Hub', path: '/profile?tab=influencer' },
         { num: '7', name: 'Creator Fan Subscription', path: '/creator/pavani_official?subscribe=true' },
         { num: '8', name: 'Reels Vertical Feed', path: '/reels' },
-        { num: '9', name: 'Creator Studio Dashboard', path: '/creator/dashboard' },
-        { num: '10', name: 'Creator Video Management', path: '/creator/videos' },
-        { num: '11', name: 'Creator Earnings & Payout', path: '/creator/earnings' },
-        { num: '12', name: 'Admin Control Panel', path: '/admin' },
+        { num: '9', name: 'Influencer Analytics (User Hub)', path: '/creator/dashboard' },
+        { num: '10', name: 'Influencer Video Manager', path: '/creator/videos' },
+        { num: '11', name: 'Influencer Earnings & Payout', path: '/creator/earnings' },
+        { num: '12', name: 'Admin Control Center', path: '/admin' },
       ]
     },
     {
@@ -55,6 +55,7 @@ export const FloatingNavButton = () => {
     {
       title: 'Admin Management Hub',
       links: [
+        { num: '★', name: 'Admin Manage Subscriptions (Global Plans)', path: '/admin/manage-subscriptions' },
         { num: '★', name: 'Admin Creator Payouts (Section 36)', path: '/admin/payouts' },
         { num: '★', name: 'Admin User Management', path: '/admin/users' },
         { num: '★', name: 'Admin Content Moderation', path: '/admin/content' },
@@ -113,40 +114,31 @@ export const FloatingNavButton = () => {
                 </button>
               </div>
 
-              {/* Quick Section Switchers (User App, Studio, Admin) */}
+              {/* Quick Section Switchers: Unified User App & Admin */}
               <div className="py-3 border-b border-white/10 shrink-0 space-y-2">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Platform Sections
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Platform Portals
+                  </span>
+                  <span className="text-[9px] text-pink-300 font-semibold bg-pink-500/10 px-2 py-0.5 rounded-full border border-pink-500/20">
+                    Unified Account System
+                  </span>
                 </div>
-                <div className="grid grid-cols-3 gap-1.5 text-xs">
+                
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <button
                     onClick={() => {
                       navigate('/');
                       setIsOpen(false);
                     }}
-                    className={`py-2 px-1 rounded-xl font-bold flex flex-col items-center gap-1 transition ${
-                      !location.pathname.startsWith('/creator') && !location.pathname.startsWith('/admin')
-                        ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
+                    className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition ${
+                      !location.pathname.startsWith('/admin')
+                        ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md'
                         : 'bg-white/5 text-gray-300 hover:bg-white/10'
                     }`}
                   >
-                    <Smartphone className="w-3.5 h-3.5" />
-                    <span className="text-[10px]">User App</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      navigate('/creator/dashboard');
-                      setIsOpen(false);
-                    }}
-                    className={`py-2 px-1 rounded-xl font-bold flex flex-col items-center gap-1 transition ${
-                      location.pathname.startsWith('/creator')
-                        ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
-                        : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                    }`}
-                  >
-                    <Video className="w-3.5 h-3.5" />
-                    <span className="text-[10px]">Studio</span>
+                    <Smartphone className="w-4 h-4" />
+                    <span className="text-xs">User App (Viewer & Creator)</span>
                   </button>
 
                   <button
@@ -154,14 +146,14 @@ export const FloatingNavButton = () => {
                       navigate('/admin');
                       setIsOpen(false);
                     }}
-                    className={`py-2 px-1 rounded-xl font-bold flex flex-col items-center gap-1 transition ${
+                    className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition ${
                       location.pathname.startsWith('/admin')
-                        ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
+                        ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md'
                         : 'bg-white/5 text-gray-300 hover:bg-white/10'
                     }`}
                   >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span className="text-[10px]">Admin</span>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span className="text-xs">Admin Center</span>
                   </button>
                 </div>
 
