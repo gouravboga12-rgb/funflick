@@ -6,10 +6,9 @@ export const AdminRevenueScreen = () => {
   const [period, setPeriod] = useState('Monthly');
 
   const monthlyBreakdown = [
-    { source: 'Monthly Publishing Plan (₹199)', amount: '₹6,40,000', percentage: '51%' },
-    { source: 'Quarterly Publishing Plan (₹499)', amount: '₹3,20,000', percentage: '26%' },
-    { source: 'Weekly Publishing Plan (₹1,599)', amount: '₹1,60,000', percentage: '13%' },
-    { source: 'Yearly Publishing Plan (₹699)', amount: '₹1,25,320', percentage: '10%' }
+    { source: 'Monthly Publishing Plan (₹199)', amount: '₹6,368', percentage: '51%' },
+    { source: 'Quarterly Publishing Plan (₹499)', amount: '₹3,493', percentage: '28%' },
+    { source: 'Yearly Publishing Plan (₹1,499)', amount: '₹2,589', percentage: '21%' }
   ];
 
   return (
@@ -41,8 +40,8 @@ export const AdminRevenueScreen = () => {
             <span className="text-xs text-gray-400">Total Subscription Revenue</span>
             <ArrowDownRight className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl font-extrabold text-white font-heading">₹12,45,320</div>
-          <span className="text-[10px] text-emerald-400 font-bold">+24.5% vs previous month</span>
+          <div className="text-2xl font-extrabold text-white font-heading">₹12,450</div>
+          <span className="text-[10px] text-emerald-400 font-bold">+18.5% vs previous month</span>
         </div>
 
         <div className="p-5 rounded-3xl bg-[#130d29] border border-amber-500/20 space-y-1">
@@ -50,8 +49,8 @@ export const AdminRevenueScreen = () => {
             <span className="text-xs text-gray-400">Creator Disbursements</span>
             <ArrowUpRight className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-2xl font-extrabold text-white font-heading">₹8,60,000</div>
-          <span className="text-[10px] text-amber-400 font-bold">Paid to top influencers</span>
+          <div className="text-2xl font-extrabold text-white font-heading">₹5,800</div>
+          <span className="text-[10px] text-amber-400 font-bold">Paid to verified creators</span>
         </div>
 
         <div className="p-5 rounded-3xl bg-[#130d29] border border-pink-500/20 space-y-1">
@@ -59,8 +58,8 @@ export const AdminRevenueScreen = () => {
             <span className="text-xs text-gray-400">Net Platform Gross Profit</span>
             <TrendingUp className="w-4 h-4 text-pink-400" />
           </div>
-          <div className="text-2xl font-extrabold text-pink-400 font-heading">₹3,85,320</div>
-          <span className="text-[10px] text-white/80 font-bold">30.9% Net Margin</span>
+          <div className="text-2xl font-extrabold text-pink-400 font-heading">₹6,650</div>
+          <span className="text-[10px] text-white/80 font-bold">53.4% Net Margin</span>
         </div>
       </div>
 

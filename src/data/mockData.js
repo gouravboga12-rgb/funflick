@@ -751,20 +751,20 @@ export const CREATOR_VIDEOS = [
   }
 ];
 
-// Admin Platform KPI stats (Screen 12)
+// Admin Platform KPI stats (Screen 12) - Realistic startup launch metrics
 export const ADMIN_STATS = {
-  totalUsers: '12,540',
-  activeUsers: '9,820',
-  totalCreators: '1,830',
-  totalVideos: '48,920',
-  totalPosts: '64,120',
-  totalStories: '14,300',
-  activeSubscriptions: '25,430',
-  subscriptionRevenue: '₹12,45,320',
-  creatorPayments: '₹8,60,000',
-  pendingApprovals: 320,
-  reportedContent: 145,
-  platformProfit: '₹3,85,320'
+  totalUsers: '142',
+  activeUsers: '98',
+  totalCreators: '24',
+  totalVideos: '56',
+  totalPosts: '74',
+  totalStories: '18',
+  activeSubscriptions: '38',
+  subscriptionRevenue: '₹12,450',
+  creatorPayments: '₹5,800',
+  pendingApprovals: 3,
+  reportedContent: 2,
+  platformProfit: '₹6,650'
 };
 
 // Admin Creator Payouts (Matching Section 36 & Screen 12 & 11)

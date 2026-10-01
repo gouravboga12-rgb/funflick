@@ -456,11 +456,16 @@ export const AppProvider = ({ children }) => {
     const submissionId = 'sub_' + Date.now();
     const newSubmission = {
       id: submissionId,
+      contentType: 'video',
       title: videoData.title || 'Untitled Reel',
+      caption: videoData.description || videoData.title,
       thumbnail: videoData.thumbnailUrl || videoData.mediaUrl,
       mediaUrl: videoData.mediaUrl,
       category: videoData.category || 'Comedy',
       hashtags: videoData.hashtags || '#funflick #comedy #reels',
+      audioTitle: videoData.audioTitle || ('🎵 Original Sound - ' + currentUser.username),
+      location: videoData.location || '',
+      tags: videoData.tags || [],
       date: 'Just now',
       status: 'Pending Admin Verification',
       views: '0 (In Review)',
@@ -474,7 +479,9 @@ export const AppProvider = ({ children }) => {
     // Add to Admin Pending Queue
     const newAdminPending = {
       id: submissionId,
+      contentType: 'video',
       title: newSubmission.title,
+      caption: newSubmission.caption,
       creator: currentUser.username,
       creatorName: currentUser.name,
       avatar: currentUser.avatar,
@@ -482,6 +489,9 @@ export const AppProvider = ({ children }) => {
       mediaUrl: newSubmission.mediaUrl,
       category: newSubmission.category,
       hashtags: newSubmission.hashtags,
+      audioTitle: newSubmission.audioTitle,
+      location: newSubmission.location,
+      tags: newSubmission.tags,
       date: 'Just now',
       status: 'Pending'
     };
@@ -498,6 +508,117 @@ export const AppProvider = ({ children }) => {
       unread: true
     };
     setNotifications(prev => [newNotif, ...prev]);
+
+    return { success: true, submission: newSubmission };
+  };
+
+  // Submit Post (Photo / Clip) for Central Admin Verification (Instagram-Style Flow)
+  const submitPostForVerification = (postData) => {
+    if (!currentUser.hasPublishingSubscription) {
+      setSubscriptionGateModalOpen(true);
+      showToast('⚠️ Creator Publishing Plan required to post media!', 'error');
+      return { success: false, reason: 'subscription_required' };
+    }
+
+    const submissionId = 'sub_' + Date.now();
+    const newSubmission = {
+      id: submissionId,
+      contentType: 'image',
+      title: postData.caption ? (postData.caption.slice(0, 35) + '...') : 'New Photo Post',
+      caption: postData.caption || '',
+      thumbnail: postData.mediaUrl,
+      mediaUrl: postData.mediaUrl,
+      category: postData.category || 'Comedy',
+      hashtags: postData.hashtags || '#funflick #comedy',
+      location: postData.location || '',
+      tags: postData.tags || [],
+      date: 'Just now',
+      status: 'Pending Admin Verification',
+      views: '0 (In Review)',
+      likes: '0',
+      adminNote: 'Submitted for admin quality verification',
+      rewardGranted: null
+    };
+
+    setUserSubmissions(prev => [newSubmission, ...prev]);
+
+    const newAdminPending = {
+      id: submissionId,
+      contentType: 'image',
+      title: newSubmission.title,
+      caption: postData.caption,
+      creator: currentUser.username,
+      creatorName: currentUser.name,
+      avatar: currentUser.avatar,
+      thumbnail: newSubmission.thumbnail,
+      mediaUrl: newSubmission.mediaUrl,
+      category: newSubmission.category,
+      hashtags: newSubmission.hashtags,
+      location: postData.location,
+      tags: postData.tags,
+      date: 'Just now',
+      status: 'Pending'
+    };
+    setPendingApprovals(prev => [newAdminPending, ...prev]);
+
+    const newNotif = {
+      id: 'notif_' + Date.now(),
+      type: 'system',
+      user: 'Admin Verification Desk',
+      avatar: '/brand/funflick-logo.png',
+      text: `Your photo post has been submitted for central admin verification!`,
+      time: 'Just now',
+      unread: true
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+
+    return { success: true, submission: newSubmission };
+  };
+
+  // Submit Story for Central Admin Verification
+  const submitStoryForVerification = (storyData) => {
+    if (!currentUser.hasPublishingSubscription) {
+      setSubscriptionGateModalOpen(true);
+      showToast('⚠️ Creator Publishing Plan required to post stories!', 'error');
+      return { success: false, reason: 'subscription_required' };
+    }
+
+    const submissionId = 'sub_' + Date.now();
+    const newSubmission = {
+      id: submissionId,
+      contentType: 'story',
+      title: 'Story: ' + (storyData.caption ? storyData.caption.slice(0, 25) : 'Moment'),
+      caption: storyData.caption || 'Enjoying life on FunFlick! ✨',
+      thumbnail: storyData.mediaUrl,
+      mediaUrl: storyData.mediaUrl,
+      category: 'Lifestyle',
+      hashtags: '#FunFlickStory',
+      date: 'Just now',
+      status: 'Pending Admin Verification',
+      views: '0 (In Review)',
+      likes: '0',
+      adminNote: 'Story submitted for admin moderation review',
+      rewardGranted: null
+    };
+
+    setUserSubmissions(prev => [newSubmission, ...prev]);
+
+    const newAdminPending = {
+      id: submissionId,
+      contentType: 'story',
+      title: newSubmission.title,
+      caption: storyData.caption,
+      creator: currentUser.username,
+      creatorName: currentUser.name,
+      avatar: currentUser.avatar,
+      thumbnail: newSubmission.thumbnail,
+      mediaUrl: newSubmission.mediaUrl,
+      category: 'Lifestyle',
+      hashtags: '#FunFlickStory',
+      date: 'Just now',
+      status: 'Pending'
+    };
+    setPendingApprovals(prev => [newAdminPending, ...prev]);
 
     return { success: true, submission: newSubmission };
   };
@@ -628,35 +749,66 @@ export const AppProvider = ({ children }) => {
         return s;
       }));
 
-      // If there's an item, add to public feed posts
+      // If there's an item, add to public feed posts or stories
       if (target) {
-        const livePost = {
-          id: 'post_' + Date.now(),
-          creator: {
-            name: target.creatorName || (target.creator === currentUser.username ? currentUser.name : target.creator),
-            username: target.creator || currentUser.username,
-            avatar: target.avatar || currentUser.avatar,
-            isVerified: true
-          },
-          title: target.title,
-          caption: `${target.title} ${target.hashtags || '#funflick #comedy #viral'}`,
-          mediaType: 'video',
-          mediaUrl: target.mediaUrl || 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-on-video-call-with-phone-41445-large.mp4',
-          posterUrl: target.thumbnail,
-          audioTitle: '🎵 Original Sound - ' + (target.creator || currentUser.username),
-          likesCount: 1,
-          commentsCount: 0,
-          sharesCount: 0,
-          savesCount: 0,
-          viewsCount: '1',
-          timeAgo: 'Just now',
-          category: target.category || 'Comedy',
-          isLiked: false,
-          isSaved: false,
-          isFollowing: false,
-          comments: []
-        };
-        setPosts(prev => [livePost, ...prev]);
+        if (target.contentType === 'story') {
+          const newStoryItem = {
+            id: 'st_item_' + Date.now(),
+            mediaUrl: target.mediaUrl,
+            caption: target.caption || target.title,
+            time: 'Just now'
+          };
+          setStories(prev => {
+            const myIndex = prev.findIndex(s => s.isUser);
+            if (myIndex >= 0) {
+              const updated = [...prev];
+              updated[myIndex] = {
+                ...updated[myIndex],
+                hasUnseen: true,
+                stories: [newStoryItem, ...(updated[myIndex].stories || [])]
+              };
+              return updated;
+            }
+            return prev;
+          });
+        } else {
+          const livePost = {
+            id: 'post_' + Date.now(),
+            creator: {
+              name: target.creatorName || (target.creator === currentUser.username ? currentUser.name : target.creator),
+              username: target.creator || currentUser.username,
+              avatar: target.avatar || currentUser.avatar,
+              isVerified: true
+            },
+            title: target.title || 'New FunFlick Post',
+            caption: target.caption || `${target.title} ${target.hashtags || ''}`,
+            mediaType: target.contentType === 'image' ? 'image' : 'video',
+            mediaUrl: target.mediaUrl || 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-on-video-call-with-phone-41445-large.mp4',
+            posterUrl: target.thumbnail || target.mediaUrl,
+            audioTitle: target.audioTitle || ('🎵 Original Sound - ' + (target.creator || currentUser.username)),
+            location: target.location || '',
+            tags: target.tags || [],
+            likesCount: 1,
+            commentsCount: 0,
+            sharesCount: 0,
+            savesCount: 0,
+            viewsCount: '1',
+            timeAgo: 'Just now',
+            category: target.category || 'Comedy',
+            isLiked: false,
+            isSaved: false,
+            isFollowing: false,
+            comments: []
+          };
+          setPosts(prev => [livePost, ...prev]);
+
+          if (target.creator === currentUser.username) {
+            setCurrentUser(prev => ({
+              ...prev,
+              stats: { ...prev.stats, posts: (prev.stats?.posts || 0) + 1 }
+            }));
+          }
+        }
 
         // Add user notification
         const approvedNotif = {
@@ -664,14 +816,14 @@ export const AppProvider = ({ children }) => {
           type: 'like',
           user: 'Admin Approval Desk',
           avatar: '/brand/funflick-logo.png',
-          text: `🎉 Good news! Your video "${target.title}" was verified & approved by Admin! It is now live on FunFlick.`,
+          text: `🎉 Good news! Your ${target.contentType || 'content'} "${target.title}" was verified & approved by Admin! It is now live on FunFlick.`,
           time: 'Just now',
           unread: true
         };
         setNotifications(prev => [approvedNotif, ...prev]);
       }
 
-      showToast('✅ Video approved and published live to FunFlick!', 'success');
+      showToast(`✅ ${target?.contentType === 'story' ? 'Story' : 'Content'} approved and published live to FunFlick!`, 'success');
     } else {
       setUserSubmissions(prev => prev.map(s => {
         if (s.id === approvalId) {
@@ -739,6 +891,8 @@ export const AppProvider = ({ children }) => {
         publishNewStory,
         publishNewVideo,
         submitVideoForVerification,
+        submitPostForVerification,
+        submitStoryForVerification,
         sendPerformanceReward,
         sendMessage,
         processAdminPayout,

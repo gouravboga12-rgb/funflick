@@ -510,19 +510,19 @@ export const AdminSubscriptionsScreen = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="p-4 rounded-3xl bg-[#140e2b] border border-white/5 space-y-1">
                 <span className="text-xs text-gray-400">Total Active Subscribers</span>
-                <div className="text-2xl font-extrabold text-white font-heading">25,430</div>
-                <span className="text-[10px] text-emerald-400 font-bold">+1,240 new this week</span>
+                <div className="text-2xl font-extrabold text-white font-heading">38</div>
+                <span className="text-[10px] text-emerald-400 font-bold">+4 new this week</span>
               </div>
 
               <div className="p-4 rounded-3xl bg-[#140e2b] border border-white/5 space-y-1">
                 <span className="text-xs text-gray-400">Monthly Gross Revenue</span>
-                <div className="text-2xl font-extrabold text-white font-heading">₹12,45,320</div>
+                <div className="text-2xl font-extrabold text-white font-heading">₹12,450</div>
                 <span className="text-[10px] text-pink-400 font-bold">From Publishing Passes</span>
               </div>
 
               <div className="p-4 rounded-3xl bg-[#140e2b] border border-white/5 space-y-1">
                 <span className="text-xs text-gray-400">Avg. Creator Retention</span>
-                <div className="text-2xl font-extrabold text-white font-heading">84.2%</div>
+                <div className="text-2xl font-extrabold text-white font-heading">92.4%</div>
                 <span className="text-[10px] text-blue-400 font-bold">High publishing retention</span>
               </div>
             </div>
