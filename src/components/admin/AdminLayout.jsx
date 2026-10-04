@@ -26,11 +26,12 @@ import {
 export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { adminPayouts, pendingApprovals, showToast, theme, setTheme } = useApp();
+  const { adminPayouts, pendingApprovals, copyrightReports, showToast, theme, setTheme } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isLight = theme === 'light';
   const pendingPayoutCount = adminPayouts.filter(p => p.status === 'Partially Paid').length;
+  const pendingCopyrightCount = (copyrightReports || []).filter(r => r.status === 'Pending').length;
 
   const navLinks = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
@@ -39,6 +40,7 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
     { label: 'Users', icon: Users, path: '/admin/users' },
     { label: 'Creators', icon: Video, path: '/admin/creators' },
     { label: 'Content Moderation', icon: Video, path: '/admin/content', badge: pendingApprovals.length },
+    { label: 'Copyright & Plagiarism', icon: ShieldAlert, path: '/admin/copyright-claims', badge: pendingCopyrightCount },
     { label: 'Manage Subscriptions', icon: Crown, path: '/admin/manage-subscriptions' },
     { label: 'Creator Payouts', icon: DollarSign, path: '/admin/payouts', badge: pendingPayoutCount },
     { label: 'Revenue Analytics', icon: BarChart3, path: '/admin/revenue' },

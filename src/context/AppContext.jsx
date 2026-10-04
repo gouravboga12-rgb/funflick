@@ -14,7 +14,8 @@ import {
   INFLUENCER_SUBSCRIPTION_PLANS,
   INITIAL_INFLUENCER_MEDIA,
   INITIAL_ADS,
-  INITIAL_USER_SUBMISSIONS
+  INITIAL_USER_SUBMISSIONS,
+  INITIAL_COPYRIGHT_REPORTS
 } from '../data/mockData';
 
 const AppContext = createContext(null);
@@ -136,6 +137,16 @@ export const AppProvider = ({ children }) => {
 
   // Admin pending video approvals
   const [pendingApprovals, setPendingApprovals] = useState(ADMIN_PENDING_APPROVALS);
+
+  // Copyright & Plagiarism Dispute Reports
+  const [copyrightReports, setCopyrightReports] = useState(() => {
+    const saved = localStorage.getItem('funflick_copyright_reports');
+    return saved ? JSON.parse(saved) : INITIAL_COPYRIGHT_REPORTS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('funflick_copyright_reports', JSON.stringify(copyrightReports));
+  }, [copyrightReports]);
 
   // View frame & demo switcher state
   const [phoneFrame, setPhoneFrame] = useState(true);
@@ -904,6 +915,165 @@ export const AppProvider = ({ children }) => {
     showToast(`Payment of ₹${amount.toLocaleString()} credited to creator wallet successfully!`, 'success');
   };
 
+  // Custom Admin Disbursal with Live/Snapshot metrics, custom rate, and settled view milestone tracking
+  const processCustomAdminPayout = (payoutId, { amount, settleScope = 'live', note = '' }) => {
+    let targetCreator = '';
+    let targetPostTitle = '';
+    let settledViews = 0;
+
+    setAdminPayouts(prev => prev.map(p => {
+      if (p.id === payoutId) {
+        targetCreator = p.creator;
+        targetPostTitle = p.postTitle;
+        const newPaid = p.paidAmount + amount;
+        settledViews = settleScope === 'live' ? (p.currentLiveViews || 12450) : (p.requestedViews || 10000);
+        return {
+          ...p,
+          paidAmount: newPaid,
+          remainingAmount: 0,
+          status: 'Paid',
+          paidUpToViews: settledViews,
+          customRateNote: note || `Disbursed ₹${amount.toLocaleString()} for ${settledViews.toLocaleString()} views`,
+          settledAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          paymentHistory: [
+            {
+              id: 'ph_' + Date.now(),
+              date: 'Just now',
+              amount,
+              method: 'FunFlick Admin Direct Settlement',
+              ref: 'FFPAY' + Math.floor(100000 + Math.random() * 900000),
+              settledViews,
+              note
+            },
+            ...(p.paymentHistory || [])
+          ]
+        };
+      }
+      return p;
+    }));
+
+    // If payout is to current user, credit wallet directly!
+    const isToCurrentUser = targetCreator.toLowerCase().includes('srilatha') || 
+                            targetCreator.toLowerCase().includes('current user');
+
+    if (isToCurrentUser) {
+      setCurrentUser(prev => ({
+        ...prev,
+        walletBalance: (prev.walletBalance || 0) + amount,
+        availableBalance: (prev.availableBalance || 0) + amount
+      }));
+
+      const newTx = {
+        id: 'tx_' + Date.now(),
+        title: `Monetization Payout from Admin`,
+        desc: `Custom performance reward for "${targetPostTitle}" (Settled up to ${settledViews.toLocaleString()} views)`,
+        type: 'credit',
+        amount,
+        formattedAmount: `+₹${amount.toLocaleString()}`,
+        date: 'Just now'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+
+      const notif = {
+        id: 'notif_' + Date.now(),
+        type: 'wallet',
+        user: 'FunFlick Admin',
+        avatar: '/brand/funflick-logo.png',
+        text: `🎉 ₹${amount.toLocaleString()} performance payout credited to your wallet! (Settled up to ${settledViews.toLocaleString()} views)`,
+        time: 'Just now',
+        unread: true
+      };
+      setNotifications(prev => [notif, ...prev]);
+    }
+
+    showToast(`Disbursed ₹${amount.toLocaleString()} to ${targetCreator}! Settled to ${settledViews.toLocaleString()} views.`, 'success');
+  };
+
+  // Creator Submits New Payout Request for a High-Performing Video
+  const requestCreatorPayout = ({ videoTitle, views = 10000, likes = 1200 }) => {
+    const newPayout = {
+      id: 'pay_' + Date.now(),
+      creator: currentUser.name || 'Srilatha',
+      creatorUsername: currentUser.username || 'srilatha_16',
+      isSubscribed: true,
+      subscriptionPlan: currentUser.subscriptionPlan || 'Monthly Influencer Pro',
+      creatorAvatar: currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+      postTitle: videoTitle || 'Viral Reel Debut',
+      postDate: 'Just now',
+      requestedViews: views,
+      requestedLikes: likes,
+      currentLiveViews: Math.round(views * 1.15),
+      currentLiveLikes: Math.round(likes * 1.12),
+      views: `${(views / 1000).toFixed(1)}K`,
+      paidUpToViews: 0,
+      approvedAmount: Math.round((views / 1000) * 50),
+      paidAmount: 0,
+      remainingAmount: Math.round((views / 1000) * 50),
+      status: 'Partially Paid',
+      customRateNote: 'New influencer monetization claim submitted',
+      paymentHistory: []
+    };
+
+    setAdminPayouts(prev => [newPayout, ...prev]);
+    showToast('🚀 Payout request submitted! Admin will evaluate and disburse payment.', 'success');
+  };
+
+  // Admin Resolves Copyright / Anti-Plagiarism Claim
+  const resolveCopyrightReport = (reportId, { action, suspensionDays = 0, note = '' }) => {
+    setCopyrightReports(prev => prev.map(r => {
+      if (r.id === reportId) {
+        const isApproved = action === 'approve';
+        return {
+          ...r,
+          status: isApproved ? 'Approved' : 'Rejected',
+          adminAction: isApproved 
+            ? (suspensionDays > 0 ? `Removed & ${suspensionDays}-Day Ban` : 'Content Removed & Forfeited') 
+            : 'Dismissed as Fair Use',
+          adminResolutionNote: note,
+          resolvedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        };
+      }
+      return r;
+    }));
+
+    if (action === 'approve') {
+      showToast('🛡️ Copyright claim approved! Stolen post removed & penalty applied.', 'success');
+    } else {
+      showToast('Report dismissed as fair use / insufficient evidence.', 'info');
+    }
+  };
+
+  // User Submits Copyright / Stolen Content Report
+  const submitCopyrightReport = ({ originalTitle, accusedUsername, accusedTitle, description, originalThumbnail, accusedThumbnail }) => {
+    const newReport = {
+      id: 'CR-' + Math.floor(100 + Math.random() * 900),
+      reporter: currentUser.name || 'You',
+      reporterUsername: currentUser.username || 'user',
+      reporterAvatar: currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+      originalTitle: originalTitle || 'My Original Post',
+      originalUploadedAt: 'Oct 1, 2026 at 10:00 AM',
+      originalViews: '4.2K',
+      originalLikes: '480',
+      originalThumbnail: originalThumbnail || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80',
+      accused: accusedUsername || 'Accused Creator',
+      accusedUsername: (accusedUsername || 'user').replace('@', ''),
+      accusedAvatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=100&q=80',
+      accusedTitle: accusedTitle || 'Copied Video Repost',
+      accusedUploadedAt: 'Oct 3, 2026 at 06:15 PM',
+      accusedViews: '45.0K',
+      accusedLikes: '6.2K',
+      accusedThumbnail: accusedThumbnail || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80',
+      timeDifference: 'Original uploaded 2 days 8 hours BEFORE accused copy',
+      description,
+      status: 'Pending',
+      adminAction: null,
+      date: 'Today'
+    };
+
+    setCopyrightReports(prev => [newReport, ...prev]);
+    showToast('🛡️ Copyright complaint filed! Admin will review side-by-side with original.', 'success');
+  };
+
   // Direct Admin Performance Reward to Creator Wallet
   const sendPerformanceReward = (creatorUsername, videoTitle, amount) => {
     setCurrentUser(prev => ({
@@ -1106,6 +1276,11 @@ export const AppProvider = ({ children }) => {
         sendPerformanceReward,
         sendMessage,
         processAdminPayout,
+        processCustomAdminPayout,
+        requestCreatorPayout,
+        copyrightReports,
+        resolveCopyrightReport,
+        submitCopyrightReport,
         handlePendingApproval,
         publishingPlans,
         updatePublishingPlan,

@@ -788,14 +788,22 @@ export const INITIAL_PAYOUTS = [
     id: 'pay_user_srilatha',
     creator: 'Srilatha (Current User)',
     creatorUsername: 'srilatha_16',
+    isSubscribed: true,
+    subscriptionPlan: 'Monthly Influencer Pro',
     creatorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
     postTitle: 'Stand-up Comedy Open Mic Debut',
     postDate: 'Aug 24, 2026',
-    views: '84.5K (High Level)',
+    requestedViews: 80000,
+    requestedLikes: 9500,
+    currentLiveViews: 84500,
+    currentLiveLikes: 10200,
+    views: '84.5K',
+    paidUpToViews: 20000,
     approvedAmount: 5000,
     paidAmount: 2000,
     remainingAmount: 3000,
     status: 'Partially Paid',
+    customRateNote: 'Base payout for 80k milestone with engagement bonus',
     paymentHistory: [
       { id: 'ph_sri1', date: 'Aug 27, 2026', amount: 2000, method: 'FunFlick Wallet Transfer', ref: 'FFW99214' }
     ]
@@ -803,14 +811,23 @@ export const INITIAL_PAYOUTS = [
   {
     id: 'pay_102',
     creator: 'Pavani Official',
+    creatorUsername: 'pavani_official',
+    isSubscribed: true,
+    subscriptionPlan: 'Quarterly Influencer Star',
     creatorAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=100&q=80',
     postTitle: 'Comedy Video #102',
     postDate: 'Aug 20, 2026',
+    requestedViews: 2000000,
+    requestedLikes: 180000,
+    currentLiveViews: 2400000,
+    currentLiveLikes: 215000,
     views: '2.4M',
+    paidUpToViews: 1200000,
     approvedAmount: 5000,
     paidAmount: 3000,
     remainingAmount: 2000,
-    status: 'Partially Paid', // Status will update to 'Paid' upon Send Payment simulation!
+    status: 'Partially Paid',
+    customRateNote: 'Multi-million view tier bonus applied',
     paymentHistory: [
       { id: 'ph_1', date: 'Aug 22, 2026', amount: 3000, method: 'IMPS Bank Transfer', ref: 'IMPS928174' }
     ]
@@ -818,14 +835,23 @@ export const INITIAL_PAYOUTS = [
   {
     id: 'pay_103',
     creator: 'Fun Bros',
+    creatorUsername: 'funbros_channel',
+    isSubscribed: true,
+    subscriptionPlan: 'Monthly Influencer Pro',
     creatorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80',
     postTitle: 'Funny Moments Vol 4',
     postDate: 'Aug 15, 2026',
+    requestedViews: 1800000,
+    requestedLikes: 145000,
+    currentLiveViews: 1900000,
+    currentLiveLikes: 152000,
     views: '1.9M',
+    paidUpToViews: 1900000,
     approvedAmount: 3000,
     paidAmount: 3000,
     remainingAmount: 0,
     status: 'Paid',
+    customRateNote: 'Fully settled up to 1.9M views',
     paymentHistory: [
       { id: 'ph_2', date: 'Aug 17, 2026', amount: 3000, method: 'UPI Instant Payout', ref: 'UPI448201' }
     ]
@@ -833,14 +859,23 @@ export const INITIAL_PAYOUTS = [
   {
     id: 'pay_104',
     creator: 'Chill Mammu',
+    creatorUsername: 'chill_mammu',
+    isSubscribed: true,
+    subscriptionPlan: 'Weekly Influencer',
     creatorAvatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=100&q=80',
     postTitle: 'Travel Comedy Series',
     postDate: 'Aug 12, 2026',
+    requestedViews: 2000000,
+    requestedLikes: 160000,
+    currentLiveViews: 2100000,
+    currentLiveLikes: 172000,
     views: '2.1M',
+    paidUpToViews: 2100000,
     approvedAmount: 4000,
     paidAmount: 4000,
     remainingAmount: 0,
     status: 'Paid',
+    customRateNote: 'Fully settled up to 2.1M views',
     paymentHistory: [
       { id: 'ph_3', date: 'Aug 14, 2026', amount: 4000, method: 'NEFT Transfer', ref: 'NEFT39108' }
     ]
@@ -848,19 +883,89 @@ export const INITIAL_PAYOUTS = [
   {
     id: 'pay_105',
     creator: 'Comedy Raju',
+    creatorUsername: 'raju_creator',
+    isSubscribed: true,
+    subscriptionPlan: 'Monthly Influencer Pro',
     creatorAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80',
     postTitle: 'Street Food Live Standup',
     postDate: 'Aug 28, 2026',
+    requestedViews: 1500000,
+    requestedLikes: 120000,
+    currentLiveViews: 1800000,
+    currentLiveLikes: 145000,
     views: '1.8M',
+    paidUpToViews: 800000,
     approvedAmount: 6000,
     paidAmount: 2000,
     remainingAmount: 4000,
     status: 'Partially Paid',
+    customRateNote: 'Pending second milestone evaluation',
     paymentHistory: [
       { id: 'ph_4', date: 'Aug 29, 2026', amount: 2000, method: 'UPI Instant Payout', ref: 'UPI98317' }
     ]
   }
 ];
+
+// Anti-Plagiarism & Copyright Dispute Claims
+export const INITIAL_COPYRIGHT_REPORTS = [
+  {
+    id: 'CR-882',
+    reporter: 'Srilatha Reddy',
+    reporterUsername: 'srilatha_16',
+    reporterAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+    originalTitle: 'Stand-up Comedy Open Mic Debut',
+    originalUploadedAt: 'Oct 1, 2026 at 10:14 AM',
+    originalViews: '84.5K',
+    originalLikes: '10.2K',
+    originalThumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80',
+    originalVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-girl-in-neon-sign-1232-large.mp4',
+
+    accused: 'Vikram Star Official',
+    accusedUsername: 'vikram_viral_star',
+    accusedAvatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=100&q=80',
+    accusedTitle: 'College Open Mic Funniest Punchline 😂',
+    accusedUploadedAt: 'Oct 3, 2026 at 04:32 PM',
+    accusedViews: '142.0K',
+    accusedLikes: '18.4K',
+    accusedThumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80',
+    accusedVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-girl-in-neon-sign-1232-large.mp4',
+
+    timeDifference: 'Original uploaded 2 days 6 hours BEFORE accused copy',
+    description: 'This popular creator cropped my watermark, removed my intro, and re-uploaded my stand-up performance without my permission to get viral views and ad revenue.',
+    status: 'Pending',
+    adminAction: null,
+    date: 'Oct 3, 2026'
+  },
+  {
+    id: 'CR-883',
+    reporter: 'Chill Mammu',
+    reporterUsername: 'chill_mammu',
+    reporterAvatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=100&q=80',
+    originalTitle: 'Hostel Room Maggi Championship',
+    originalUploadedAt: 'Sep 25, 2026 at 02:00 PM',
+    originalViews: '45.0K',
+    originalLikes: '5.1K',
+    originalThumbnail: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
+    originalVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-on-video-call-with-phone-41484-large.mp4',
+
+    accused: 'Meme Central India',
+    accusedUsername: 'memecentral_in',
+    accusedAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80',
+    accusedTitle: 'Hostel Guys When Hungry at 2 AM',
+    accusedUploadedAt: 'Sep 28, 2026 at 08:15 PM',
+    accusedViews: '98.5K',
+    accusedLikes: '12.0K',
+    accusedThumbnail: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
+    accusedVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-on-video-call-with-phone-41484-large.mp4',
+
+    timeDifference: 'Original uploaded 3 days 6 hours BEFORE accused copy',
+    description: 'Direct screen recording of my hostel kitchen sketch posted without attribution.',
+    status: 'Pending',
+    adminAction: null,
+    date: 'Sep 29, 2026'
+  }
+];
+
 
 // Admin Pending Approvals for Screen 12 "Recent Videos for Approval"
 export const ADMIN_PENDING_APPROVALS = [

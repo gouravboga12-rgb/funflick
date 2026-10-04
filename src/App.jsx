@@ -49,6 +49,7 @@ import { AdminCategoriesScreen } from './pages/admin/AdminCategoriesScreen';
 import { AdminSettingsScreen } from './pages/admin/AdminSettingsScreen';
 import { AdminInfluencerMediaScreen } from './pages/admin/AdminInfluencerMediaScreen';
 import { AdminAdsScreen } from './pages/admin/AdminAdsScreen';
+import { AdminCopyrightScreen } from './pages/admin/AdminCopyrightScreen';
 
 // Wrapper for mobile-first user routes
 const MobileAppWrapper = ({ children }) => {
@@ -123,6 +124,7 @@ function AppRoutes() {
           <Route path="/admin/subscriptions" element={<AdminSubscriptionsScreen />} />
           <Route path="/admin/manage-subscriptions" element={<AdminSubscriptionsScreen />} />
           <Route path="/admin/payouts" element={<AdminPayoutsScreen />} />
+          <Route path="/admin/copyright-claims" element={<AdminCopyrightScreen />} />
           <Route path="/admin/revenue" element={<AdminRevenueScreen />} />
           <Route path="/admin/reports" element={<AdminReportsScreen />} />
           <Route path="/admin/categories" element={<AdminCategoriesScreen />} />
