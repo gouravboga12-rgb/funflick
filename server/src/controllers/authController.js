@@ -111,3 +111,68 @@ export async function getCurrentUser(req, res) {
     return res.status(500).json({ error: 'Failed to fetch user' });
   }
 }
+
+export async function googleLogin(req, res) {
+  try {
+    const { email, name, picture, googleId } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required from Google' });
+    }
+
+    // Check if user already exists
+    const [existing] = await pool.query(
+      'SELECT * FROM users WHERE email = ? LIMIT 1',
+      [email]
+    );
+
+    let user;
+    if (existing.length > 0) {
+      user = existing[0];
+      if (picture && !user.avatar_url) {
+        await pool.query('UPDATE users SET avatar_url = ? WHERE id = ?', [picture, user.id]);
+        user.avatar_url = picture;
+      }
+    } else {
+      const baseUsername = (name || email.split('@')[0])
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_')
+        .substring(0, 30);
+      const uniqueSuffix = Math.floor(1000 + Math.random() * 9000);
+      const username = `${baseUsername}_${uniqueSuffix}`;
+      const dummyPasswordHash = await bcrypt.hash(`google_${googleId || Date.now()}`, 10);
+
+      const [result] = await pool.query(
+        'INSERT INTO users (name, username, email, password_hash, avatar_url, role) VALUES (?, ?, ?, ?, ?, ?)',
+        [name || email.split('@')[0], username, email, dummyPasswordHash, picture || null, 'user']
+      );
+
+      const [newUserRows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
+      user = newUserRows[0];
+    }
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'funflick_secret',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    return res.json({
+      message: 'Google authentication successful',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        avatar_url: user.avatar_url,
+        bio: user.bio,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error('Google auth error:', err);
+    return res.status(500).json({ error: 'Server error during Google authentication' });
+  }
+}
+

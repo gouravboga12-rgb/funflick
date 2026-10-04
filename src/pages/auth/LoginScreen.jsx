@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { motion } from 'framer-motion';
 import { Smartphone, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { GoogleAuthButton } from '../../components/auth/GoogleAuthButton';
 
 export const LoginScreen = () => {
   const navigate = useNavigate();
@@ -134,30 +135,23 @@ export const LoginScreen = () => {
           )}
         </button>
 
+        {/* Google One-Click Login Button */}
+        <div className="pt-1">
+          <GoogleAuthButton mode="login" variant="full" />
+        </div>
+
         {/* OR Divider */}
         <div className="relative flex items-center justify-center my-4">
           <div className="border-t border-white/10 w-full" />
           <span className="bg-[#090514] px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider absolute">
-            OR
+            OTHER OPTIONS
           </span>
         </div>
 
         {/* Social Login Buttons (Google, Apple, Facebook - Screen 2) */}
         <div className="flex items-center justify-center gap-4">
           {/* Google */}
-          <button
-            type="button"
-            onClick={() => handleSocialLogin('Google')}
-            className="w-12 h-12 rounded-2xl bg-[#160f2b] border border-white/10 hover:border-white/20 flex items-center justify-center hover:scale-105 active:scale-95 transition shadow-sm"
-            aria-label="Google Login"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.9C6.2 7.3 8.9 5 12 5z"/>
-              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/>
-              <path fill="#FBBC05" d="M5.3 14.7c-.2-.7-.4-1.5-.4-2.3 0-.8.1-1.6.4-2.3L1.6 7.2C.6 9.2 0 11.5 0 14s.6 4.8 1.6 6.8l3.7-2.9v-3.2z"/>
-              <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.1-6.7-5l-3.7 2.9C3.5 20.1 7.4 23 12 23z"/>
-            </svg>
-          </button>
+          <GoogleAuthButton mode="login" variant="icon" />
 
           {/* Apple */}
           <button

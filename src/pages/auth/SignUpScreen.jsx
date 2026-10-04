@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Camera, User, AtSign, Mail, Smartphone, Lock, Check } from 'lucide-react';
+import { GoogleAuthButton } from '../../components/auth/GoogleAuthButton';
 
 export const SignUpScreen = () => {
   const navigate = useNavigate();
@@ -64,8 +65,20 @@ export const SignUpScreen = () => {
         </div>
       </div>
 
+      {/* Google One-Click Sign Up */}
+      <div className="mt-4 space-y-3">
+        <GoogleAuthButton mode="signup" variant="full" />
+
+        <div className="relative flex items-center justify-center my-2">
+          <div className="border-t border-white/10 w-full" />
+          <span className="bg-[#090514] px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider absolute">
+            OR REGISTER WITH EMAIL
+          </span>
+        </div>
+      </div>
+
       {/* Form Fields */}
-      <form onSubmit={handleSignUp} className="space-y-3.5 my-4">
+      <form onSubmit={handleSignUp} className="space-y-3.5 my-3">
         {/* Full Name */}
         <div className="relative flex items-center">
           <User className="w-4 h-4 text-gray-400 absolute left-4 pointer-events-none" />
