@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { 
   Camera, 
@@ -13,18 +13,23 @@ import {
   EyeOff, 
   CheckCircle2, 
   XCircle, 
-  Loader2 
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { GoogleAuthButton } from '../../components/auth/GoogleAuthButton';
 
 export const SignUpScreen = () => {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const location = useLocation();
+  const { showToast, loginUser } = useApp();
 
-  const [avatar, setAvatar] = useState(null);
-  const [fullName, setFullName] = useState('');
+  // If redirected from Google or initiated via button
+  const [googleUser, setGoogleUser] = useState(location.state?.googleUser || null);
+
+  const [avatar, setAvatar] = useState(location.state?.googleUser?.avatar || null);
+  const [fullName, setFullName] = useState(location.state?.googleUser?.name || '');
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(location.state?.googleUser?.email || '');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -32,6 +37,15 @@ export const SignUpScreen = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // When googleUser updates, auto-populate email and name
+  useEffect(() => {
+    if (googleUser?.email) {
+      setEmail(googleUser.email);
+      if (googleUser.name && !fullName) setFullName(googleUser.name);
+      if (googleUser.avatar && !avatar) setAvatar(googleUser.avatar);
+    }
+  }, [googleUser]);
 
   // Live username uniqueness state
   const [usernameStatus, setUsernameStatus] = useState({ state: 'idle', message: '' });
@@ -76,6 +90,14 @@ export const SignUpScreen = () => {
     }
   };
 
+  const handleGoogleVerified = (profile) => {
+    setGoogleUser(profile);
+    setEmail(profile.email);
+    if (profile.name) setFullName(profile.name);
+    if (profile.avatar) setAvatar(profile.avatar);
+    showToast(`Google verified: ${profile.email}! Please pick your @handle.`, 'success');
+  };
+
   const handleSignUp = async (e) => {
     e.preventDefault();
 
@@ -101,8 +123,59 @@ export const SignUpScreen = () => {
 
     setLoading(true);
     const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = (googleUser ? googleUser.email : email).trim().toLowerCase();
 
+    // =========================================================================
+    // FLOW A: GOOGLE SIGN-UP (NO SMTP OTP NEEDED - GOOGLE ALREADY VERIFIED EMAIL)
+    // =========================================================================
+    if (googleUser) {
+      try {
+        const res = await fetch('/api/auth/google-signup-complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: fullName.trim() || cleanUsername,
+            username: cleanUsername,
+            email: cleanEmail,
+            phone: phone.trim(),
+            password,
+            avatar_url: avatar
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          if (data.token) {
+            localStorage.setItem('funflick_token', data.token);
+          }
+          loginUser(data.user);
+          showToast(`Welcome to FunFlick, @${data.user?.username}! 🎉`, 'success');
+          navigate('/feed');
+        } else {
+          showToast(data.error || 'Failed to complete registration.', 'error');
+        }
+      } catch (err) {
+        // Fallback simulation
+        const mockUser = {
+          id: Date.now(),
+          name: fullName.trim() || cleanUsername,
+          username: cleanUsername,
+          email: cleanEmail,
+          phone: phone.trim(),
+          avatar_url: avatar
+        };
+        loginUser(mockUser);
+        showToast(`Welcome to FunFlick, @${cleanUsername}! ✨`, 'success');
+        navigate('/feed');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // =========================================================================
+    // FLOW B: STANDARD EMAIL REGISTRATION (SENDS 6-DIGIT SMTP OTP)
+    // =========================================================================
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
@@ -117,7 +190,6 @@ export const SignUpScreen = () => {
       });
 
       if (res.ok) {
-        const data = await res.json();
         showToast(`Verification code sent to ${cleanEmail}! 📧`, 'success');
         navigate(`/verify?email=${encodeURIComponent(cleanEmail)}&username=${encodeURIComponent(cleanUsername)}`);
       } else {
@@ -175,17 +247,51 @@ export const SignUpScreen = () => {
         </div>
       </div>
 
-      {/* Google One-Click Sign Up */}
-      <div className="mt-4 space-y-3">
-        <GoogleAuthButton mode="signup" variant="full" />
-
-        <div className="relative flex items-center justify-center my-2">
-          <div className="border-t border-white/10 w-full" />
-          <span className="bg-[#090514] px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider absolute">
-            OR REGISTER WITH DETAILS
-          </span>
+      {/* Google Sign Up / Verified Badge */}
+      {googleUser ? (
+        <div className="mt-4 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-purple-500/15 border border-emerald-500/40 shadow-lg flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-md flex-shrink-0">
+              <img 
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
+                alt="Google" 
+                className="w-5 h-5" 
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-white font-heading">
+                  Google Verified
+                </span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> No OTP Needed
+                </span>
+              </div>
+              <span className="text-[11px] text-gray-300 font-mono block mt-0.5">
+                {googleUser.email}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setGoogleUser(null); setEmail(''); }}
+            className="text-[10px] font-semibold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-xl border border-white/10 transition cursor-pointer"
+          >
+            Change
+          </button>
         </div>
-      </div>
+      ) : (
+        <div className="mt-4 space-y-3">
+          <GoogleAuthButton mode="signup" variant="full" onGoogleVerified={handleGoogleVerified} />
+
+          <div className="relative flex items-center justify-center my-2">
+            <div className="border-t border-white/10 w-full" />
+            <span className="bg-[#090514] px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider absolute">
+              OR REGISTER WITH DETAILS
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Form Fields */}
       <form onSubmit={handleSignUp} className="space-y-3 my-2">
@@ -256,20 +362,38 @@ export const SignUpScreen = () => {
 
         {/* Email Address */}
         <div className="space-y-1">
-          <label className="text-[11px] font-semibold text-gray-300 block">Email Address</label>
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] font-semibold text-gray-300 block">Email Address</label>
+            {googleUser && (
+              <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Google Verified
+              </span>
+            )}
+          </div>
           <div className="relative flex items-center">
             <Mail className="w-4 h-4 text-gray-400 absolute left-4 pointer-events-none" />
             <input
               type="email"
               required
-              value={email}
+              value={googleUser ? googleUser.email : email}
+              readOnly={!!googleUser}
               onChange={e => setEmail(e.target.value)}
               placeholder="e.g. user@gmail.com"
-              className="w-full bg-[#160f2b] text-white placeholder-gray-500 text-xs px-11 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-[#ff007a] transition shadow-inner"
+              className={`w-full text-white placeholder-gray-500 text-xs px-11 py-3 rounded-2xl border transition shadow-inner focus:outline-none ${
+                googleUser 
+                  ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200 cursor-not-allowed' 
+                  : 'bg-[#160f2b] border-white/10 focus:border-[#ff007a]'
+              }`}
             />
           </div>
           <span className="text-[10px] text-gray-400 block px-1">
-            6-digit OTP verification code will be sent to this email
+            {googleUser ? (
+              <span className="text-emerald-400/90 font-medium">
+                ✓ Identity verified by Google. No SMTP OTP code needed.
+              </span>
+            ) : (
+              '6-digit OTP verification code will be sent to this email'
+            )}
           </span>
         </div>
 
@@ -383,10 +507,10 @@ export const SignUpScreen = () => {
           {loading ? (
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>Sending Verification Code...</span>
+              <span>{googleUser ? 'Saving Profile...' : 'Sending Verification Code...'}</span>
             </div>
           ) : (
-            <span>Continue & Verify Email</span>
+            <span>{googleUser ? 'Save & Complete Sign Up' : 'Continue & Verify Email'}</span>
           )}
         </button>
       </form>

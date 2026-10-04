@@ -17,6 +17,7 @@ export const LoginScreen = () => {
 
   // Instagram-style Account Chooser Modal state (when multiple accounts match email/phone & password)
   const [matchingAccounts, setMatchingAccounts] = useState(null);
+  const [googleAuthEmail, setGoogleAuthEmail] = useState(null);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -39,6 +40,7 @@ export const LoginScreen = () => {
         // Check if multiple accounts were found with the same credentials (Instagram Chooser)
         if (data.requiresAccountChoice && data.accounts?.length > 1) {
           setMatchingAccounts(data.accounts);
+          setGoogleAuthEmail(null);
           setLoading(false);
           return;
         }
@@ -72,13 +74,24 @@ export const LoginScreen = () => {
   const handleChooseAccount = async (account) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/select-account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: account.username, password })
-      });
+      let res;
+      if (googleAuthEmail) {
+        // Authenticated via Google OAuth
+        res = await fetch('/api/auth/google-select-account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: account.id, email: googleAuthEmail })
+        });
+      } else {
+        // Authenticated via password
+        res = await fetch('/api/auth/select-account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: account.username, password })
+        });
+      }
 
-      if (res.ok) {
+      if (res && res.ok) {
         const data = await res.json();
         if (data.token) localStorage.setItem('funflick_token', data.token);
         loginUser(data.user || account);
@@ -93,6 +106,7 @@ export const LoginScreen = () => {
       navigate('/feed');
     } finally {
       setMatchingAccounts(null);
+      setGoogleAuthEmail(null);
       setLoading(false);
     }
   };
@@ -220,7 +234,14 @@ export const LoginScreen = () => {
 
         {/* Google One-Click Login Button */}
         <div className="pt-1">
-          <GoogleAuthButton mode="login" variant="full" />
+          <GoogleAuthButton 
+            mode="login" 
+            variant="full" 
+            onAccountChoice={(accounts, email) => {
+              setMatchingAccounts(accounts);
+              setGoogleAuthEmail(email);
+            }}
+          />
         </div>
 
         {/* OR Divider */}
@@ -233,7 +254,14 @@ export const LoginScreen = () => {
 
         {/* Social Login Buttons (Google, Apple, Facebook) */}
         <div className="flex items-center justify-center gap-4">
-          <GoogleAuthButton mode="login" variant="icon" />
+          <GoogleAuthButton 
+            mode="login" 
+            variant="icon" 
+            onAccountChoice={(accounts, email) => {
+              setMatchingAccounts(accounts);
+              setGoogleAuthEmail(email);
+            }}
+          />
 
           {/* Apple */}
           <button
@@ -287,7 +315,10 @@ export const LoginScreen = () => {
                   </h3>
                 </div>
                 <button
-                  onClick={() => setMatchingAccounts(null)}
+                  onClick={() => {
+                    setMatchingAccounts(null);
+                    setGoogleAuthEmail(null);
+                  }}
                   className="p-1.5 rounded-full bg-white/10 text-gray-300 hover:text-white"
                 >
                   <X className="w-4 h-4" />
@@ -295,7 +326,9 @@ export const LoginScreen = () => {
               </div>
 
               <p className="text-xs text-gray-300">
-                Multiple accounts are registered with this email/phone. Tap to select which profile to log in:
+                {googleAuthEmail 
+                  ? `Multiple accounts found with ${googleAuthEmail}. Select which account to access:`
+                  : 'Multiple accounts match your credentials. Tap to select which profile to log in:'}
               </p>
 
               <div className="space-y-2">

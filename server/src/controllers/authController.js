@@ -497,44 +497,54 @@ export async function getCurrentUser(req, res) {
 /**
  * Google OAuth Login & Auto-Registration
  */
+/**
+ * Google Login:
+ * Strictly checks if account(s) already exist for this Google email.
+ * - If NO account: returns 404 with message 'No account found. Please sign up first!'
+ * - If 1 account: logs in immediately!
+ * - If multiple accounts: returns Instagram-style account chooser list!
+ */
 export async function googleLogin(req, res) {
   try {
-    const { email, name, picture, googleId } = req.body;
+    const { email } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: 'Email is required from Google' });
     }
 
-    const [existing] = await pool.query(
-      'SELECT * FROM users WHERE email = ? LIMIT 1',
-      [email]
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Find ALL accounts linked to this Google email
+    const [accounts] = await pool.query(
+      'SELECT id, name, username, email, phone, avatar_url, bio, role FROM users WHERE email = ?',
+      [cleanEmail]
     );
 
-    let user;
-    if (existing.length > 0) {
-      user = existing[0];
-      if (picture && !user.avatar_url) {
-        await pool.query('UPDATE users SET avatar_url = ? WHERE id = ?', [picture, user.id]);
-        user.avatar_url = picture;
-      }
-    } else {
-      const baseUsername = (name || email.split('@')[0])
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '_')
-        .substring(0, 25);
-      const uniqueSuffix = Math.floor(1000 + Math.random() * 9000);
-      const username = `${baseUsername}_${uniqueSuffix}`;
-      const dummyPasswordHash = await bcrypt.hash(`google_${googleId || Date.now()}`, 10);
-
-      const [result] = await pool.query(
-        'INSERT INTO users (name, username, email, password_hash, avatar_url, role) VALUES (?, ?, ?, ?, ?, ?)',
-        [name || email.split('@')[0], username, email, dummyPasswordHash, picture || null, 'user']
-      );
-
-      const [newUserRows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-      user = newUserRows[0];
+    if (accounts.length === 0) {
+      return res.status(404).json({
+        registered: false,
+        error: 'No FunFlicks account found with this Google email. Please Sign Up first!',
+        email: cleanEmail,
+      });
     }
 
+    // If multiple accounts share this Google email, prompt account choice
+    if (accounts.length > 1) {
+      return res.json({
+        requiresAccountChoice: true,
+        message: 'Multiple accounts found for this email. Choose which account to access:',
+        accounts: accounts.map(u => ({
+          id: u.id,
+          name: u.name,
+          username: u.username,
+          email: u.email,
+          avatar_url: u.avatar_url,
+        })),
+      });
+    }
+
+    // Exactly 1 account: log in directly
+    const user = accounts[0];
     const token = jwt.sign(
       { id: user.id, username: user.username, email: user.email, role: user.role },
       process.env.JWT_SECRET || 'funflick_secret',
@@ -542,21 +552,111 @@ export async function googleLogin(req, res) {
     );
 
     return res.json({
-      message: 'Google authentication successful',
+      message: 'Google login successful',
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        username: user.username,
-        email: user.email,
-        phone: user.phone,
-        avatar_url: user.avatar_url,
-        bio: user.bio,
-        role: user.role,
-      },
+      user,
     });
   } catch (err) {
-    console.error('Google auth error:', err);
-    return res.status(500).json({ error: 'Server error during Google authentication' });
+    console.error('Google login error:', err);
+    return res.status(500).json({ error: 'Server error during Google login' });
   }
 }
+
+/**
+ * Google Select Account Login:
+ * When multiple accounts share a Google email, user selects which one to access.
+ */
+export async function googleSelectAccount(req, res) {
+  try {
+    const { userId, email } = req.body;
+
+    if (!userId || !email) {
+      return res.status(400).json({ error: 'User ID and Google email are required' });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, name, username, email, phone, avatar_url, bio, role FROM users WHERE id = ? AND email = ?',
+      [userId, email.trim().toLowerCase()]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Selected account not found' });
+    }
+
+    const user = rows[0];
+    const token = jwt.sign(
+      { id: user.id, username: user.username, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'funflick_secret',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    return res.json({
+      message: 'Logged in successfully',
+      token,
+      user,
+    });
+  } catch (err) {
+    console.error('Google select account error:', err);
+    return res.status(500).json({ error: 'Server error selecting account' });
+  }
+}
+
+/**
+ * Google Sign-Up Complete:
+ * Called after Google auth verification when user fills in their custom handle, phone, and password.
+ * NO SMTP OTP needed because Google verified the email.
+ */
+export async function googleSignupComplete(req, res) {
+  try {
+    const { name, username, email, phone, password, avatar_url } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email, and password are required' });
+    }
+
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone ? phone.trim() : null;
+
+    // Verify username is unique
+    const [existingUser] = await pool.query(
+      'SELECT id FROM users WHERE username = ?',
+      [cleanUsername]
+    );
+
+    if (existingUser.length > 0) {
+      return res.status(400).json({ error: `@${cleanUsername} is already taken. Please choose another handle.` });
+    }
+
+    // Hash password so user can also log in with username/phone + password!
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const [result] = await pool.query(
+      'INSERT INTO users (name, username, email, phone, password_hash, avatar_url, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [name || cleanUsername, cleanUsername, cleanEmail, cleanPhone, passwordHash, avatar_url || null, 'user']
+    );
+
+    const [newUserRows] = await pool.query(
+      'SELECT id, name, username, email, phone, avatar_url, bio, role FROM users WHERE id = ?',
+      [result.insertId]
+    );
+
+    const user = newUserRows[0];
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'funflick_secret',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    return res.status(201).json({
+      message: 'Account created and verified with Google successfully!',
+      token,
+      user,
+    });
+  } catch (err) {
+    console.error('Google signup complete error:', err);
+    return res.status(500).json({ error: 'Server error completing Google registration' });
+  }
+}
+

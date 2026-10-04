@@ -8,7 +8,9 @@ import {
   forgotPasswordLookup,
   forgotPasswordReset,
   getCurrentUser, 
-  googleLogin 
+  googleLogin,
+  googleSelectAccount,
+  googleSignupComplete
 } from '../controllers/authController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -27,8 +29,11 @@ router.post('/select-account', selectAccountLogin);
 router.post('/forgot-password/lookup', forgotPasswordLookup);
 router.post('/forgot-password/reset', forgotPasswordReset);
 
-// Google OAuth
+// Google OAuth (Strictly distinct Login vs Sign-Up)
 router.post('/google', googleLogin);
+router.post('/google-login', googleLogin);
+router.post('/google-select-account', googleSelectAccount);
+router.post('/google-signup-complete', googleSignupComplete);
 
 // Protected session check
 router.get('/me', authenticateToken, getCurrentUser);

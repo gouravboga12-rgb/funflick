@@ -25,13 +25,15 @@ function parseJwt(token) {
 export const GoogleAuthButton = ({ 
   mode = 'login', // 'login' | 'signup'
   variant = 'full', // 'full' | 'icon'
+  onGoogleVerified, // callback for Sign Up flow to continue to details
+  onAccountChoice, // callback for Login flow when multiple accounts exist
   onSuccess
 }) => {
   const navigate = useNavigate();
   const { loginUser, showToast } = useApp();
   const [loading, setLoading] = useState(false);
 
-  // Process user data obtained from Google (via credential JWT or access_token userinfo)
+  // Process user data obtained from Google
   const handleGoogleSuccess = async (googleUser) => {
     setLoading(true);
     try {
@@ -40,42 +42,69 @@ export const GoogleAuthButton = ({
       const avatar = googleUser.picture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80';
       const googleId = googleUser.sub || googleUser.id || 'google_user';
 
-      // 1. Send to Backend API if reachable
-      try {
-        const response = await fetch('/api/auth/google', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, name, picture: avatar, googleId })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.token) {
-            localStorage.setItem('funflick_token', data.token);
-          }
+      // ========================================================
+      // 1. SIGN-UP FLOW WITH GOOGLE
+      // ========================================================
+      if (mode === 'signup') {
+        setLoading(false);
+        // Do NOT auto-login! Google has verified the email.
+        // Hand off to parent screen so user fills in custom @username, phone, and password!
+        if (onGoogleVerified) {
+          onGoogleVerified({ email, name, avatar, googleId });
+        } else {
+          // If on standalone page, pass to sign up
+          navigate('/signup', { state: { googleUser: { email, name, avatar, googleId } } });
         }
-      } catch (apiErr) {
-        console.warn('Backend API request skipped or offline:', apiErr);
+        return;
       }
 
-      // 2. Set client application session
-      loginUser({
-        name,
-        username: email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_'),
-        email,
-        avatar
-      });
+      // ========================================================
+      // 2. LOGIN FLOW WITH GOOGLE
+      // ========================================================
+      try {
+        const response = await fetch('/api/auth/google-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
 
-      showToast(
-        mode === 'signup'
-          ? `Welcome to FunFlick, ${name}! 🎉`
-          : `Signed in as ${name} via Google ✨`,
-        'success'
-      );
+        const data = await response.json();
 
-      if (onSuccess) {
-        onSuccess(googleUser);
-      } else {
-        navigate('/feed');
+        // Case A: No account found
+        if (response.status === 404 || data.registered === false) {
+          showToast('No FunFlicks account found with this Google email. Please Sign Up first!', 'error');
+          setTimeout(() => {
+            navigate('/signup', { state: { googleUser: { email, name, avatar, googleId } } });
+          }, 1200);
+          return;
+        }
+
+        // Case B: Multiple accounts found on same Gmail (Instagram Chooser)
+        if (data.requiresAccountChoice && data.accounts?.length > 1) {
+          if (onAccountChoice) {
+            onAccountChoice(data.accounts, email);
+          } else {
+            showToast('Multiple accounts found. Please choose an account.', 'info');
+          }
+          return;
+        }
+
+        // Case C: Single account found -> Direct Login
+        if (data.token) {
+          localStorage.setItem('funflick_token', data.token);
+        }
+
+        loginUser(data.user);
+        showToast(`Welcome back, ${data.user?.name || name}! ✨`, 'success');
+
+        if (onSuccess) {
+          onSuccess(data.user);
+        } else {
+          navigate('/feed');
+        }
+      } catch (apiErr) {
+        console.warn('API error during Google login:', apiErr);
+        showToast('Login verification failed. Please check connection.', 'error');
       }
     } catch (err) {
       console.error('Google auth processing error:', err);
@@ -89,7 +118,6 @@ export const GoogleAuthButton = ({
   const triggerGoogleSignIn = () => {
     if (typeof window === 'undefined' || !window.google?.accounts) {
       showToast('Loading Google Sign-In SDK... please wait a moment.', 'info');
-      // If SDK not ready, retry in 500ms
       setTimeout(() => {
         if (window.google?.accounts) {
           initiateFlow();
@@ -115,7 +143,7 @@ export const GoogleAuthButton = ({
           if (tokenResponse.error) {
             console.error('Google Token error:', tokenResponse);
             setLoading(false);
-            showToast(`Google login error: ${tokenResponse.error}`, 'error');
+            showToast(`Google sign-in error: ${tokenResponse.error}`, 'error');
             return;
           }
 
