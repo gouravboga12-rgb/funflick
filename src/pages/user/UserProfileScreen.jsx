@@ -170,14 +170,15 @@ export const UserProfileScreen = () => {
         {/* User Card */}
         <div className="flex flex-col items-center text-center space-y-2.5 pt-1">
           <div className="relative">
+            {/* Same profile icon style for both Users and Influencers */}
             <img
               src={currentUser.avatar}
               alt={currentUser.name}
               className="w-20 h-20 rounded-full object-cover border-2 border-pink-500 shadow-xl"
             />
-            {currentUser.hasPublishingSubscription && (
-              <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-gradient-to-r from-amber-400 to-pink-500 flex items-center justify-center text-xs shadow-md border-2 border-[#090514]" title="Active Creator Publishing Pass">
-                👑
+            {currentUser.isInfluencer && (
+              <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-gradient-to-r from-amber-400 to-pink-500 flex items-center justify-center text-xs shadow-md border-2 border-[#090514]" title="Active Influencer Subscription">
+                ⭐
               </span>
             )}
           </div>
@@ -187,8 +188,12 @@ export const UserProfileScreen = () => {
               <h2 className="text-lg font-extrabold text-white font-heading">
                 {currentUser.name}
               </h2>
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-pink-500/20 text-pink-300 border border-pink-500/30">
-                Influencer Ready
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                currentUser.isInfluencer
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+              }`}>
+                {currentUser.isInfluencer ? '⭐ Influencer' : 'User (Free Member)'}
               </span>
             </div>
             <span className="text-xs text-gray-400 font-semibold block">
@@ -283,28 +288,32 @@ export const UserProfileScreen = () => {
                     Influencer & Creator Status
                   </span>
                   <p className="text-[10px] text-gray-300">
-                    One unified account: View content, upload reels, get admin verification, and earn wallet payouts!
+                    Free upload for all! Upgrade to Influencer to unlock in-depth media analytics & Admin monetary rewards.
                   </p>
                 </div>
               </div>
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
-                Active
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border shrink-0 ${
+                currentUser.isInfluencer
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : 'bg-white/10 text-gray-400 border-white/10'
+              }`}>
+                {currentUser.isInfluencer ? 'Influencer Active' : 'User (Free)'}
               </span>
             </div>
 
-            {/* Publishing Subscription Requirement Banner */}
+            {/* Influencer Subscription Banner */}
             <div 
-              onClick={() => setSubscriptionGateModalOpen(true)}
+              onClick={() => navigate('/subscription')}
               className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
-                currentUser.hasPublishingSubscription
-                  ? 'bg-gradient-to-r from-emerald-950/50 via-teal-950/40 to-[#120d29] border-emerald-500/40'
+                currentUser.isInfluencer
+                  ? 'bg-gradient-to-r from-amber-950/40 via-purple-950/40 to-[#120d29] border-amber-500/40'
                   : 'bg-gradient-to-r from-pink-950/60 via-purple-950/50 to-amber-950/40 border-pink-500/50 shadow-lg shadow-pink-500/10'
               }`}
             >
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 ${
-                  currentUser.hasPublishingSubscription 
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                  currentUser.isInfluencer 
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
                     : 'bg-gradient-to-tr from-pink-500 to-amber-500 shadow'
                 }`}>
                   <Crown className="w-5 h-5" />
@@ -312,22 +321,22 @@ export const UserProfileScreen = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-white font-heading">
-                      {currentUser.hasPublishingSubscription
-                        ? `Publishing Pass: Active (${currentUser.subscriptionPlan || 'Monthly'})`
-                        : 'Publishing Subscription Required'}
+                      {currentUser.isInfluencer
+                        ? `Influencer Plan: ${currentUser.subscriptionPlan || 'Monthly Pass'}`
+                        : 'Upgrade to Influencer Status'}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold ${
-                      currentUser.hasPublishingSubscription
+                      currentUser.isInfluencer
                         ? 'bg-emerald-500/20 text-emerald-300'
                         : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
                     }`}>
-                      {currentUser.hasPublishingSubscription ? 'UNLOCKED' : 'ACTION REQUIRED'}
+                      {currentUser.isInfluencer ? 'SUBSCRIBED' : 'BOOST REACH'}
                     </span>
                   </div>
                   <p className="text-[10px] text-gray-300 mt-0.5">
-                    {currentUser.hasPublishingSubscription
-                      ? 'Unlimited uploads, stories, and eligible for admin video performance rewards'
-                      : 'Subscribe to publish reels/videos. All posts are verified by Admin before going live.'}
+                    {currentUser.isInfluencer
+                      ? 'Deep analytics (Views, Likes, Comments, Shares, Saves, Performance) & Admin rewards eligible'
+                      : 'Free uploads active for everyone. Subscribe to become an Influencer and unlock deep analytics & rewards!'}
                   </p>
                 </div>
               </div>
@@ -337,13 +346,7 @@ export const UserProfileScreen = () => {
             {/* Quick Action Influencer Grid */}
             <div className="grid grid-cols-3 gap-2.5">
               <button
-                onClick={() => {
-                  if (!currentUser.hasPublishingSubscription) {
-                    setSubscriptionGateModalOpen(true);
-                  } else {
-                    navigate('/upload-video');
-                  }
-                }}
+                onClick={() => navigate('/create/video')}
                 className="p-3 rounded-2xl bg-[#160f33] hover:bg-[#1f1545] border border-white/10 flex flex-col items-center text-center gap-1.5 transition active:scale-95 group"
               >
                 <div className="w-9 h-9 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center group-hover:bg-pink-500 group-hover:text-white transition">
@@ -352,7 +355,7 @@ export const UserProfileScreen = () => {
                 <span className="text-[11px] font-bold text-white leading-tight">
                   Upload Reel
                 </span>
-                <span className="text-[9px] text-gray-400">Post Video</span>
+                <span className="text-[9px] text-emerald-400 font-semibold">100% Free</span>
               </button>
 
               <button
@@ -451,13 +454,7 @@ export const UserProfileScreen = () => {
                   </span>
                 </div>
                 <button 
-                  onClick={() => {
-                    if (!currentUser.hasPublishingSubscription) {
-                      setSubscriptionGateModalOpen(true);
-                    } else {
-                      navigate('/upload-video');
-                    }
-                  }}
+                  onClick={() => navigate('/upload-video')}
                   className="text-[11px] font-bold text-pink-400 hover:text-pink-300"
                 >
                   + Submit Reel

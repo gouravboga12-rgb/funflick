@@ -11,6 +11,9 @@ import {
   INITIAL_PAYOUTS,
   ADMIN_PENDING_APPROVALS,
   PUBLISHING_PLANS,
+  INFLUENCER_SUBSCRIPTION_PLANS,
+  INITIAL_INFLUENCER_MEDIA,
+  INITIAL_ADS,
   INITIAL_USER_SUBMISSIONS
 } from '../data/mockData';
 
@@ -18,7 +21,8 @@ const AppContext = createContext(null);
 
 export const AppProvider = ({ children }) => {
   // Current user state (Unified Viewer + Influencer)
-  // Ensure subscription is OFF by default for test account so user can test subscription flow fresh
+  // Rule 1: Upload is free for everyone!
+  // Rule 2: Subscribing to an Influencer plan unlocks Influencer status & deep analytics
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('funflick_user');
     let userObj = CURRENT_USER;
@@ -29,8 +33,10 @@ export const AppProvider = ({ children }) => {
     }
     const freshState = {
       ...userObj,
-      hasPublishingSubscription: false,
-      subscriptionPlan: null
+      hasPublishingSubscription: true, // Free upload for everyone!
+      isInfluencer: !!userObj.isInfluencer,
+      accountStatus: userObj.isInfluencer ? 'Influencer' : 'User',
+      subscriptionPlan: userObj.subscriptionPlan || null
     };
     try {
       localStorage.setItem('funflick_user', JSON.stringify(freshState));
@@ -89,11 +95,26 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : INITIAL_PAYOUTS;
   });
 
-  // Global Publishing Subscription Plans (Admin Managed & Globally Synced)
+  // Global Influencer Subscription Plans (Admin Managed & Globally Synced)
   const [publishingPlans, setPublishingPlans] = useState(() => {
     const saved = localStorage.getItem('funflick_publishing_plans');
-    return saved ? JSON.parse(saved) : PUBLISHING_PLANS;
+    return saved ? JSON.parse(saved) : (INFLUENCER_SUBSCRIPTION_PLANS || PUBLISHING_PLANS);
   });
+
+  // Influencer Media Items (For Admin Review & Rewards)
+  const [influencerMedia, setInfluencerMedia] = useState(() => {
+    const saved = localStorage.getItem('funflick_influencer_media');
+    return saved ? JSON.parse(saved) : INITIAL_INFLUENCER_MEDIA;
+  });
+
+  // Ads & Promotions (For Admin Management & In-App Popups)
+  const [adsList, setAdsList] = useState(() => {
+    const saved = localStorage.getItem('funflick_ads');
+    return saved ? JSON.parse(saved) : INITIAL_ADS;
+  });
+
+  // Active Mobile Popup Ad
+  const [activePopupAd, setActivePopupAd] = useState(null);
 
   // Admin pending video approvals
   const [pendingApprovals, setPendingApprovals] = useState(ADMIN_PENDING_APPROVALS);
@@ -243,21 +264,24 @@ export const AppProvider = ({ children }) => {
     showToast('Comment posted! 💬');
   };
 
-  // FunFlick Platform Publishing Subscription Purchase
+  // Influencer Subscription Purchase (Free uploads for all; Subscription unlocks Influencer status & analytics)
   const purchasePublishingSubscription = (planId) => {
-    const plan = publishingPlans.find(p => p.id === planId) || publishingPlans[0] || PUBLISHING_PLANS[1];
+    const plan = publishingPlans.find(p => p.id === planId) || publishingPlans[0] || INFLUENCER_SUBSCRIPTION_PLANS[1];
     setCurrentUser(prev => ({
       ...prev,
+      isInfluencer: true,
+      hasInfluencerSubscription: true,
       hasPublishingSubscription: true,
+      accountStatus: 'Influencer',
       subscriptionPlan: plan.name,
-      walletBalance: Math.max(0, prev.walletBalance - plan.price)
+      walletBalance: Math.max(0, (prev.walletBalance || 125430) - plan.price)
     }));
 
     // Record wallet transaction
     const newTx = {
       id: 'tx_' + Date.now(),
-      title: `Publishing ${plan.name} Subscription`,
-      desc: `FunFlick Creator Plan (${plan.formattedPrice})`,
+      title: `Influencer ${plan.name} Subscription`,
+      desc: `FunFlick Influencer Tier (${plan.formattedPrice})`,
       type: 'debit',
       amount: plan.price,
       formattedAmount: `-${plan.formattedPrice}`,
@@ -268,7 +292,7 @@ export const AppProvider = ({ children }) => {
     setTransactions(prev => [newTx, ...prev]);
 
     setSubscriptionGateModalOpen(false);
-    showToast(`🎉 Publishing Unlocked! Welcome to FunFlick Creator Suite (${plan.name} Plan)`, 'success');
+    showToast(`🎉 Influencer Status Activated! Welcome to FunFlick Influencer Suite (${plan.name})`, 'success');
   };
 
   // Admin: Update an existing plan globally
@@ -284,7 +308,19 @@ export const AppProvider = ({ children }) => {
       }
       return p;
     }));
-    showToast(`✅ Plan "${updatedPlan.name}" updated globally across user side!`, 'success');
+    showToast(`✅ Plan "${updatedPlan.name}" updated globally!`, 'success');
+  };
+
+  // Admin: Toggle plan active/inactive status
+  const togglePlanActiveStatus = (planId) => {
+    setPublishingPlans(prev => prev.map(p => {
+      if (p.id === planId) {
+        const nextActive = p.active === false ? true : false;
+        showToast(`Plan "${p.name}" is now ${nextActive ? 'ACTIVE' : 'INACTIVE'}`, 'info');
+        return { ...p, active: nextActive };
+      }
+      return p;
+    }));
   };
 
   // Admin: Add a new custom plan
@@ -295,11 +331,13 @@ export const AppProvider = ({ children }) => {
       id: planId,
       price: Number(newPlan.price),
       formattedPrice: `₹${Number(newPlan.price).toLocaleString()}`,
+      duration: newPlan.duration || '30 Days',
+      active: newPlan.active !== undefined ? newPlan.active : true,
       popular: !!newPlan.popular,
-      features: Array.isArray(newPlan.features) ? newPlan.features : ['Unlimited video uploads', 'Creator studio tools']
+      features: Array.isArray(newPlan.features) ? newPlan.features : ['Influencer badge', 'Advanced analytics & rewards']
     };
     setPublishingPlans(prev => [...prev, formatted]);
-    showToast(`🎉 New plan "${newPlan.name}" added to user subscription plans!`, 'success');
+    showToast(`🎉 New plan "${newPlan.name}" added to influencer plans!`, 'success');
   };
 
   // Admin: Delete a plan
@@ -310,22 +348,142 @@ export const AppProvider = ({ children }) => {
 
   // Admin: Reset plans to default
   const resetPublishingPlansToDefault = () => {
-    setPublishingPlans(PUBLISHING_PLANS);
+    setPublishingPlans(INFLUENCER_SUBSCRIPTION_PLANS);
     localStorage.removeItem('funflick_publishing_plans');
-    showToast('Publishing plans reset to default factory values!', 'info');
+    showToast('Influencer plans reset to default factory values!', 'info');
   };
 
-  // Toggle user subscription for quick testing in prototype demo
+  // Toggle user Influencer status for quick testing in prototype demo
   const toggleUserSubscriptionStatus = () => {
     setCurrentUser(prev => {
-      const nextStatus = !prev.hasPublishingSubscription;
-      showToast(nextStatus ? 'Publishing subscription: ACTIVE (Unlocked)' : 'Publishing subscription: INACTIVE (Locked)', 'info');
+      const nextStatus = !prev.isInfluencer;
+      showToast(nextStatus ? 'Status updated: INFLUENCER (Subscription Active ⭐)' : 'Status updated: USER (Regular Member)', 'info');
       return {
         ...prev,
-        hasPublishingSubscription: nextStatus,
-        subscriptionPlan: nextStatus ? 'Monthly' : null
+        isInfluencer: nextStatus,
+        hasInfluencerSubscription: nextStatus,
+        accountStatus: nextStatus ? 'Influencer' : 'User',
+        subscriptionPlan: nextStatus ? 'Monthly Influencer Pro' : null
       };
     });
+  };
+
+  // Admin: Send Influencer Content Reward (Payment)
+  const sendInfluencerReward = (mediaId, amount) => {
+    const numAmount = Number(amount);
+    if (!numAmount || numAmount <= 0) {
+      showToast('⚠️ Please enter a valid reward amount (₹)', 'error');
+      return false;
+    }
+
+    let rewardedItem = null;
+
+    setInfluencerMedia(prev => prev.map(item => {
+      if (item.id === mediaId) {
+        rewardedItem = item;
+        return {
+          ...item,
+          paymentStatus: 'Paid',
+          paidAmount: numAmount,
+          paidDate: 'Just now'
+        };
+      }
+      return item;
+    }));
+
+    // If current user is the rewarded creator, credit wallet
+    if (rewardedItem && (rewardedItem.username === currentUser.username || rewardedItem.influencerName === currentUser.name)) {
+      setCurrentUser(prev => ({
+        ...prev,
+        walletBalance: (prev.walletBalance || 0) + numAmount
+      }));
+    }
+
+    // Add to transactions log
+    const payoutTx = {
+      id: 'tx_rwd_' + Date.now(),
+      title: `Content Reward: ${rewardedItem?.title?.slice(0, 30) || 'Video Performance'}`,
+      desc: `Admin Reward sent to @${rewardedItem?.username || 'influencer'}`,
+      type: 'credit',
+      amount: numAmount,
+      formattedAmount: `+₹${numAmount.toLocaleString()}`,
+      date: 'Today',
+      status: 'Completed',
+      category: 'Admin Reward'
+    };
+    setTransactions(prev => [payoutTx, ...prev]);
+
+    // Also record in Admin Payouts list
+    const adminPayoutEntry = {
+      id: 'po_' + Date.now(),
+      creator: rewardedItem?.influencerName || 'Influencer',
+      username: rewardedItem?.username || 'creator',
+      avatar: rewardedItem?.avatar || '/brand/funflick-logo.png',
+      amount: `₹${numAmount.toLocaleString()}`,
+      period: 'Performance Bonus',
+      views: rewardedItem?.views || '100K',
+      subscribers: 'Active Member',
+      status: 'Completed',
+      date: 'Today'
+    };
+    setAdminPayouts(prev => [adminPayoutEntry, ...prev]);
+
+    showToast(`🎉 Reward of ₹${numAmount.toLocaleString()} sent to ${rewardedItem?.influencerName || 'Creator'}! Payment status: PAID`, 'success');
+    return true;
+  };
+
+  // Admin: Create New Ad
+  const createAd = (adData) => {
+    const newAd = {
+      ...adData,
+      id: 'ad_' + Date.now(),
+      impressions: 0,
+      clicks: 0,
+      active: adData.active !== undefined ? adData.active : true,
+      duration: Number(adData.duration) || 15,
+      allowCloseAfter: Number(adData.allowCloseAfter) || 0
+    };
+    setAdsList(prev => [newAd, ...prev]);
+    showToast(`📢 Ad "${newAd.title}" published successfully!`, 'success');
+    return newAd;
+  };
+
+  // Admin: Update Ad
+  const updateAd = (id, adData) => {
+    setAdsList(prev => prev.map(ad => ad.id === id ? { ...ad, ...adData } : ad));
+    showToast('✅ Advertisement updated successfully!', 'success');
+  };
+
+  // Admin: Delete Ad
+  const deleteAd = (id) => {
+    setAdsList(prev => prev.filter(ad => ad.id !== id));
+    showToast('Advertisement deleted.', 'info');
+  };
+
+  // Admin: Toggle Ad Active / Inactive
+  const toggleAdStatus = (id) => {
+    setAdsList(prev => prev.map(ad => {
+      if (ad.id === id) {
+        const nextStatus = !ad.active;
+        showToast(`Ad "${ad.title}" is now ${nextStatus ? 'ACTIVE' : 'INACTIVE'}`, 'info');
+        return { ...ad, active: nextStatus };
+      }
+      return ad;
+    }));
+  };
+
+  // Mobile In-App Ad Popup Trigger
+  const showMobileAd = (adId) => {
+    const targetAd = adId ? adsList.find(a => a.id === adId) : adsList.find(a => a.active) || adsList[0];
+    if (targetAd) {
+      setActivePopupAd(targetAd);
+    } else {
+      showToast('No active ads configured to display!', 'info');
+    }
+  };
+
+  const dismissMobileAd = () => {
+    setActivePopupAd(null);
   };
 
   // Publish a new Post
@@ -492,13 +650,8 @@ export const AppProvider = ({ children }) => {
     }, 1500);
   };
 
-  // Submit Video for Central Admin Verification (Unified Influencer Workflow)
+  // Submit Video for Central Admin Verification (Unified Influencer Workflow) - FREE FOR ALL USERS!
   const submitVideoForVerification = (videoData) => {
-    if (!currentUser.hasPublishingSubscription) {
-      setSubscriptionGateModalOpen(true);
-      showToast('⚠️ Creator Publishing Plan required to post reels!', 'error');
-      return { success: false, reason: 'subscription_required' };
-    }
 
     const submissionId = 'sub_' + Date.now();
     const newSubmission = {
@@ -559,13 +712,8 @@ export const AppProvider = ({ children }) => {
     return { success: true, submission: newSubmission };
   };
 
-  // Submit Post (Photo / Clip) for Central Admin Verification (Instagram-Style Flow)
+  // Submit Post (Photo / Clip) for Central Admin Verification - FREE FOR ALL USERS!
   const submitPostForVerification = (postData) => {
-    if (!currentUser.hasPublishingSubscription) {
-      setSubscriptionGateModalOpen(true);
-      showToast('⚠️ Creator Publishing Plan required to post media!', 'error');
-      return { success: false, reason: 'subscription_required' };
-    }
 
     const submissionId = 'sub_' + Date.now();
     const newSubmission = {
@@ -622,13 +770,8 @@ export const AppProvider = ({ children }) => {
     return { success: true, submission: newSubmission };
   };
 
-  // Submit Story for Central Admin Verification
+  // Submit Story for Central Admin Verification - FREE FOR ALL USERS!
   const submitStoryForVerification = (storyData) => {
-    if (!currentUser.hasPublishingSubscription) {
-      setSubscriptionGateModalOpen(true);
-      showToast('⚠️ Creator Publishing Plan required to post stories!', 'error');
-      return { success: false, reason: 'subscription_required' };
-    }
 
     const submissionId = 'sub_' + Date.now();
     const newSubmission = {
@@ -950,7 +1093,18 @@ export const AppProvider = ({ children }) => {
         updatePublishingPlan,
         addPublishingPlan,
         deletePublishingPlan,
+        togglePlanActiveStatus,
         resetPublishingPlansToDefault,
+        influencerMedia,
+        sendInfluencerReward,
+        adsList,
+        createAd,
+        updateAd,
+        deleteAd,
+        toggleAdStatus,
+        activePopupAd,
+        showMobileAd,
+        dismissMobileAd,
         resetDemoData,
         theme,
         setTheme,

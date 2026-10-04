@@ -18,7 +18,9 @@ import {
   ShieldCheck,
   Search,
   Sun,
-  Moon
+  Moon,
+  Sparkles,
+  Megaphone
 } from 'lucide-react';
 
 export const AdminLayout = ({ children, title = 'Dashboard' }) => {
@@ -32,6 +34,8 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
 
   const navLinks = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
+    { label: 'Influencer Media & Rewards', icon: Sparkles, path: '/admin/influencer-media' },
+    { label: 'Ads & Promotions', icon: Megaphone, path: '/admin/ads' },
     { label: 'Users', icon: Users, path: '/admin/users' },
     { label: 'Creators', icon: Video, path: '/admin/creators' },
     { label: 'Content Moderation', icon: Video, path: '/admin/content', badge: pendingApprovals.length },

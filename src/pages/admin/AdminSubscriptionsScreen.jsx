@@ -34,6 +34,7 @@ export const AdminSubscriptionsScreen = () => {
     updatePublishingPlan, 
     addPublishingPlan, 
     deletePublishingPlan, 
+    togglePlanActiveStatus,
     resetPublishingPlansToDefault,
     showToast,
     currentUser,
@@ -51,9 +52,11 @@ export const AdminSubscriptionsScreen = () => {
     name: '',
     price: 199,
     period: 'month',
+    duration: '30 Days',
     label: '',
     savings: '',
     popular: false,
+    active: true,
     description: '',
     features: []
   });
@@ -82,9 +85,11 @@ export const AdminSubscriptionsScreen = () => {
       name: plan.name,
       price: plan.price,
       period: plan.period,
+      duration: plan.duration || (plan.period === 'week' ? '7 Days' : plan.period === '3 months' ? '90 Days' : plan.period === 'year' ? '365 Days' : '30 Days'),
       label: plan.label || '',
       savings: plan.savings || '',
       popular: !!plan.popular,
+      active: plan.active !== false,
       description: plan.description || '',
       features: [...(plan.features || [])]
     });
@@ -348,19 +353,34 @@ export const AdminSubscriptionsScreen = () => {
                         </div>
 
                         {/* Card Footer Controls */}
-                        <div className="pt-3 flex items-center justify-between gap-2">
-                          <button
-                            onClick={() => handleTogglePopular(plan)}
-                            title={isPopular ? 'Remove popular tag' : 'Set as most popular'}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border transition ${
-                              isPopular
-                                ? 'bg-pink-500/20 text-pink-300 border-pink-500/40 hover:bg-pink-500/30'
-                                : 'bg-white/5 text-gray-400 border-white/5 hover:text-white'
-                            }`}
-                          >
-                            <Star className={`w-3 h-3 ${isPopular ? 'fill-current text-pink-400' : ''}`} />
-                            <span>{isPopular ? 'Featured' : 'Make Featured'}</span>
-                          </button>
+                        <div className="pt-3 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            {/* Active/Inactive Status Toggle */}
+                            <button
+                              onClick={() => togglePlanActiveStatus(plan.id)}
+                              title="Toggle whether plan is visible to users"
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition flex items-center gap-1 ${
+                                plan.active !== false
+                                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30'
+                                  : 'bg-gray-500/20 text-gray-400 border-gray-500/40 hover:bg-gray-500/30'
+                              }`}
+                            >
+                              <span>{plan.active !== false ? '● Active' : '○ Inactive'}</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleTogglePopular(plan)}
+                              title={isPopular ? 'Remove popular tag' : 'Set as most popular'}
+                              className={`flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-semibold border transition ${
+                                isPopular
+                                  ? 'bg-pink-500/20 text-pink-300 border-pink-500/40 hover:bg-pink-500/30'
+                                  : 'bg-white/5 text-gray-400 border-white/5 hover:text-white'
+                              }`}
+                            >
+                              <Star className={`w-3 h-3 ${isPopular ? 'fill-current text-pink-400' : ''}`} />
+                              <span>{isPopular ? 'Featured' : 'Feature'}</span>
+                            </button>
+                          </div>
 
                           <div className="flex items-center gap-1.5">
                             <button
@@ -730,6 +750,35 @@ export const AdminSubscriptionsScreen = () => {
                         placeholder="e.g. Save 35%"
                         className="w-full bg-[#1b1338] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-pink-500"
                       />
+                    </div>
+                  </div>
+
+                  {/* Duration & Active status (Requirement 2) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-300">Plan Duration</label>
+                      <input
+                        type="text"
+                        value={editingPlan.duration || '30 Days'}
+                        onChange={e => setEditingPlan({ ...editingPlan, duration: e.target.value })}
+                        placeholder="e.g. 7 Days, 30 Days, 90 Days"
+                        className="w-full bg-[#1b1338] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-pink-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-300">Active Status</label>
+                      <button
+                        type="button"
+                        onClick={() => setEditingPlan({ ...editingPlan, active: !editingPlan.active })}
+                        className={`w-full py-2 rounded-xl text-xs font-bold border transition ${
+                          editingPlan.active
+                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                            : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                        }`}
+                      >
+                        {editingPlan.active ? 'Active (Visible on App)' : 'Inactive (Hidden)'}
+                      </button>
                     </div>
                   </div>
 

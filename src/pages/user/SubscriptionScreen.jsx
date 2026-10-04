@@ -46,7 +46,7 @@ export const SubscriptionScreen = () => {
           <ChevronLeft className="w-6 h-6" />
         </button>
         <span className="text-sm font-bold text-white font-heading">
-          Publishing Subscription
+          Influencer Subscription
         </span>
         <div className="w-6" />
       </div>
@@ -60,34 +60,34 @@ export const SubscriptionScreen = () => {
             <Crown className="w-7 h-7" />
           </div>
           <h2 className="text-xl font-extrabold text-white font-heading">
-            Unlock FunFlick Creator Suite
+            Upgrade to Influencer Status
           </h2>
           <p className="text-xs text-gray-300 max-w-xs mx-auto leading-relaxed">
-            Free viewing for everyone. Subscribe once to publish unlimited comedy posts, high-res videos & stories.
+            <span className="text-emerald-400 font-semibold">Uploading is 100% Free for everyone!</span> Subscribe to become an Influencer, unlock deep engagement analytics, and earn cash rewards from Admin.
           </p>
         </div>
 
         {/* Current Active Plan Badge if subscribed */}
-        {currentUser.hasPublishingSubscription && (
+        {currentUser.isInfluencer && (
           <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
               <div>
-                <span className="text-xs font-bold text-white block">
-                  Active Plan: {currentUser.subscriptionPlan || 'Monthly Plan'}
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  ⭐ Influencer Active: {currentUser.subscriptionPlan || 'Monthly Influencer Pro'}
                 </span>
-                <span className="text-[10px] text-emerald-300">Renews next month automatically</span>
+                <span className="text-[10px] text-emerald-300">Eligible for Admin Performance Cash Rewards</span>
               </div>
             </div>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white">
-              ACTIVE
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white shadow">
+              INFLUENCER
             </span>
           </div>
         )}
 
         {/* Plan Cards Grid */}
         <div className="space-y-3">
-          {activePlans.map(plan => {
+          {activePlans.filter(p => p.active !== false).map(plan => {
             const isSelected = selectedPlanId === plan.id;
             return (
               <div
@@ -191,7 +191,7 @@ export const SubscriptionScreen = () => {
               </div>
             ) : (
               <>
-                <span>{currentUser.hasPublishingSubscription ? 'Switch / Renew Plan' : 'Purchase Publishing Pass'}</span>
+                <span>{currentUser.isInfluencer ? 'Renew / Upgrade Influencer Plan' : 'Activate Influencer Status'}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}

@@ -6,78 +6,93 @@ export const BRAND = {
   logo: '/brand/funflick-logo.png',
 };
 
-// Platform Publishing Subscription Plans
-export const PUBLISHING_PLANS = [
+// Influencer Subscription Plans (Free uploads for all; Subscription unlocks Influencer status & analytics)
+export const INFLUENCER_SUBSCRIPTION_PLANS = [
   {
     id: 'weekly',
-    name: 'Weekly',
-    price: 1599,
-    formattedPrice: '₹1,599',
+    name: 'Weekly Influencer',
+    price: 99,
+    formattedPrice: '₹99',
     period: 'week',
-    label: 'Weekly Access',
-    description: 'Perfect for testing creator tools for 7 days',
+    duration: '7 Days',
+    label: 'Starter Pass',
+    description: 'Perfect for trying Influencer analytics & rewards for 7 days',
     popular: false,
+    active: true,
     savings: null,
     features: [
-      'Unlimited post & video publishing',
-      'Create 24h stories with music',
-      'Standard creator analytics',
-      'Community badge'
+      'Official Influencer status badge',
+      'Advanced performance analytics (Views, Likes, Comments, Shares, Saves)',
+      'Engagement rate analysis',
+      'Eligible for Admin Content Cash Rewards',
+      'Fast-track creator support'
     ]
   },
   {
     id: 'monthly',
-    name: 'Monthly',
+    name: 'Monthly Influencer Pro',
     price: 199,
     formattedPrice: '₹199',
     period: 'month',
+    duration: '30 Days',
     label: 'Most Popular',
     description: 'Billed monthly. Cancel anytime.',
     popular: true,
+    active: true,
     savings: 'Save 45%',
     features: [
-      'Unlimited post & video publishing',
-      'Create 24h stories with custom music & stickers',
-      'Full Creator Studio access & video analytics',
-      'Eligible for creator monetization & bonuses',
+      'Official Influencer status badge',
+      'Full in-depth video & reel analytics',
+      'Views, Likes, Comments, Shares, Saves & Engagement %',
+      'Eligible for Admin Performance Cash Rewards',
+      'Direct wallet earnings transfer',
       'Priority content indexing in Discover'
     ]
   },
   {
     id: 'quarterly',
-    name: 'Quarterly',
+    name: 'Quarterly Influencer Star',
     price: 499,
     formattedPrice: '₹499',
     period: '3 months',
-    label: '3 Month Plan',
-    description: '₹166/month. Save more on long term.',
+    duration: '90 Days',
+    label: 'Best Value',
+    description: '₹166/month. Save more for consistent creators.',
     popular: false,
+    active: true,
     savings: 'Save 60%',
     features: [
-      'All Monthly plan features included',
-      'Quarterly creator spotlight boost',
-      'Priority approval on branded content',
-      'Dedicated creator support'
+      'All Monthly Influencer Pro benefits',
+      'Quarterly Influencer spotlight boost',
+      'Top priority for Admin performance payouts',
+      'Exclusive brand promotion opportunities',
+      'Dedicated influencer manager'
     ]
   },
   {
     id: 'yearly',
-    name: 'Yearly',
-    price: 699,
-    formattedPrice: '₹699',
+    name: 'Annual VIP Influencer',
+    price: 1499,
+    formattedPrice: '₹1,499',
     period: 'year',
-    label: 'Best Value',
-    description: '₹58/month. Ultimate value for creators.',
+    duration: '365 Days',
+    label: 'VIP Access',
+    description: '₹125/month. For serious professional creators.',
     popular: false,
-    savings: 'Save 75%',
+    active: true,
+    savings: 'Save 70%',
     features: [
-      'Everything in Quarterly plan',
-      'Gold verified creator badge candidate',
-      '0% commission on fan tips for 6 months',
-      'Early access to new editing features & AI tools'
+      'All Quarterly benefits included',
+      'VIP Gold Influencer verification badge',
+      'Maximum tier for Admin content cash rewards',
+      'Invitation to FunFlick Creator Summits',
+      'Early access to all upcoming monetization tools'
     ]
   }
 ];
+
+// Alias for backwards compatibility
+export const PUBLISHING_PLANS = INFLUENCER_SUBSCRIPTION_PLANS;
 
 // Creator Direct Subscription Plans (Fan subscriptions like Screen 7)
 export const CREATOR_SUBSCRIPTION_PLANS = [
@@ -907,3 +922,237 @@ export const ADMIN_REPORTS = [
     status: 'Pending'
   }
 ];
+
+// Initial Media for Admin Influencer Review & Content Rewards
+export const INITIAL_INFLUENCER_MEDIA = [
+  {
+    id: 'med_1',
+    influencerName: 'Pavani Official',
+    username: 'pavani_official',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
+    isInfluencer: true,
+    subscriptionPlan: 'Monthly Influencer Pro',
+    contentType: 'video', // 'video', 'post', 'story'
+    title: 'When parents catch you scrolling reels at 3 AM 😂',
+    thumbnail: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    mediaUrl: 'https://assets.mixkit.co/videos/preview/mixkit-girl-in-neon-sign-1232-large.mp4',
+    category: 'Comedy',
+    date: '2 hours ago',
+    views: '142.8K',
+    viewsCount: 142800,
+    likes: '28.4K',
+    likesCount: 28400,
+    comments: '1,840',
+    commentsCount: 1840,
+    shares: '6,210',
+    sharesCount: 6210,
+    saves: '3,450',
+    savesCount: 3450,
+    engagementRate: '27.9%',
+    currentEarning: '₹4,500',
+    paymentStatus: 'Pending Reward', // 'Pending Reward' | 'Paid'
+    paidAmount: null,
+    paidDate: null
+  },
+  {
+    id: 'med_2',
+    influencerName: 'Fun Bros Comedy',
+    username: 'fun_bros',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    isInfluencer: true,
+    subscriptionPlan: 'Quarterly Influencer Star',
+    contentType: 'video',
+    title: 'Corporate Appraisal vs Real Life Expectations 💀',
+    thumbnail: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=400&q=80',
+    mediaUrl: 'https://assets.mixkit.co/videos/preview/mixkit-man-dancing-under-neon-lights-1230-large.mp4',
+    category: 'Workplace Comedy',
+    date: 'Yesterday',
+    views: '98.5K',
+    viewsCount: 98500,
+    likes: '19.2K',
+    likesCount: 19200,
+    comments: '940',
+    commentsCount: 940,
+    shares: '4,100',
+    sharesCount: 4100,
+    saves: '2,100',
+    savesCount: 2100,
+    engagementRate: '26.7%',
+    currentEarning: '₹3,200',
+    paymentStatus: 'Pending Reward',
+    paidAmount: null,
+    paidDate: null
+  },
+  {
+    id: 'med_3',
+    influencerName: 'Srilatha Reddy',
+    username: 'srilatha_16',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    isInfluencer: true,
+    subscriptionPlan: 'Monthly Influencer Pro',
+    contentType: 'post',
+    title: 'Hyderabad Sunday Biryani Trail with the gang! 🍗✨',
+    thumbnail: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=400&q=80',
+    mediaUrl: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=800&q=80',
+    category: 'Food & Laughs',
+    date: '3 days ago',
+    views: '45.2K',
+    viewsCount: 45200,
+    likes: '8.9K',
+    likesCount: 8900,
+    comments: '412',
+    commentsCount: 412,
+    shares: '1,280',
+    sharesCount: 1280,
+    saves: '950',
+    savesCount: 950,
+    engagementRate: '25.5%',
+    currentEarning: '₹1,800',
+    paymentStatus: 'Paid',
+    paidAmount: 1800,
+    paidDate: '02 Oct, 2026'
+  },
+  {
+    id: 'med_4',
+    influencerName: 'Rohan Deshmukh',
+    username: 'rohan_comedy',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
+    isInfluencer: true,
+    subscriptionPlan: 'Annual VIP Influencer',
+    contentType: 'video',
+    title: 'Types of people during Engineering viva exams 😂',
+    thumbnail: 'https://images.unsplash.com/photo-1516251193007-45ef944ab0c6?auto=format&fit=crop&w=400&q=80',
+    mediaUrl: 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-on-video-call-40068-large.mp4',
+    category: 'College Life',
+    date: '5 days ago',
+    views: '210.4K',
+    viewsCount: 210400,
+    likes: '42.1K',
+    likesCount: 42100,
+    comments: '3,100',
+    commentsCount: 3100,
+    shares: '11.5K',
+    sharesCount: 11500,
+    saves: '7,800',
+    savesCount: 7800,
+    engagementRate: '30.6%',
+    currentEarning: '₹7,500',
+    paymentStatus: 'Paid',
+    paidAmount: 7500,
+    paidDate: '01 Oct, 2026'
+  },
+  {
+    id: 'med_5',
+    influencerName: 'Sneha Patel',
+    username: 'sneha_laughs',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
+    isInfluencer: true,
+    subscriptionPlan: 'Weekly Influencer',
+    contentType: 'story',
+    title: 'BTS rehearsals for tonight live show in Bengaluru! 🎤🔥',
+    thumbnail: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=400&q=80',
+    mediaUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=800&q=80',
+    category: 'Behind The Scenes',
+    date: '6 hours ago',
+    views: '18.9K',
+    viewsCount: 18900,
+    likes: '3.4K',
+    likesCount: 3400,
+    comments: '180',
+    commentsCount: 180,
+    shares: '560',
+    sharesCount: 560,
+    saves: '290',
+    savesCount: 290,
+    engagementRate: '23.4%',
+    currentEarning: '₹1,000',
+    paymentStatus: 'Pending Reward',
+    paidAmount: null,
+    paidDate: null
+  },
+  {
+    id: 'med_6',
+    influencerName: 'Rahul Verma (User)',
+    username: 'rahul_v',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+    isInfluencer: false,
+    subscriptionPlan: null,
+    contentType: 'post',
+    title: 'First standup comedy open mic trial in Pune! 🎙️',
+    thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80',
+    mediaUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
+    category: 'Standup',
+    date: '1 day ago',
+    views: '3.2K',
+    viewsCount: 3200,
+    likes: '420',
+    likesCount: 420,
+    comments: '35',
+    commentsCount: 35,
+    shares: '12',
+    sharesCount: 12,
+    saves: '18',
+    savesCount: 18,
+    engagementRate: '15.1%',
+    currentEarning: '₹0',
+    paymentStatus: 'Regular User (No Sub)',
+    paidAmount: null,
+    paidDate: null
+  }
+];
+
+// Initial In-App Mobile Ads for Admin "Ads & Promotions"
+export const INITIAL_ADS = [
+  {
+    id: 'ad_1',
+    title: 'Swiggy Weekend Comedy Bites - 50% OFF 🍔',
+    type: 'image', // 'image' | 'video'
+    mediaUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80',
+    duration: 10,
+    allowCloseAfter: 0, // 0 = closeable immediately
+    active: true,
+    startDate: '2026-10-01',
+    endDate: '2026-10-31',
+    frequency: 'On App Open',
+    actionUrl: 'https://swiggy.com',
+    actionText: 'Order Food Now',
+    impressions: 4820,
+    clicks: 640
+  },
+  {
+    id: 'ad_2',
+    title: 'Noise Smart Wireless Earbuds - Bass Edition 🎧',
+    type: 'video',
+    mediaUrl: 'https://assets.mixkit.co/videos/preview/mixkit-young-man-wearing-headphones-enjoying-music-40955-large.mp4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80',
+    duration: 20,
+    allowCloseAfter: 8, // Close button available after 8s countdown
+    active: true,
+    startDate: '2026-10-01',
+    endDate: '2026-11-15',
+    frequency: 'Every 3 Reels',
+    actionUrl: 'https://gonoise.com',
+    actionText: 'Shop Earbuds 40% Off',
+    impressions: 12500,
+    clicks: 1890
+  },
+  {
+    id: 'ad_3',
+    title: 'FunFlick Creator Fest Hyderabad 2026 🎟️',
+    type: 'video',
+    mediaUrl: 'https://assets.mixkit.co/videos/preview/mixkit-dj-mixing-music-at-a-party-with-neon-lights-42995-large.mp4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80',
+    duration: 15,
+    allowCloseAfter: 15, // Unskippable: close only after video ends
+    active: false,
+    startDate: '2026-11-01',
+    endDate: '2026-11-05',
+    frequency: 'Once per session',
+    actionUrl: 'https://funflick.in/fest',
+    actionText: 'Book VIP Pass',
+    impressions: 3100,
+    clicks: 520
+  }
+];
+

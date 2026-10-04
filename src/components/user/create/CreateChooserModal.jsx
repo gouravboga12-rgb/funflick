@@ -63,12 +63,7 @@ export const CreateChooserModal = () => {
                 key={opt.title}
                 onClick={() => {
                   setCreateModalOpen(false);
-                  if (!currentUser?.hasPublishingSubscription) {
-                    setSubscriptionGateModalOpen(true);
-                    showToast('⚠️ Creator Publishing Plan required to create media!', 'error');
-                  } else {
-                    navigate(opt.path);
-                  }
+                  navigate(opt.path);
                 }}
                 className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-pink-500/40 cursor-pointer transition group"
               >

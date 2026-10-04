@@ -19,7 +19,7 @@ export const FloatingNavButton = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, toggleUserSubscriptionStatus, resetDemoData, theme } = useApp();
+  const { currentUser, toggleUserSubscriptionStatus, resetDemoData, theme, showMobileAd } = useApp();
   const isLight = theme === 'light';
 
   const sections = [
@@ -56,7 +56,9 @@ export const FloatingNavButton = () => {
     {
       title: 'Admin Management Hub',
       links: [
-        { num: '★', name: 'Admin Manage Subscriptions (Global Plans)', path: '/admin/manage-subscriptions' },
+        { num: '★', name: 'Admin: Influencer Media & Rewards (NEW)', path: '/admin/influencer-media' },
+        { num: '★', name: 'Admin: Ads & Promotions (NEW)', path: '/admin/ads' },
+        { num: '★', name: 'Admin Manage Subscriptions (Influencer Plans)', path: '/admin/manage-subscriptions' },
         { num: '★', name: 'Admin Creator Payouts (Section 36)', path: '/admin/payouts' },
         { num: '★', name: 'Admin User Management', path: '/admin/users' },
         { num: '★', name: 'Admin Content Moderation', path: '/admin/content' },
@@ -168,26 +170,45 @@ export const FloatingNavButton = () => {
                   </button>
                 </div>
 
-                {/* Subscription Gate Tester */}
+                {/* Influencer Status Tester */}
                 <button
                   onClick={toggleUserSubscriptionStatus}
                   className={`w-full py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-between transition ${
                     currentUser.hasPublishingSubscription
-                      ? (isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300')
-                      : (isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-950/60 border-amber-500/40 text-amber-300')
+                      ? (isLight ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-amber-950/60 border-amber-500/40 text-amber-300')
+                      : (isLight ? 'bg-slate-100 border-slate-300 text-slate-800' : 'bg-white/5 border-white/10 text-gray-300')
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
                     {currentUser.hasPublishingSubscription ? (
-                      <CheckCircle2 className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                      <CheckCircle2 className={`w-3.5 h-3.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
                     ) : (
-                      <Lock className={`w-3.5 h-3.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
+                      <Lock className={`w-3.5 h-3.5 ${isLight ? 'text-slate-500' : 'text-gray-400'}`} />
                     )}
-                    <span>Publishing Plan:</span>
+                    <span>Account Status:</span>
                   </div>
                   <span className="font-bold underline">
-                    {currentUser.hasPublishingSubscription ? 'Active (Click to Lock)' : 'Locked (Click to Unlock)'}
+                    {currentUser.hasPublishingSubscription ? '⭐ Influencer (Subscribed)' : 'User (Free Member)'}
                   </span>
+                </button>
+
+                {/* Mobile Popup Ad Tester */}
+                <button
+                  onClick={() => {
+                    showMobileAd();
+                    setIsOpen(false);
+                  }}
+                  className={`w-full py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-between transition ${
+                    isLight 
+                      ? 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100' 
+                      : 'bg-purple-950/40 border-purple-500/30 text-purple-300 hover:bg-purple-900/40'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span>📱</span>
+                    <span>Test Mobile Pop-up Ad:</span>
+                  </span>
+                  <span className="font-bold underline text-pink-400">Trigger Overlay</span>
                 </button>
               </div>
 
