@@ -83,6 +83,35 @@ export const CreateChooserModal = () => {
             );
           })}
         </div>
+
+        {/* Free Upload Note & Influencer Upgrade Discovery Banner */}
+        <div 
+          onClick={() => {
+            setCreateModalOpen(false);
+            navigate('/subscription');
+          }}
+          className="mt-3.5 p-3 rounded-2xl bg-gradient-to-r from-amber-500/15 via-pink-500/15 to-purple-500/15 border border-amber-500/30 flex items-center justify-between cursor-pointer hover:border-amber-400 transition group"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="text-lg">⭐</span>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-white block">
+                  Uploading is 100% Free for Everyone!
+                </span>
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-emerald-500/20 text-emerald-300">
+                  FREE
+                </span>
+              </div>
+              <p className="text-[10px] text-pink-300 mt-0.5">
+                {currentUser?.isInfluencer 
+                  ? '⭐ Influencer Pass Active: Deep analytics & Admin rewards enabled'
+                  : 'Want deep 8-factor analytics & Admin cash rewards? Upgrade to Influencer'}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-pink-400 group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
+        </div>
       </motion.div>
     </div>
   );

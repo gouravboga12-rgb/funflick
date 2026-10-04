@@ -78,10 +78,10 @@ export const UserProfileScreen = () => {
     },
     {
       icon: Crown,
-      color: 'text-purple-400',
-      label: 'Fan Subscriptions',
-      badge: '2 Subscribed',
-      badgeColor: 'bg-purple-500/20 text-purple-300',
+      color: 'text-amber-400',
+      label: 'Influencer Membership Plans',
+      badge: currentUser.isInfluencer ? '⭐ Influencer Active' : 'Upgrade to Influencer',
+      badgeColor: currentUser.isInfluencer ? 'bg-amber-500/20 text-amber-300' : 'bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold animate-pulse',
       path: '/subscription'
     },
     {
@@ -232,13 +232,33 @@ export const UserProfileScreen = () => {
             </div>
           </div>
 
-          {/* Edit Profile CTA Button */}
-          <button
-            onClick={() => setIsEditModalOpen(true)}
-            className="w-full py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs tracking-wide border border-white/10 transition"
-          >
-            Edit Profile
-          </button>
+          {/* Profile CTA Buttons */}
+          <div className="grid grid-cols-2 gap-2 w-full">
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs tracking-wide border border-white/10 transition"
+            >
+              Edit Profile
+            </button>
+
+            {!currentUser.isInfluencer ? (
+              <button
+                onClick={() => navigate('/subscription')}
+                className="py-2 px-2 rounded-xl bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:opacity-95 text-white font-bold text-xs tracking-wide shadow-md shadow-pink-500/25 flex items-center justify-center gap-1.5 transition active:scale-95 animate-pulse"
+              >
+                <span>⭐</span>
+                <span>Get Influencer Pass</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/subscription')}
+                className="py-2 px-2 rounded-xl bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 font-bold text-xs tracking-wide flex items-center justify-center gap-1.5 transition"
+              >
+                <span>⭐</span>
+                <span>Influencer Active</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ======================================================== */}
