@@ -21,20 +21,20 @@ export const SignUpScreen = () => {
   const navigate = useNavigate();
   const { showToast } = useApp();
 
-  const [avatar, setAvatar] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80');
-  const [fullName, setFullName] = useState('Srilatha Reddy');
-  const [username, setUsername] = useState('srilatha_16');
-  const [email, setEmail] = useState('funflick0308@gmail.com');
-  const [phone, setPhone] = useState('+91 98765 43210');
-  const [password, setPassword] = useState('FunFlick@2026');
-  const [confirmPassword, setConfirmPassword] = useState('FunFlick@2026');
+  const [avatar, setAvatar] = useState(null);
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(true);
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Live username uniqueness state
-  const [usernameStatus, setUsernameStatus] = useState({ state: 'available', message: 'Available' }); // 'idle' | 'checking' | 'available' | 'taken'
+  const [usernameStatus, setUsernameStatus] = useState({ state: 'idle', message: '' });
 
   // Debounced check for unique User ID
   useEffect(() => {
@@ -157,11 +157,17 @@ export const SignUpScreen = () => {
 
         {/* Avatar Upload Preview */}
         <div className="relative mt-4">
-          <img
-            src={avatar}
-            alt="Profile preview"
-            className="w-20 h-20 rounded-full object-cover border-2 border-pink-500 shadow-xl"
-          />
+          <div className="w-20 h-20 rounded-full border-2 border-pink-500 shadow-xl overflow-hidden bg-[#160f2b] flex items-center justify-center">
+            {avatar ? (
+              <img
+                src={avatar}
+                alt="Profile preview"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <User className="w-9 h-9 text-gray-400" />
+            )}
+          </div>
           <label className="absolute bottom-0 right-0 p-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white cursor-pointer shadow-lg hover:scale-110 active:scale-95 transition">
             <Camera className="w-3.5 h-3.5" />
             <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />

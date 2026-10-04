@@ -20,7 +20,7 @@ export const ForgotPasswordScreen = () => {
   const navigate = useNavigate();
   const { showToast } = useApp();
 
-  const [identifier, setIdentifier] = useState('funflick0308@gmail.com');
+  const [identifier, setIdentifier] = useState('');
   const [step, setStep] = useState(1); // 1 = Lookup, 2 = Account Selection / OTP & New Password
   const [loading, setLoading] = useState(false);
 

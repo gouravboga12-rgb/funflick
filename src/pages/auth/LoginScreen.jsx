@@ -9,10 +9,10 @@ export const LoginScreen = () => {
   const navigate = useNavigate();
   const { showToast, loginUser } = useApp();
 
-  const [identifier, setIdentifier] = useState('srilatha_16');
-  const [password, setPassword] = useState('FunFlick@2026');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Instagram-style Account Chooser Modal state (when multiple accounts match email/phone & password)
