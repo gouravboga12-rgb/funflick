@@ -24,12 +24,51 @@ export async function initDatabase() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         username VARCHAR(50) NOT NULL UNIQUE,
-        email VARCHAR(120) NOT NULL UNIQUE,
+        email VARCHAR(120) NOT NULL,
+        phone VARCHAR(20) DEFAULT NULL,
         password_hash VARCHAR(255) NOT NULL,
         avatar_url TEXT DEFAULT NULL,
         bio TEXT DEFAULT NULL,
         role ENUM('user', 'creator', 'admin') DEFAULT 'user',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_email (email),
+        INDEX idx_phone (phone)
+      ) ENGINE=InnoDB;
+    `);
+
+    // Migration helper: add phone column if not present
+    try {
+      const [colRows] = await connection.query(`
+        SHOW COLUMNS FROM users LIKE 'phone'
+      `);
+      if (colRows.length === 0) {
+        await connection.query(`ALTER TABLE users ADD COLUMN phone VARCHAR(20) DEFAULT NULL AFTER email`);
+      }
+    } catch (err) {}
+
+    // Migration helper: drop unique constraint on email if present
+    try {
+      const [indexRows] = await connection.query(`
+        SHOW INDEX FROM users WHERE Column_name = 'email' AND Non_unique = 0
+      `);
+      if (indexRows.length > 0) {
+        await connection.query(`ALTER TABLE users DROP INDEX \`${indexRows[0].Key_name}\``);
+        await connection.query(`ALTER TABLE users ADD INDEX idx_email (email)`);
+      }
+    } catch (err) {}
+
+    // Email Verifications / OTP table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS email_verifications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(120) NOT NULL,
+        otp_code VARCHAR(10) NOT NULL,
+        type ENUM('registration', 'forgot_password') DEFAULT 'registration',
+        target_username VARCHAR(50) DEFAULT NULL,
+        payload JSON DEFAULT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_email_otp (email, otp_code)
       ) ENGINE=InnoDB;
     `);
 
