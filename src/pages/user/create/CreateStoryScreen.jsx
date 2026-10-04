@@ -18,6 +18,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { UploadSuccessMonetizationModal } from '../../../components/common/UploadSuccessMonetizationModal';
 
 const SAMPLE_STORY_PHOTOS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
@@ -218,41 +219,13 @@ export const CreateStoryScreen = () => {
         )}
       </div>
 
-      {/* Submission Success Modal */}
+      {/* Submission Success Modal with Influencer & High Views/Likes Payments Pop Message */}
       {submittedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-sm bg-[#140d2d] border border-pink-500/40 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white mx-auto shadow-lg shadow-emerald-500/30">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-1.5">
-              <h3 className="text-base font-extrabold text-white font-heading">
-                Story Sent for Admin Verification!
-              </h3>
-              <p className="text-xs text-gray-300 leading-relaxed">
-                Your 24h story has been sent to the Admin Moderation Desk. Once verified, it will be added to your profile's story ring for your followers.
-              </p>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <button
-                onClick={() => navigate('/admin/content')}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md"
-              >
-                <span>Go to Admin Moderation Desk to Approve</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                onClick={() => navigate('/')}
-                className="w-full py-2 rounded-xl bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white font-bold text-xs transition"
-              >
-                Return to Home Feed
-              </button>
-            </div>
-          </div>
-        </div>
+        <UploadSuccessMonetizationModal
+          item={submittedItem}
+          type="Story"
+          onClose={() => setSubmittedItem(null)}
+        />
       )}
     </div>
   );

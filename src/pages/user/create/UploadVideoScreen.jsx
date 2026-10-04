@@ -28,6 +28,7 @@ import {
   Film
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { UploadSuccessMonetizationModal } from '../../../components/common/UploadSuccessMonetizationModal';
 
 const SAMPLE_COMEDY_VIDEOS = [
   {
@@ -533,56 +534,13 @@ export const UploadVideoScreen = () => {
         </button>
       </div>
 
-      {/* Submission Success Modal */}
+      {/* Submission Success Modal with Influencer & High Views/Likes Payments Pop Message */}
       {submittedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-sm bg-[#140d2d] border border-pink-500/40 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white mx-auto shadow-lg shadow-emerald-500/30">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-1.5">
-              <h3 className="text-base font-extrabold text-white font-heading">
-                Reel Submitted for Verification!
-              </h3>
-              <p className="text-xs text-gray-300 leading-relaxed">
-                Your reel <span className="text-pink-300 font-bold">"{submittedItem.title}"</span> has been sent to the Central Admin Moderation Desk.
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5 text-left text-xs space-y-2">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-gray-400">Current Status:</span>
-                <span className="px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 text-[10px]">
-                  ⏳ In Admin Review
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-gray-400">Next Action:</span>
-                <span className="text-gray-200 text-[10px]">
-                  Admin approves at <code className="text-pink-300 font-mono">/admin/content</code>
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <button
-                onClick={() => navigate('/profile?tab=influencer')}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xs shadow-md"
-              >
-                Track in My Influencer Hub
-              </button>
-
-              <button
-                onClick={() => navigate('/admin/content')}
-                className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
-              >
-                <span>Go to Admin Moderation Desk to Approve</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <UploadSuccessMonetizationModal
+          item={submittedItem}
+          type="Reel"
+          onClose={() => setSubmittedItem(null)}
+        />
       )}
     </div>
   );
