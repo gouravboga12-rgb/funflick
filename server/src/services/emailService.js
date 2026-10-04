@@ -1,14 +1,22 @@
+import 'dotenv/config';
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587', 10),
-  secure: false, // TLS
-  auth: {
-    user: process.env.SMTP_USER || 'funflick0308@gmail.com',
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
+function getTransporter() {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const user = process.env.SMTP_USER || 'funflick0308@gmail.com';
+  const pass = (process.env.SMTP_PASSWORD || '').trim();
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: {
+      user,
+      pass,
+    },
+  });
+}
 
 /**
  * Send 6-digit OTP Email for Registration or Password Reset
@@ -71,6 +79,7 @@ export async function sendOtpEmail({ toEmail, otpCode, username = '', type = 're
     </html>
   `;
 
+  const transporter = getTransporter();
   const info = await transporter.sendMail({
     from: process.env.SMTP_FROM || '"FunFlicks" <funflick0308@gmail.com>',
     to: toEmail,
