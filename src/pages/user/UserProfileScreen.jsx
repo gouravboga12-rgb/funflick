@@ -46,7 +46,8 @@ export const UserProfileScreen = () => {
     deleteUserPost,
     setSubscriptionGateModalOpen, 
     setCreateModalOpen,
-    showToast 
+    showToast,
+    logoutUser
   } = useApp();
 
   const [activeProfileMode, setActiveProfileMode] = useState(initialTab); // 'viewer' | 'influencer'
@@ -118,8 +119,9 @@ export const UserProfileScreen = () => {
   ];
 
   const handleLogout = () => {
+    logoutUser();
     showToast('Logged out of FunFlick session', 'info');
-    navigate('/login');
+    navigate('/splash');
   };
 
   return (

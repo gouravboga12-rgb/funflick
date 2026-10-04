@@ -57,7 +57,7 @@ const MobileAppWrapper = ({ children }) => {
 
 function AppRoutes() {
   const location = useLocation();
-  const { theme } = useApp();
+  const { theme, isAuthenticated } = useApp();
   const isAdmin = location.pathname.startsWith('/admin');
   const isCreatorStudio = location.pathname.startsWith('/creator') && location.pathname !== '/creator/pavani_official' && !location.pathname.startsWith('/creator/c');
 
@@ -73,7 +73,15 @@ function AppRoutes() {
 
       <div className="flex-1 flex flex-col">
         <Routes>
-          {/* Auth Routes */}
+          {/* Initial Entry Route: Visitors get the Get Started Splash Page First */}
+          <Route 
+            path="/" 
+            element={
+              <MobileAppWrapper>
+                {!isAuthenticated ? <SplashScreen /> : <HomeScreen />}
+              </MobileAppWrapper>
+            } 
+          />
           <Route path="/splash" element={<MobileAppWrapper><SplashScreen /></MobileAppWrapper>} />
           <Route path="/login" element={<MobileAppWrapper><LoginScreen /></MobileAppWrapper>} />
           <Route path="/signup" element={<MobileAppWrapper><SignUpScreen /></MobileAppWrapper>} />
@@ -81,7 +89,7 @@ function AppRoutes() {
           <Route path="/forgot-password" element={<MobileAppWrapper><ForgotPasswordScreen /></MobileAppWrapper>} />
 
           {/* User Mobile App Routes */}
-          <Route path="/" element={<MobileAppWrapper><HomeScreen /></MobileAppWrapper>} />
+          <Route path="/feed" element={<MobileAppWrapper><HomeScreen /></MobileAppWrapper>} />
           <Route path="/reels" element={<MobileAppWrapper><ReelsScreen /></MobileAppWrapper>} />
           <Route path="/discover" element={<MobileAppWrapper><DiscoverScreen /></MobileAppWrapper>} />
           <Route path="/video/:id" element={<MobileAppWrapper><VideoDetailScreen /></MobileAppWrapper>} />

@@ -44,6 +44,24 @@ export const AppProvider = ({ children }) => {
     return freshState;
   });
 
+  // Track session authentication (ensure new visitors get Get Started / Splash first)
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem('funflick_authenticated') === 'true';
+  });
+
+  const loginUser = (customUser) => {
+    setIsAuthenticated(true);
+    sessionStorage.setItem('funflick_authenticated', 'true');
+    if (customUser) {
+      setCurrentUser(prev => ({ ...prev, ...customUser }));
+    }
+  };
+
+  const logoutUser = () => {
+    setIsAuthenticated(false);
+    sessionStorage.removeItem('funflick_authenticated');
+  };
+
   // User video submissions (for Influencer Section verification tracker)
   const [userSubmissions, setUserSubmissions] = useState(() => {
     const saved = localStorage.getItem('funflick_submissions');
@@ -1108,7 +1126,10 @@ export const AppProvider = ({ children }) => {
         resetDemoData,
         theme,
         setTheme,
-        toggleTheme
+        toggleTheme,
+        isAuthenticated,
+        loginUser,
+        logoutUser
       }}
     >
       {children}

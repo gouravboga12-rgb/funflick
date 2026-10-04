@@ -20,16 +20,12 @@ export const BottomNavigation = () => {
   const unreadMessages = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
 
   const handleCreateClick = () => {
-    // Check FunFlick Publishing Monetization Requirement!
-    if (!currentUser.hasPublishingSubscription) {
-      setSubscriptionGateModalOpen(true);
-    } else {
-      setCreateModalOpen(true);
-    }
+    // Upload is free for everyone!
+    setCreateModalOpen(true);
   };
 
   const navItems = [
-    { label: 'Home', icon: Home, path: '/' },
+    { label: 'Home', icon: Home, path: '/feed' },
     { label: 'Discover', icon: Compass, path: '/discover' },
     { label: 'Create', isCreate: true },
     { label: 'Inbox', icon: MessageSquare, path: '/messages', badge: unreadMessages },
@@ -61,7 +57,7 @@ export const BottomNavigation = () => {
             );
           }
 
-          const isActive = currentPath === item.path;
+          const isActive = currentPath === item.path || (item.path === '/feed' && currentPath === '/');
           const Icon = item.icon;
 
           return (

@@ -28,7 +28,7 @@ export const FloatingNavButton = () => {
       links: [
         { num: '1', name: 'Splash Screen', path: '/splash' },
         { num: '2', name: 'Login Screen (Unified Account)', path: '/login' },
-        { num: '3', name: 'Home / Video Feed', path: '/' },
+        { num: '3', name: 'Home / Video Feed', path: '/feed' },
         { num: '4', name: 'Discover / Categories', path: '/discover' },
         { num: '5', name: 'Creator Showcase Profile', path: '/creator/pavani_official' },
         { num: '6', name: 'User Profile & Influencer Hub', path: '/profile?tab=influencer' },

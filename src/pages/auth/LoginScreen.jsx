@@ -6,7 +6,7 @@ import { Smartphone, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 
 export const LoginScreen = () => {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const { showToast, loginUser } = useApp();
 
   const [identifier, setIdentifier] = useState('srilatha_16');
   const [password, setPassword] = useState('••••••••');
@@ -19,14 +19,16 @@ export const LoginScreen = () => {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
+      loginUser();
       showToast('Welcome back, Srilatha! ✨', 'success');
-      navigate('/');
+      navigate('/feed');
     }, 700);
   };
 
   const handleSocialLogin = (platform) => {
+    loginUser();
     showToast(`Logged in via ${platform}!`, 'success');
-    navigate('/');
+    navigate('/feed');
   };
 
   return (
