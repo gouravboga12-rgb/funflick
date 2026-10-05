@@ -28,3 +28,14 @@ server/.env.*
 *.njsproj
 *.sln
 *.sw?
+
+# Security & Credentials - Prevent Key Leaks
+*.csv
+rzp-key*
+*.pem
+*.key
+*.cert
+*.crt
+*credential*
+credentials.json
+client_secret*.json
