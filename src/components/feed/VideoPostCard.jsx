@@ -22,7 +22,8 @@ import {
   EyeOff, 
   Eye, 
   Ban,
-  BarChart3
+  BarChart3,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CommentSheet } from './CommentSheet';
@@ -33,6 +34,11 @@ import { PostInsightsModal } from './PostInsightsModal';
 export const VideoPostCard = ({ post }) => {
   const navigate = useNavigate();
   const { toggleLikePost, recordPostView, toggleSavePost, toggleFollowCreator, deleteUserPost, blockUser, currentUser, showToast } = useApp();
+
+  const isOwner = post.creator?.username === currentUser?.username;
+  const isPrivateAccount = !!post.creator?.isPrivate;
+  const hasAccess = isOwner || post.isFollowing || post.isSubscribed;
+  const isLocked = isPrivateAccount && !hasAccess;
 
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -51,6 +57,7 @@ export const VideoPostCard = ({ post }) => {
 
   // Record view after 2.5s of continuous watch
   const handleTimeUpdate = () => {
+    if (isLocked) return;
     if (!hasRecordedViewRef.current && videoRef.current) {
       if (videoRef.current.currentTime >= 2.5) {
         hasRecordedViewRef.current = true;
@@ -113,9 +120,44 @@ export const VideoPostCard = ({ post }) => {
       {/* Video / Media Player */}
       <div 
         className="absolute inset-0 z-0 cursor-pointer flex items-center justify-center bg-black"
-        onClick={handleVideoClick}
+        onClick={isLocked ? undefined : handleVideoClick}
       >
-        {post.mediaType === 'video' && post.mediaUrl ? (
+        {isLocked ? (
+          <div className="relative w-full h-full bg-black flex items-center justify-center overflow-hidden">
+            {/* Heavily blurred background */}
+            {post.posterUrl || post.mediaUrl ? (
+              <img
+                src={post.posterUrl || post.mediaUrl}
+                alt={post.title}
+                className="w-full h-full object-cover filter blur-2xl opacity-35 scale-110 pointer-events-none"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-[#1b092b] via-black to-[#0d0718]" />
+            )}
+
+            {/* Lock Center Overlay */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 bg-black/60 backdrop-blur-md">
+              <div className="w-16 h-16 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-pink-500 mb-4 shadow-xl shadow-pink-500/10">
+                <Lock className="w-8 h-8 text-pink-500" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-1.5 font-heading">
+                This Account is Private
+              </h3>
+              <p className="text-xs text-gray-300 max-w-[260px] mb-6 leading-relaxed">
+                Follow or subscribe to <span className="font-semibold text-white">@{post.creator.username}</span> to view their videos and photos.
+              </p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFollowCreator(post.creator.username);
+                }}
+                className="px-6 py-2.5 rounded-full text-xs font-bold bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white shadow-lg shadow-pink-500/25 hover:opacity-95 active:scale-95 transition"
+              >
+                Follow to Watch
+              </button>
+            </div>
+          </div>
+        ) : post.mediaType === 'video' && post.mediaUrl ? (
           <video
             ref={videoRef}
             src={post.mediaUrl}
@@ -188,6 +230,11 @@ export const VideoPostCard = ({ post }) => {
             <span className="font-extrabold text-sm text-white drop-shadow-md group-hover:underline">
               @{post.creator.username}
             </span>
+            {isPrivateAccount && (
+              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[10px] font-semibold">
+                <Lock className="w-2.5 h-2.5" />
+              </span>
+            )}
             {post.creator.isVerified && (
               <span className="w-4 h-4 rounded-full bg-[#0070f3] flex items-center justify-center text-white text-[10px] font-bold">
                 ✓

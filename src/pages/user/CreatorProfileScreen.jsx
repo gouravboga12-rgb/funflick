@@ -15,17 +15,41 @@ import {
   Info, 
   Play, 
   Crown,
-  CheckCircle2
+  CheckCircle2,
+  Lock
 } from 'lucide-react';
 
 export const CreatorProfileScreen = () => {
   const { username } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { creators, toggleFollowCreator, showToast } = useApp();
+  const { creators, currentUser, toggleFollowCreator, showToast } = useApp();
 
-  const creator = creators.find(c => c.username === (username || 'pavani_official')) || creators[0];
-  
+  const isOwner = username === currentUser.username;
+  const creator = isOwner 
+    ? {
+        name: currentUser.name,
+        username: currentUser.username,
+        avatar: currentUser.avatar,
+        bio: currentUser.bio,
+        isPrivate: currentUser.isPrivate,
+        isFollowing: true,
+        isSubscribed: true,
+        stats: currentUser.stats,
+        socials: { instagram: currentUser.username, youtube: currentUser.username }
+      }
+    : (creators.find(c => c.username === username) || {
+        name: username,
+        username: username,
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+        bio: 'FunFlick Creator | Entertaining India 🎬✨',
+        isPrivate: false,
+        stats: { followers: '0', following: 0, posts: 0 }
+      });
+
+  const isAccountPrivate = isOwner ? !!currentUser.isPrivate : !!creator.isPrivate;
+  const hasAccess = isOwner || creator.isFollowing || creator.isSubscribed;
+
   const [activeTab, setActiveTab] = useState('Videos');
   const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(searchParams.get('subscribe') === 'true');
 
@@ -115,6 +139,11 @@ export const CreatorProfileScreen = () => {
               <h2 className="text-base font-extrabold text-white font-heading">
                 {creator.name}
               </h2>
+              {isAccountPrivate && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-semibold border border-amber-500/30">
+                  <Lock className="w-2.5 h-2.5" /> Private
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-300 mt-1 leading-relaxed">
               {creator.bio}
@@ -193,8 +222,24 @@ export const CreatorProfileScreen = () => {
             ))}
           </div>
 
-          {/* Tab Content: Video Grid (Screen 5) */}
-          {activeTab === 'Videos' || activeTab === 'Shorts' ? (
+          {/* Tab Content: Video Grid or Private Lock (Screen 5) */}
+          {isAccountPrivate && !hasAccess ? (
+            <div className="flex flex-col items-center justify-center p-12 text-center">
+              <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 mb-4 shadow-inner">
+                <Lock className="w-8 h-8 text-pink-500" />
+              </div>
+              <h3 className="text-base font-bold text-white mb-1">This Account is Private</h3>
+              <p className="text-xs text-gray-400 max-w-xs mb-5">
+                Follow or subscribe to @{creator.username} to view their photos, videos, and reels.
+              </p>
+              <button
+                onClick={() => toggleFollowCreator(creator.username)}
+                className="px-6 py-2.5 rounded-full text-xs font-bold bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white shadow-lg shadow-pink-500/20 hover:opacity-95"
+              >
+                Follow to View Content
+              </button>
+            </div>
+          ) : activeTab === 'Videos' || activeTab === 'Shorts' ? (
             <div className="grid grid-cols-3 gap-1 p-1">
               {videoThumbnails.map(v => (
                 <div

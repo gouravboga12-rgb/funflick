@@ -522,6 +522,39 @@ export async function getCurrentUser(req, res) {
 }
 
 /**
+ * Update Contact Info (Email & Phone) for the logged-in user
+ */
+export async function updateContactInfo(req, res) {
+  try {
+    const { email, phone } = req.body;
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPhone = (phone || '').trim();
+
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Please enter a valid email address' });
+    }
+    if (cleanPhone && !/^\+?[0-9\s-]{7,20}$/.test(cleanPhone)) {
+      return res.status(400).json({ error: 'Please enter a valid phone number' });
+    }
+
+    await pool.query(
+      'UPDATE users SET email = ?, phone = ? WHERE id = ?',
+      [cleanEmail, cleanPhone || null, req.user.id]
+    );
+
+    const [rows] = await pool.query(
+      'SELECT id, name, username, email, phone, avatar_url, bio, role FROM users WHERE id = ?',
+      [req.user.id]
+    );
+
+    return res.json({ user: rows[0] });
+  } catch (err) {
+    console.error('Update contact info error:', err);
+    return res.status(500).json({ error: 'Failed to update contact info' });
+  }
+}
+
+/**
  * Google OAuth Login & Auto-Registration
  */
 /**

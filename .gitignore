@@ -39,3 +39,6 @@ rzp-key*
 *credential*
 credentials.json
 client_secret*.json
+
+# Temporary screenshot captures
+/image*.png

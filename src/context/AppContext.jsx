@@ -79,7 +79,18 @@ export const AppProvider = ({ children }) => {
     setIsAuthenticated(true);
     sessionStorage.setItem('funflick_authenticated', 'true');
     if (customUser) {
-      setCurrentUser(prev => ({ ...prev, ...customUser }));
+      setCurrentUser(prev => {
+        const next = {
+          ...prev,
+          ...customUser,
+          email: customUser.email || prev.email,
+          phone: customUser.phone !== undefined ? customUser.phone : prev.phone
+        };
+        try {
+          localStorage.setItem('funflick_user', JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
     }
   };
 
@@ -1431,7 +1442,8 @@ export const AppProvider = ({ children }) => {
               name: target.creatorName || (target.creator === currentUser.username ? currentUser.name : target.creator),
               username: target.creator || currentUser.username,
               avatar: target.avatar || currentUser.avatar,
-              isVerified: true
+              isVerified: true,
+              isPrivate: (target.creator === currentUser.username) ? !!currentUser.isPrivate : false
             },
             title: target.title || 'New FunFlick Post',
             caption: target.caption || `${target.title} ${target.hashtags || ''}`,

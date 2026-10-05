@@ -81,11 +81,17 @@ export const VerifyOtpScreen = () => {
         const data = await res.json();
         if (data.token) localStorage.setItem('funflick_token', data.token);
 
-        loginUser(data.user || {
+        const pendingData = sessionStorage.getItem('pending_reg_user');
+        const pendingUser = pendingData ? JSON.parse(pendingData) : null;
+
+        loginUser({
           name: 'FunFlick Member',
           username: usernameParam || 'funflick_user',
           email: emailParam,
-          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80'
+          phone: pendingUser?.phone || '',
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
+          ...(pendingUser || {}),
+          ...(data.user || {})
         });
 
         try {
@@ -105,10 +111,14 @@ export const VerifyOtpScreen = () => {
     } catch (networkErr) {
       // Offline simulation fallback: verify and create user in local context
       const pendingData = sessionStorage.getItem('pending_reg_user');
-      const userObj = pendingData ? JSON.parse(pendingData) : {
+      const pendingUser = pendingData ? JSON.parse(pendingData) : null;
+      const userObj = {
         name: 'FunFlick Member',
         username: usernameParam || 'funflick_user',
-        email: emailParam
+        email: emailParam,
+        phone: pendingUser?.phone || '',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
+        ...(pendingUser || {})
       };
 
       loginUser(userObj);

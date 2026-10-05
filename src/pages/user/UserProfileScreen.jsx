@@ -31,7 +31,8 @@ import {
   Award,
   Zap,
   Info,
-  Trash2
+  Trash2,
+  Lock
 } from 'lucide-react';
 
 export const UserProfileScreen = () => {
@@ -197,6 +198,12 @@ export const UserProfileScreen = () => {
               }`}>
                 {currentUser.isInfluencer ? '⭐ Influencer' : 'User (Free Member)'}
               </span>
+              {currentUser.isPrivate && (
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border bg-purple-500/20 text-purple-300 border-purple-500/30 flex items-center gap-1 shadow-sm">
+                  <Lock className="w-2.5 h-2.5" />
+                  <span>Private</span>
+                </span>
+              )}
             </div>
             <span className="text-xs text-gray-400 font-semibold block">
               @{currentUser.username} · Hyderabad

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -23,20 +23,82 @@ import {
 export const AccountSettingsModal = ({ isOpen, onClose }) => {
   const { currentUser, setCurrentUser, showToast, theme, setTheme } = useApp();
 
-  const [email, setEmail] = useState('srilatha@funflick.tv');
-  const [phone, setPhone] = useState('+91 98765 43210');
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [allowDMs, setAllowDMs] = useState(true);
+  const [email, setEmail] = useState(currentUser?.email || '');
+  const [phone, setPhone] = useState(currentUser?.phone || '');
+  const [isPrivate, setIsPrivate] = useState(!!currentUser?.isPrivate);
+  const [allowDMs, setAllowDMs] = useState(currentUser?.allowDMs !== false);
   const [autoplayWifi, setAutoplayWifi] = useState(true);
   const [highQuality, setHighQuality] = useState(true);
   const [notifLikes, setNotifLikes] = useState(true);
   const [notifEarnings, setNotifEarnings] = useState(true);
   const [language, setLanguage] = useState('Telugu & Hindi');
+  const [saving, setSaving] = useState(false);
+
+  // Re-sync fields with the logged-in account every time the modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setEmail(currentUser?.email || '');
+      setPhone(currentUser?.phone || '');
+      setIsPrivate(!!currentUser?.isPrivate);
+      setAllowDMs(currentUser?.allowDMs !== false);
+    }
+  }, [isOpen, currentUser?.email, currentUser?.phone, currentUser?.isPrivate, currentUser?.allowDMs]);
 
   if (!isOpen) return null;
 
-  const handleSave = (e) => {
-    e.preventDefault();
+  const handleSave = async (e) => {
+    e?.preventDefault?.();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.trim();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      showToast('Please enter a valid email address', 'error');
+      return;
+    }
+    if (cleanPhone && !/^\+?[0-9\s-]{7,20}$/.test(cleanPhone)) {
+      showToast('Please enter a valid mobile number', 'error');
+      return;
+    }
+
+    setSaving(true);
+    const contactChanged = cleanEmail !== (currentUser?.email || '') || cleanPhone !== (currentUser?.phone || '');
+    let savedUser = null;
+
+    if (contactChanged) {
+      const token = localStorage.getItem('funflick_token');
+      if (token) {
+        try {
+          const res = await fetch('/api/auth/profile/contact', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ email: cleanEmail, phone: cleanPhone })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            showToast(data.error || 'Could not update contact details', 'error');
+            setSaving(false);
+            return;
+          }
+          savedUser = data.user;
+        } catch (err) {
+          showToast('Server unreachable. Saved on this device only.', 'info');
+        }
+      }
+    }
+
+    setCurrentUser(prev => {
+      const next = {
+        ...prev,
+        email: savedUser?.email ?? cleanEmail,
+        phone: savedUser?.phone ?? cleanPhone,
+        isPrivate,
+        allowDMs
+      };
+      try { localStorage.setItem('funflick_user', JSON.stringify(next)); } catch (err) {}
+      return next;
+    });
+
+    setSaving(false);
     showToast('⚙️ Account settings saved successfully!', 'success');
     onClose();
   };
@@ -99,9 +161,11 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
                   </div>
                   <input
                     type="email"
+                    id="settings-email-input"
                     value={email}
+                    placeholder="you@example.com"
                     onChange={e => setEmail(e.target.value)}
-                    className={`bg-transparent text-right text-xs font-semibold ${theme === 'light' ? 'text-slate-900 border-pink-500/50' : 'text-white border-pink-500/30'} focus:outline-none border-b w-44`}
+                    className={`bg-transparent text-right text-xs font-semibold ${theme === 'light' ? 'text-slate-900 border-pink-500/50' : 'text-white border-pink-500/30'} focus:outline-none focus:border-pink-500 border-b w-44`}
                   />
                 </div>
 
@@ -111,12 +175,17 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
                     <span>Mobile Number</span>
                   </div>
                   <input
-                    type="text"
+                    type="tel"
+                    id="settings-phone-input"
                     value={phone}
+                    placeholder="+91 XXXXX XXXXX"
                     onChange={e => setPhone(e.target.value)}
-                    className={`bg-transparent text-right text-xs font-semibold ${theme === 'light' ? 'text-slate-900 border-pink-500/50' : 'text-white border-pink-500/30'} focus:outline-none border-b w-36`}
+                    className={`bg-transparent text-right text-xs font-semibold ${theme === 'light' ? 'text-slate-900 border-pink-500/50' : 'text-white border-pink-500/30'} focus:outline-none focus:border-pink-500 border-b w-36`}
                   />
                 </div>
+                <p className={`text-[10px] pt-1 ${theme === 'light' ? 'text-slate-500' : 'text-gray-500'}`}>
+                  Tap a field to edit, then press <span className="text-pink-400 font-semibold">Save Settings</span>.
+                </p>
               </div>
             </div>
 
@@ -383,10 +452,12 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
           <button
             type="button"
             onClick={handleSave}
-            className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xs shadow-lg shadow-pink-500/25 transition active:scale-95 flex items-center justify-center gap-1.5"
+            disabled={saving}
+            id="settings-save-btn"
+            className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xs shadow-lg shadow-pink-500/25 transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-60"
           >
             <Check className="w-4 h-4" />
-            <span>Save Settings</span>
+            <span>{saving ? 'Saving...' : 'Save Settings'}</span>
           </button>
         </div>
       </motion.div>
