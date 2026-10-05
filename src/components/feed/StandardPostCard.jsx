@@ -384,6 +384,7 @@ export const StandardPostCard = ({ post }) => {
       <CommentSheet
         isOpen={showComments}
         onClose={() => setShowComments(false)}
+        post={post}
         postId={post.id}
         commentsCount={post.commentsCount}
         comments={post.comments}

@@ -262,6 +262,51 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Followers, Following, and Follow Requests (Instagram Style)
+  const [followingList, setFollowingList] = useState(() => {
+    const saved = localStorage.getItem('funflick_following_list');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [followersList, setFollowersList] = useState(() => {
+    const saved = localStorage.getItem('funflick_followers_list');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [followRequests, setFollowRequests] = useState(() => {
+    const saved = localStorage.getItem('funflick_follow_requests');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'fr_1',
+        username: 'rohan_comedy',
+        name: 'Rohan Sharma',
+        avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=100&q=80',
+        time: '2h ago',
+        category: 'Comedy'
+      },
+      {
+        id: 'fr_2',
+        username: 'priya_vines',
+        name: 'Priya Verma',
+        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80',
+        time: '5h ago',
+        category: 'Entertainment'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('funflick_following_list', JSON.stringify(followingList));
+  }, [followingList]);
+
+  useEffect(() => {
+    localStorage.setItem('funflick_followers_list', JSON.stringify(followersList));
+  }, [followersList]);
+
+  useEffect(() => {
+    localStorage.setItem('funflick_follow_requests', JSON.stringify(followRequests));
+  }, [followRequests]);
+
   // View frame & demo switcher state
   const [phoneFrame, setPhoneFrame] = useState(true);
   const [subscriptionGateModalOpen, setSubscriptionGateModalOpen] = useState(false);
@@ -322,33 +367,42 @@ export const AppProvider = ({ children }) => {
       if (res.ok) {
         const data = await res.json();
         if (data.videos && Array.isArray(data.videos) && data.videos.length > 0) {
-          const livePosts = data.videos.map(v => ({
-            id: v.id,
-            title: v.title,
-            caption: v.description || v.title,
-            category: v.category || 'Comedy',
-            mediaType: 'video',
-            mediaUrl: v.video_url,
-            posterUrl: v.thumbnail_url || v.video_url,
-            likesCount: Number(v.likes_count) || 0,
-            viewsCount: v.views_count ? String(v.views_count) : '0',
-            commentsCount: 0,
-            sharesCount: 0,
-            savesCount: 0,
-            creator: {
-              id: v.creator_id,
-              name: v.creator_name || 'Creator',
-              username: v.creator_username || 'creator',
-              avatar: v.creator_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-              isVerified: true,
-              isPrivate: false
-            },
-            timeAgo: 'Just now',
-            isLiked: false,
-            isFollowing: false,
-            isSaved: false,
-            comments: []
-          }));
+          const livePosts = data.videos.map(v => {
+            const url = v.video_url || '';
+            const isImg = /\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i.test(url) ||
+                          url.startsWith('data:image/') ||
+                          v.category === 'Photo' ||
+                          v.category === 'Post';
+            const determinedType = isImg ? 'image' : 'video';
+
+            return {
+              id: v.id,
+              title: v.title || 'FunFlick Post',
+              caption: v.description || v.title || '',
+              category: v.category || 'Comedy',
+              mediaType: determinedType,
+              mediaUrl: v.video_url,
+              posterUrl: v.thumbnail_url || v.video_url,
+              likesCount: Number(v.likes_count) || 0,
+              viewsCount: v.views_count ? String(v.views_count) : '0',
+              commentsCount: 0,
+              sharesCount: 0,
+              savesCount: 0,
+              creator: {
+                id: v.creator_id,
+                name: v.creator_name || 'Creator',
+                username: v.creator_username || 'creator',
+                avatar: v.creator_avatar || '/brand/default-avatar.svg',
+                isVerified: true,
+                isPrivate: false
+              },
+              timeAgo: 'Just now',
+              isLiked: false,
+              isFollowing: false,
+              isSaved: false,
+              comments: []
+            };
+          });
           setPosts(livePosts);
         }
       }
@@ -442,12 +496,12 @@ export const AppProvider = ({ children }) => {
   const toggleLikePost = (postId) => {
     const username = currentUser?.username || 'me';
     const userLikes = userLikesMap[username] || [];
-    const isCurrentlyLiked = userLikes.includes(postId);
+    const isCurrentlyLiked = userLikes.some(id => String(id) === String(postId));
     const newLikedStatus = !isCurrentlyLiked;
 
     const updatedUserLikes = newLikedStatus 
-      ? [...userLikes, postId] 
-      : userLikes.filter(id => id !== postId);
+      ? [...userLikes.filter(id => String(id) !== String(postId)), postId] 
+      : userLikes.filter(id => String(id) !== String(postId));
 
     const nextMap = { ...userLikesMap, [username]: updatedUserLikes };
     setUserLikesMap(nextMap);
@@ -456,7 +510,7 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
 
     setPosts(prev => prev.map(p => {
-      if (p.id === postId) {
+      if (String(p.id) === String(postId)) {
         return {
           ...p,
           isLiked: newLikedStatus,
@@ -467,7 +521,7 @@ export const AppProvider = ({ children }) => {
     }));
 
     setInfluencerMedia(prev => prev.map(m => {
-      if (m.id === postId || m.postId === postId) {
+      if (String(m.id) === String(postId) || String(m.postId) === String(postId)) {
         const nextLikes = newLikedStatus ? (m.likesCount || 0) + 1 : Math.max(0, (m.likesCount || 1) - 1);
         const views = parseViews(m.viewsCount || 1);
         return {
@@ -505,13 +559,13 @@ export const AppProvider = ({ children }) => {
     return String(count);
   };
 
-  // Real-Time View Counter Increment (Triggered after 2.5s continuous watch)
+  // Real-Time View Counter Increment (Triggered after 2s continuous view)
   const recordPostView = (postId) => {
     // Sync with AWS MySQL database
     fetch(`/api/videos/${postId}/view`, { method: 'POST' }).catch(() => {});
 
     setPosts(prev => prev.map(p => {
-      if (p.id === postId) {
+      if (String(p.id) === String(postId)) {
         const currentVal = parseViews(p.viewsCount || p.views || 0);
         const nextVal = currentVal + 1;
         return {
@@ -524,7 +578,7 @@ export const AppProvider = ({ children }) => {
     }));
 
     setInfluencerMedia(prev => prev.map(m => {
-      if (m.id === postId || m.postId === postId) {
+      if (String(m.id) === String(postId) || String(m.postId) === String(postId)) {
         const currentVal = parseViews(m.viewsCount || 0);
         const nextVal = currentVal + 1;
         return {
@@ -540,7 +594,7 @@ export const AppProvider = ({ children }) => {
   // Toggle post save
   const toggleSavePost = (postId) => {
     setPosts(prev => prev.map(p => {
-      if (p.id === postId) {
+      if (String(p.id) === String(postId)) {
         const isSaved = !p.isSaved;
         showToast(isSaved ? 'Saved to your collection' : 'Removed from saved', 'info');
         return { ...p, isSaved };
@@ -549,7 +603,7 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
-  // Toggle follow creator
+  // Toggle follow creator (sync with followingList & dynamic count)
   const toggleFollowCreator = (username) => {
     let nowFollowing = false;
     setCreators(prev => prev.map(c => {
@@ -561,13 +615,88 @@ export const AppProvider = ({ children }) => {
     }));
 
     setPosts(prev => prev.map(p => {
-      if (p.creator.username === username) {
+      if (p.creator?.username === username) {
         return { ...p, isFollowing: nowFollowing };
       }
       return p;
     }));
 
+    setFollowingList(prev => {
+      if (nowFollowing) {
+        if (!prev.some(u => u.username === username)) {
+          const creatorObj = creators.find(c => c.username === username) || {
+            username,
+            name: username,
+            avatar: '/brand/default-avatar.svg'
+          };
+          return [...prev, creatorObj];
+        }
+        return prev;
+      } else {
+        return prev.filter(u => u.username !== username);
+      }
+    });
+
+    setCurrentUser(prev => ({
+      ...prev,
+      stats: {
+        ...prev.stats,
+        following: nowFollowing ? (Number(prev.stats?.following) || 0) + 1 : Math.max(0, (Number(prev.stats?.following) || 1) - 1)
+      }
+    }));
+
     showToast(nowFollowing ? `Following @${username}` : `Unfollowed @${username}`, 'info');
+  };
+
+  // Accept Follow Request (Instagram style)
+  const acceptFollowRequest = (requestId) => {
+    const req = followRequests.find(r => r.id === requestId);
+    if (!req) return;
+    setFollowRequests(prev => prev.filter(r => r.id !== requestId));
+    setFollowersList(prev => {
+      if (!prev.some(f => f.username === req.username)) {
+        return [...prev, {
+          id: req.id,
+          username: req.username,
+          name: req.name,
+          avatar: req.avatar
+        }];
+      }
+      return prev;
+    });
+    setCurrentUser(prev => ({
+      ...prev,
+      stats: {
+        ...prev.stats,
+        followers: (Number(prev.stats?.followers) || 0) + 1
+      }
+    }));
+    showToast(`Accepted follow request from @${req.username}! 🎉`, 'success');
+  };
+
+  // Decline Follow Request
+  const declineFollowRequest = (requestId) => {
+    setFollowRequests(prev => prev.filter(r => r.id !== requestId));
+    showToast('Follow request removed', 'info');
+  };
+
+  // Remove a Follower
+  const removeFollower = (followerUsername) => {
+    setFollowersList(prev => prev.filter(f => f.username !== followerUsername));
+    setCurrentUser(prev => ({
+      ...prev,
+      stats: {
+        ...prev.stats,
+        followers: Math.max(0, (Number(prev.stats?.followers) || 1) - 1)
+      }
+    }));
+    showToast(`Removed @${followerUsername} from followers`, 'info');
+  };
+
+  // Mark all notifications as read
+  const markAllNotificationsAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+    showToast('All notifications marked as read! ✔️', 'info');
   };
 
   // Subscribe to a specific creator (Screen 7 flow)
@@ -608,18 +737,18 @@ export const AppProvider = ({ children }) => {
       time: 'Just now'
     };
     setPosts(prev => prev.map(p => {
-      if (p.id === postId) {
+      if (String(p.id) === String(postId)) {
         return {
           ...p,
-          commentsCount: p.commentsCount + 1,
-          comments: [newComment, ...p.comments]
+          commentsCount: (p.commentsCount || 0) + 1,
+          comments: [newComment, ...(p.comments || [])]
         };
       }
       return p;
     }));
 
     setInfluencerMedia(prev => prev.map(m => {
-      if (m.id === postId || m.postId === postId) {
+      if (String(m.id) === String(postId) || String(m.postId) === String(postId)) {
         const nextComments = (m.commentsCount || 0) + 1;
         const views = parseViews(m.viewsCount || 1);
         return {
@@ -637,7 +766,7 @@ export const AppProvider = ({ children }) => {
   // Delete Comment (Allowed by Author, Post Creator, or Admin)
   const deleteComment = (postId, commentId) => {
     setPosts(prev => prev.map(p => {
-      if (p.id === postId) {
+      if (String(p.id) === String(postId)) {
         return {
           ...p,
           commentsCount: Math.max(0, (p.commentsCount || 1) - 1),
@@ -700,7 +829,7 @@ export const AppProvider = ({ children }) => {
       hasPublishingSubscription: true,
       accountStatus: 'Influencer',
       subscriptionPlan: plan.name,
-      walletBalance: Math.max(0, (prev.walletBalance || 125430) - plan.price)
+      walletBalance: Math.max(0, (prev.walletBalance || 0) - plan.price)
     }));
 
     // Record wallet transaction
@@ -1849,6 +1978,16 @@ export const AppProvider = ({ children }) => {
         recordPostView,
         toggleSavePost,
         toggleFollowCreator,
+        followingList,
+        setFollowingList,
+        followersList,
+        setFollowersList,
+        followRequests,
+        setFollowRequests,
+        acceptFollowRequest,
+        declineFollowRequest,
+        removeFollower,
+        markAllNotificationsAsRead,
         subscribeToCreator,
         addComment,
         deleteComment,

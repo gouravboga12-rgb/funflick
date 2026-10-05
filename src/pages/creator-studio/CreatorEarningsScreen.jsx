@@ -36,15 +36,15 @@ export const CreatorEarningsScreen = () => {
   const handleWithdraw = (e) => {
     e.preventDefault();
     const num = parseInt(amount, 10);
-    if (!num || num > (currentUser.availableBalance || 50000)) {
+    if (!num || num > (currentUser.availableBalance || currentUser.walletBalance || 0)) {
       showToast('Invalid withdrawal amount', 'error');
       return;
     }
     setWithdrawModal(false);
     setCurrentUser(prev => ({
       ...prev,
-      walletBalance: (prev.walletBalance || 125430) - num,
-      availableBalance: (prev.availableBalance || 50000) - num
+      walletBalance: Math.max(0, (prev.walletBalance || 0) - num),
+      availableBalance: Math.max(0, (prev.availableBalance || 0) - num)
     }));
     showToast(`Withdrawal of ₹${num.toLocaleString()} processed!`, 'success');
   };
@@ -115,7 +115,7 @@ export const CreatorEarningsScreen = () => {
 
           <div className="my-3">
             <h2 className="text-3xl font-extrabold tracking-tight font-heading">
-              ₹{(currentUser.walletBalance || 125430).toLocaleString()}
+              ₹{(currentUser.walletBalance || 0).toLocaleString()}
             </h2>
           </div>
 
@@ -124,7 +124,7 @@ export const CreatorEarningsScreen = () => {
             <div className="p-2 rounded-2xl bg-black/20 backdrop-blur-sm">
               <span className="text-[10px] text-white/70 block">Available Balance</span>
               <span className="text-sm font-bold font-heading text-emerald-200">
-                ₹{(currentUser.availableBalance || 50000).toLocaleString()}
+                ₹{(currentUser.availableBalance || currentUser.walletBalance || 0).toLocaleString()}
               </span>
             </div>
             <div className="p-2 rounded-2xl bg-black/20 backdrop-blur-sm">

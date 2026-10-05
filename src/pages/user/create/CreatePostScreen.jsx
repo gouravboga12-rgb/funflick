@@ -115,10 +115,8 @@ export const CreatePostScreen = () => {
       return;
     }
 
-    if (!caption.trim()) {
-      showToast('Please enter a caption for your post', 'error');
-      return;
-    }
+    // Caption is optional (social media post style)
+    const finalCaption = caption.trim();
 
     setIsUploading(true);
     setProgress(30);
@@ -126,8 +124,9 @@ export const CreatePostScreen = () => {
     setTimeout(() => setProgress(70), 300);
     setTimeout(() => {
       setProgress(100);
+      const finalCaption = caption.trim();
       const res = submitPostForVerification({
-        caption,
+        caption: finalCaption,
         hashtags,
         mediaType: 'image',
         mediaUrl,
@@ -273,7 +272,7 @@ export const CreatePostScreen = () => {
         {/* Caption & Description */}
         <div className="space-y-1.5 pt-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-gray-300">Write a caption</label>
+            <label className="text-xs font-bold text-gray-300">Write a caption <span className="text-gray-500 font-normal">(optional)</span></label>
             <span className="text-[10px] text-gray-500">{caption.length}/500</span>
           </div>
           <textarea
@@ -281,7 +280,7 @@ export const CreatePostScreen = () => {
             maxLength={500}
             value={caption}
             onChange={e => setCaption(e.target.value)}
-            placeholder="Write a funny caption for your comedy post..."
+            placeholder="Write a caption for your post... (optional)"
             className="w-full bg-[#150f2c] text-white text-xs p-3.5 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500 leading-relaxed transition"
           />
         </div>

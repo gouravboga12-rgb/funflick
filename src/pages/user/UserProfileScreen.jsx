@@ -48,8 +48,21 @@ export const UserProfileScreen = () => {
     setSubscriptionGateModalOpen, 
     setCreateModalOpen,
     showToast,
-    logoutUser
+    logoutUser,
+    posts,
+    followingList,
+    followersList,
+    followRequests,
+    transactions
   } = useApp();
+
+  // Compute real dynamic stats
+  const realPostCount = currentUser.stats?.posts || posts.filter(p => p.creator?.username === currentUser.username).length || 0;
+  const realFollowing = currentUser.stats?.following || followingList.length || 0;
+  const realFollowers = currentUser.stats?.followers || followersList.length || 0;
+  const realWallet = currentUser.walletBalance || 0;
+  const realViews = currentUser.creatorMetrics?.totalViews || '0';
+  const realEarnings = currentUser.creatorMetrics?.performanceEarnings || '₹0';
 
   const [activeProfileMode, setActiveProfileMode] = useState(initialTab); // 'viewer' | 'influencer'
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -90,7 +103,7 @@ export const UserProfileScreen = () => {
       icon: Wallet,
       color: 'text-emerald-400',
       label: 'Wallet & Payouts',
-      badge: `₹${(currentUser.walletBalance || 125430).toLocaleString()}`,
+      badge: `₹${realWallet.toLocaleString()}`,  
       badgeColor: 'bg-emerald-500/20 text-emerald-300',
       path: '/wallet'
     },
@@ -98,7 +111,7 @@ export const UserProfileScreen = () => {
       icon: Video,
       color: 'text-rose-400',
       label: 'My Content Library',
-      badge: `${currentUser.stats?.posts || 128} posts`,
+      badge: `${realPostCount} posts`,
       path: '/my-content'
     },
     {
@@ -224,19 +237,22 @@ export const UserProfileScreen = () => {
           <div className="flex items-center justify-center gap-8 py-2 w-full border-y border-white/5">
             <div className="text-center">
               <span className="font-extrabold text-base text-white block font-heading">
-                {currentUser.stats?.posts || 128}
+                {realPostCount}
               </span>
               <span className="text-[11px] text-gray-400">Posts</span>
             </div>
-            <div className="text-center">
+            <div className="text-center cursor-pointer" onClick={() => navigate('/notifications')}>
               <span className="font-extrabold text-base text-white block font-heading">
-                {currentUser.stats?.following || 420}
+                {realFollowing}
               </span>
               <span className="text-[11px] text-gray-400">Following</span>
             </div>
-            <div className="text-center">
+            <div className="text-center cursor-pointer" onClick={() => navigate('/notifications?tab=followers')}>
               <span className="font-extrabold text-base text-white block font-heading">
-                {currentUser.stats?.followers || '2.3K'}
+                {realFollowers}
+                {followRequests.length > 0 && (
+                  <span className="text-[10px] text-pink-400 ml-1">+{followRequests.length}</span>
+                )}
               </span>
               <span className="text-[11px] text-gray-400">Followers</span>
             </div>
@@ -440,7 +456,7 @@ export const UserProfileScreen = () => {
                     <span>Total Video Views</span>
                   </div>
                   <span className="text-base font-extrabold text-white font-heading block">
-                    {currentUser.creatorMetrics?.totalViews || '84.5K'}
+                    {realViews}
                   </span>
                   <span className="text-[9px] text-emerald-400 font-semibold">+18% this week</span>
                 </div>
@@ -451,7 +467,7 @@ export const UserProfileScreen = () => {
                     <span>Admin Rewards Paid</span>
                   </div>
                   <span className="text-base font-extrabold text-emerald-400 font-heading block">
-                    {currentUser.creatorMetrics?.performanceEarnings || '₹14,500'}
+                    {realEarnings}
                   </span>
                   <span className="text-[9px] text-gray-400">Credited to wallet</span>
                 </div>
@@ -462,7 +478,7 @@ export const UserProfileScreen = () => {
                 <div>
                   <span className="text-[10px] text-gray-400 block">Available In Wallet</span>
                   <span className="text-sm font-extrabold text-white font-heading">
-                    ₹{(currentUser.walletBalance || 125430).toLocaleString()}
+                    ₹{realWallet.toLocaleString()}
                   </span>
                 </div>
                 <button

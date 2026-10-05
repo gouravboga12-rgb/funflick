@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Bell, MessageCircle, ChevronLeft, Search } from 'lucide-react';
+import { Heart, MessageCircle, ChevronLeft, Search } from 'lucide-react';
 
 export const AppHeader = ({ 
   title, 
@@ -109,7 +109,7 @@ export const AppHeader = ({
           </div>
         )}
 
-        {/* Right Section Actions */}
+          {/* Right Section Actions */}
         <div className="flex items-center gap-1 shrink-0">
           {searchIcon && (
             <button
@@ -129,7 +129,7 @@ export const AppHeader = ({
             rightAction
           ) : (
             <div className="flex items-center gap-0.5">
-              {/* Notifications Icon with Badge */}
+              {/* Activity / Notifications Heart Icon (Instagram Style) */}
               <button
                 onClick={() => navigate('/notifications')}
                 className={`relative p-1.5 rounded-full ${
@@ -137,11 +137,13 @@ export const AppHeader = ({
                     ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' 
                     : 'text-gray-300 hover:text-white hover:bg-white/10'
                 } transition`}
-                aria-label="Notifications"
+                aria-label="Activity & Notifications"
               >
-                <Bell className="w-5 h-5" />
+                <Heart className={`w-5 h-5 ${unreadNotifs > 0 ? 'text-pink-400' : ''}`} />
                 {unreadNotifs > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#ff007a] animate-pulse" />
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#ff007a] text-[9px] font-bold text-white flex items-center justify-center leading-none">
+                    {unreadNotifs > 9 ? '9+' : unreadNotifs}
+                  </span>
                 )}
               </button>
 

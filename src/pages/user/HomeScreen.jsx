@@ -66,7 +66,11 @@ export const HomeScreen = () => {
             </div>
           ) : (
             filteredPosts.map(post => {
-              const isVideo = post.mediaType === 'video' || (post.mediaUrl && /\.(mp4|webm|mov|m4v)($|\?)/i.test(post.mediaUrl));
+              const url = post.mediaUrl || '';
+              const isImage = post.mediaType === 'image' ||
+                              /\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i.test(url) ||
+                              url.startsWith('data:image/');
+              const isVideo = !isImage && (post.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(url));
               if (isVideo) {
                 return <VideoPostCard key={post.id} post={post} />;
               }

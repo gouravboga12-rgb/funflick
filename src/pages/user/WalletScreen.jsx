@@ -90,7 +90,7 @@ export const WalletScreen = () => {
 
           <div className="mt-2 mb-4">
             <h2 className="text-3xl font-extrabold tracking-tight font-heading">
-              ₹{(currentUser.walletBalance || 125430).toLocaleString()}
+              ₹{(currentUser.walletBalance || 0).toLocaleString()}
             </h2>
           </div>
 
@@ -99,13 +99,13 @@ export const WalletScreen = () => {
             <div>
               <span className="text-[10px] text-white/70 block">Available to Withdraw</span>
               <span className="text-sm font-bold font-heading">
-                ₹{(currentUser.availableBalance || 100430).toLocaleString()}
+                ₹{(currentUser.availableBalance || currentUser.walletBalance || 0).toLocaleString()}
               </span>
             </div>
             <div>
               <span className="text-[10px] text-white/70 block">Pending Clearance</span>
               <span className="text-sm font-bold font-heading text-amber-200">
-                ₹{(currentUser.pendingBalance || 25000).toLocaleString()}
+                ₹{(currentUser.pendingBalance || 0).toLocaleString()}
               </span>
             </div>
           </div>
