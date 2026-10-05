@@ -21,7 +21,9 @@ import {
   Play, 
   ChevronRight,
   TrendingUp,
-  X
+  X,
+  Eye,
+  Heart
 } from 'lucide-react';
 
 export const DiscoverScreen = () => {
@@ -58,14 +60,70 @@ export const DiscoverScreen = () => {
     }
   };
 
-  // Filtered creators or posts when searching
+  // Helper to parse string or number views into clean integer
+  const parseViewsNum = (views) => {
+    if (typeof views === 'number') return views;
+    if (!views) return 0;
+    const str = String(views).trim().toUpperCase();
+    if (str.endsWith('M')) return Math.round(parseFloat(str) * 1000000);
+    if (str.endsWith('K')) return Math.round(parseFloat(str) * 1000);
+    return parseInt(str, 10) || 0;
+  };
+
+  // Algorithmic Trending Ranking:
+  // Score = Views + (Likes * 2) + (Comments * 3) + (Shares * 2) + Recency Boost
+  const calculateTrendingScore = (post) => {
+    const views = parseViewsNum(post.viewsCount || post.views || 0);
+    const likes = Number(post.likesCount || post.likes || 0);
+    const comments = Number(post.commentsCount || (post.comments?.length) || 0);
+    const shares = Number(post.sharesCount || 0);
+    
+    // Freshness/Recency bonus: brand-new posts get temporary boost to trend
+    const isRecent = post.timeAgo === 'Just now' || post.date === 'Just now' || post.date === 'Today';
+    const recencyBonus = isRecent ? 50 : 0;
+
+    return (views * 1.0) + (likes * 2.0) + (comments * 3.0) + (shares * 2.0) + recencyBonus;
+  };
+
+  // Filtered creators when searching
   const filteredCreators = searchQuery.trim() 
-    ? creators.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.username.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? creators.filter(c => c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || c.username?.toLowerCase().includes(searchQuery.toLowerCase()))
     : creators;
 
-  const filteredVideos = searchQuery.trim()
-    ? posts.filter(p => (p.caption || '').toLowerCase().includes(searchQuery.toLowerCase()) || (p.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
-    : posts;
+  // Filtered and Trending-Ranked Videos
+  const filteredVideos = posts
+    .filter(p => {
+      // 1. Search Query filter (matches title, caption, tags, creator username, category)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = (p.title || '').toLowerCase().includes(q);
+        const matchCaption = (p.caption || '').toLowerCase().includes(q);
+        const matchCategory = (p.category || '').toLowerCase().includes(q);
+        const matchCreator = (p.creator?.name || p.creator?.username || '').toLowerCase().includes(q);
+        const matchTags = (p.tags || []).some(t => t.toLowerCase().includes(q));
+        if (!matchTitle && !matchCaption && !matchCategory && !matchCreator && !matchTags) {
+          return false;
+        }
+      }
+
+      // 2. Category Filter (unless 'Trending' is selected)
+      if (selectedCategory && selectedCategory !== 'Trending') {
+        const pCat = (p.category || '').toLowerCase();
+        const sCat = selectedCategory.toLowerCase();
+        if (pCat !== sCat && !pCat.includes(sCat) && !sCat.includes(pCat)) {
+          return false;
+        }
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      // Primary sort: Algorithmic Trending Score
+      const scoreDiff = calculateTrendingScore(b) - calculateTrendingScore(a);
+      if (scoreDiff !== 0) return scoreDiff;
+      // Fallback: Pure highest views
+      return parseViewsNum(b.viewsCount || b.views) - parseViewsNum(a.viewsCount || a.views);
+    });
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#090514] min-h-full select-none">
@@ -118,26 +176,34 @@ export const DiscoverScreen = () => {
         {/* Featured Hero Banner: "Trending Comedy Videos" (Screen 4 top) */}
         {!searchQuery && (
           <div 
-            onClick={() => navigate('/reels')}
+            onClick={() => {
+              if (filteredVideos[0]) {
+                navigate(`/reels?id=${filteredVideos[0].id}`);
+              } else {
+                navigate('/reels');
+              }
+            }}
             className="relative w-full rounded-3xl overflow-hidden bg-gradient-to-r from-purple-900 via-pink-700 to-amber-600 p-5 shadow-xl shadow-pink-500/15 cursor-pointer group"
           >
             <div className="relative z-10 max-w-[65%] space-y-1.5">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-black/40 text-amber-300 backdrop-blur-md inline-block">
-                🔥 TOP OF THE WEEK
+                🔥 #1 TRENDING NOW
               </span>
-              <h2 className="text-xl font-extrabold text-white leading-tight font-heading group-hover:text-amber-200 transition-colors">
-                Trending Comedy Videos
+              <h2 className="text-xl font-extrabold text-white leading-tight font-heading group-hover:text-amber-200 transition-colors line-clamp-2">
+                {filteredVideos[0]?.title || 'Trending Content Hub'}
               </h2>
-              <p className="text-xs text-white/90 font-medium">
-                Laugh non-stop with India's most viral sketches & stand-up clips!
+              <p className="text-xs text-white/90 font-medium line-clamp-1">
+                {filteredVideos[0] 
+                  ? `By @${filteredVideos[0].creator?.username || 'creator'} • ${filteredVideos[0].viewsCount || filteredVideos[0].views || 0} views`
+                  : "Watch India's most viral sketches & verified creator clips!"}
               </p>
             </div>
 
             {/* Right Character / Comedian Visual */}
-            <div className="absolute -right-2 -bottom-2 w-36 h-36 pointer-events-none group-hover:scale-105 transition-transform duration-300">
+            <div className="absolute -right-2 -bottom-2 w-32 h-32 pointer-events-none group-hover:scale-105 transition-transform duration-300">
               <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
-                alt="Trending Comedy"
+                src={filteredVideos[0]?.posterUrl || filteredVideos[0]?.mediaUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"}
+                alt="Trending Content"
                 className="w-full h-full object-cover rounded-2xl rotate-6 shadow-2xl border-2 border-white/20"
               />
             </div>
@@ -207,48 +273,79 @@ export const DiscoverScreen = () => {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-white font-heading flex items-center gap-1.5">
-              <span>Trending Now</span>
+              <span>{selectedCategory === 'Trending' ? '🔥 Top Trending Videos' : `${selectedCategory} Trending`}</span>
+              <span className="text-[11px] font-semibold text-gray-400">({filteredVideos.length})</span>
             </h3>
             <button 
               onClick={() => navigate('/reels')}
               className="text-xs font-bold text-pink-400 hover:text-pink-300 flex items-center gap-0.5"
             >
-              <span>See All</span>
+              <span>Watch Reels</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {filteredVideos.length === 0 ? (
-            <div className="p-6 rounded-2xl bg-[#140c26] border border-white/5 text-center text-xs text-gray-400">
-              <p>No trending videos yet. Approved creator reels will appear here!</p>
+            <div className="p-8 rounded-3xl bg-[#140c26] border border-white/5 text-center text-xs text-gray-400 space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-pink-500/10 border border-pink-500/20 text-pink-400 flex items-center justify-center mx-auto">
+                <Film className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">No {selectedCategory !== 'Trending' ? selectedCategory : 'trending'} videos yet</p>
+                <p className="text-gray-400 text-xs mt-1">
+                  Upload your video now to claim the #1 trending spot on FunFlick!
+                </p>
+              </div>
+              <button
+                onClick={() => navigate('/create/video')}
+                className="px-4 py-2 rounded-full bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca] text-white font-extrabold text-xs shadow-lg shadow-pink-500/25 hover:brightness-110 active:scale-95 transition inline-flex items-center gap-1.5"
+              >
+                <span>+ Upload Video</span>
+              </button>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-2.5">
-              {filteredVideos.slice(0, 3).map(video => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {filteredVideos.slice(0, 6).map((video, idx) => (
                 <div
                   key={video.id}
-                  onClick={() => navigate('/reels')}
-                  className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-gray-900 cursor-pointer group shadow-lg"
+                  onClick={() => navigate(`/reels?id=${video.id}`)}
+                  className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-gray-900 cursor-pointer group shadow-lg hover:ring-2 hover:ring-pink-500/50 transition-all"
                 >
                   <img
                     src={video.posterUrl || video.mediaUrl || video.image}
                     alt={video.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
                   
-                  {/* Views Badge */}
-                  <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/50 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white">
-                    <Play className="w-2.5 h-2.5 fill-current text-pink-400" />
-                    <span>{video.views || video.viewsCount || '1'}</span>
+                  {/* Rank Badge & Views Badge */}
+                  <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-[#ff007a] text-white flex items-center justify-center text-[10px] font-black shadow">
+                      #{idx + 1}
+                    </span>
+                    <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white border border-white/10">
+                      <Eye className="w-2.5 h-2.5 text-pink-300" />
+                      <span>{video.viewsCount || video.views || '0'}</span>
+                    </div>
                   </div>
 
-                  {/* Bottom Title & Tag */}
-                  <div className="absolute bottom-2 left-2 right-2 text-left">
-                    <p className="text-[11px] font-bold text-white truncate font-heading">
+                  {/* Likes badge if any */}
+                  {Number(video.likesCount || 0) > 0 && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white border border-white/10">
+                      <Heart className="w-2.5 h-2.5 text-rose-500 fill-current" />
+                      <span>{video.likesCount}</span>
+                    </div>
+                  )}
+
+                  {/* Bottom Title, Creator & Tag */}
+                  <div className="absolute bottom-2 left-2 right-2 text-left space-y-0.5">
+                    <p className="text-[11px] font-bold text-white truncate font-heading group-hover:text-pink-200">
                       {video.title}
                     </p>
-                    <span className="text-[10px] text-pink-300 block truncate">
+                    <p className="text-[10px] text-gray-300 truncate">
+                      @{video.creator?.username || 'creator'}
+                    </p>
+                    <span className="text-[9px] text-pink-400 font-semibold block truncate">
                       {video.category ? `#${video.category.toLowerCase()}` : '#comedy'}
                     </span>
                   </div>

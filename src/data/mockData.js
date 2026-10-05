@@ -191,6 +191,7 @@ export const INITIAL_POSTS = [];
 
 // Discover Categories
 export const DISCOVER_CATEGORIES = [
+  { id: 'cat_all', name: 'Trending', icon: 'Flame', emoji: '🔥', color: 'from-amber-500 via-orange-500 to-red-500', activeRing: 'ring-amber-500/50', border: 'border-amber-500/40', bg: 'bg-amber-500/10' },
   { id: 'cat_comedy', name: 'Comedy', icon: 'Laugh', emoji: '😂', color: 'from-pink-500 via-rose-500 to-red-500', activeRing: 'ring-pink-500/50', border: 'border-pink-500/40', bg: 'bg-pink-500/10' },
   { id: 'cat_entertainment', name: 'Entertainment', icon: 'Clapperboard', emoji: '🎬', color: 'from-purple-600 via-violet-600 to-indigo-600', activeRing: 'ring-purple-500/50', border: 'border-purple-500/40', bg: 'bg-purple-500/10' },
   { id: 'cat_dance', name: 'Dance', icon: 'Music2', emoji: '💃', color: 'from-cyan-400 via-blue-500 to-indigo-600', activeRing: 'ring-cyan-500/50', border: 'border-cyan-500/40', bg: 'bg-cyan-500/10' },

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { VideoPostCard } from '../../components/feed/VideoPostCard';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
@@ -10,10 +10,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export const ReelsScreen = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const targetId = searchParams.get('id');
   const { posts, blockedUsers, showMobileAd, adsList } = useApp();
-  const [currentIdx, setCurrentIdx] = useState(0);
 
   const visiblePosts = posts.filter(p => !blockedUsers?.includes(p.creator?.username));
+
+  const [currentIdx, setCurrentIdx] = useState(() => {
+    if (targetId) {
+      const idx = visiblePosts.findIndex(p => p.id === targetId);
+      if (idx !== -1) return idx;
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (targetId) {
+      const idx = visiblePosts.findIndex(p => p.id === targetId);
+      if (idx !== -1) setCurrentIdx(idx);
+    }
+  }, [targetId, visiblePosts]);
+
   const currentPost = visiblePosts[currentIdx] || visiblePosts[0] || posts[0];
 
   const handleNext = () => {
