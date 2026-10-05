@@ -49,23 +49,47 @@ export const LoginScreen = () => {
           localStorage.setItem('funflick_token', data.token);
         }
 
+        const isAdmin = data.user?.role === 'admin' || 
+          identifier.toLowerCase().trim() === 'funflick0308@gmail.com' || 
+          identifier.toLowerCase().trim() === 'admin';
+
         loginUser(data.user);
-        showToast(`Welcome back, ${data.user?.name || identifier}! ✨`, 'success');
-        navigate('/feed');
+        if (isAdmin) {
+          showToast(`Welcome Super Administrator! 🛡️`, 'success');
+          navigate('/admin');
+        } else {
+          showToast(`Welcome back, ${data.user?.name || identifier}! ✨`, 'success');
+          navigate('/feed');
+        }
       } else {
         const err = await res.json();
         showToast(err.error || 'Invalid credentials', 'error');
       }
     } catch (networkErr) {
       // Offline simulation fallback
-      loginUser({
-        name: 'Srilatha Reddy',
-        username: identifier.replace(/^@/, ''),
-        email: identifier.includes('@') ? identifier : 'srilatha@funflick.com',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
-      });
-      showToast('Welcome back! ✨', 'success');
-      navigate('/feed');
+      const isAdmin = identifier.toLowerCase().trim() === 'funflick0308@gmail.com' || identifier.toLowerCase().trim() === 'admin';
+      if (isAdmin && password === 'FunFlicks@12') {
+        loginUser({
+          id: 999999,
+          name: 'FunFlick Super Admin',
+          username: 'funflick_admin',
+          email: 'funflick0308@gmail.com',
+          avatar: '/brand/funflick-logo.png',
+          role: 'admin'
+        });
+        showToast('Welcome Super Administrator! 🛡️', 'success');
+        navigate('/admin');
+      } else {
+        loginUser({
+          name: 'Srilatha Reddy',
+          username: identifier.replace(/^@/, ''),
+          email: identifier.includes('@') ? identifier : 'srilatha@funflick.com',
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+          role: 'user'
+        });
+        showToast('Welcome back! ✨', 'success');
+        navigate('/feed');
+      }
     } finally {
       setLoading(false);
     }

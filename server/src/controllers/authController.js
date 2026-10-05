@@ -221,6 +221,33 @@ export async function login(req, res) {
     const clean = rawIdentifier.trim();
     const cleanHandle = clean.toLowerCase().replace(/^@/, '');
 
+    // Super Admin Direct Authentication (Dedicated Admin Credentials)
+    if (
+      (clean.toLowerCase() === 'funflick0308@gmail.com' || cleanHandle === 'admin' || cleanHandle === 'funflick0308') &&
+      password === 'FunFlicks@12'
+    ) {
+      const adminUser = {
+        id: 999999,
+        name: 'FunFlick Super Admin',
+        username: 'funflick_admin',
+        email: 'funflick0308@gmail.com',
+        phone: '+919999999999',
+        avatar_url: '/brand/funflick-logo.png',
+        bio: 'FunFlick Super Administrator Account',
+        role: 'admin'
+      };
+      const token = jwt.sign(
+        { id: adminUser.id, username: adminUser.username, email: adminUser.email, role: 'admin' },
+        process.env.JWT_SECRET || 'funflick_secret',
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      );
+      return res.json({
+        message: 'Super Admin Login successful',
+        token,
+        user: adminUser
+      });
+    }
+
     // Search by username, email, or phone
     const [rows] = await pool.query(
       `SELECT * FROM users 

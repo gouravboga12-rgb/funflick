@@ -15,7 +15,8 @@ import {
   INITIAL_INFLUENCER_MEDIA,
   INITIAL_ADS,
   INITIAL_USER_SUBMISSIONS,
-  INITIAL_COPYRIGHT_REPORTS
+  INITIAL_COPYRIGHT_REPORTS,
+  INITIAL_SUBSCRIPTION_TRANSACTIONS
 } from '../data/mockData';
 
 const AppContext = createContext(null);
@@ -119,6 +120,16 @@ export const AppProvider = ({ children }) => {
     const saved = localStorage.getItem('funflick_publishing_plans');
     return saved ? JSON.parse(saved) : (INFLUENCER_SUBSCRIPTION_PLANS || PUBLISHING_PLANS);
   });
+
+  // User Registration & Influencer Subscription Transactions (Razorpay Test Payments)
+  const [subscriptionTransactions, setSubscriptionTransactions] = useState(() => {
+    const saved = localStorage.getItem('funflick_subscription_transactions');
+    return saved ? JSON.parse(saved) : INITIAL_SUBSCRIPTION_TRANSACTIONS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('funflick_subscription_transactions', JSON.stringify(subscriptionTransactions));
+  }, [subscriptionTransactions]);
 
   // Influencer Media Items (For Admin Review & Rewards)
   const [influencerMedia, setInfluencerMedia] = useState(() => {
@@ -432,6 +443,70 @@ export const AppProvider = ({ children }) => {
 
     setSubscriptionGateModalOpen(false);
     showToast(`🎉 Influencer Status Activated! Welcome to FunFlick Influencer Suite (${plan.name})`, 'success');
+  };
+
+  // Record Verified Razorpay Test Subscription Payment
+  const recordSubscriptionPayment = ({ plan, paymentId, paymentMethod = 'Razorpay Test (UPI / Card)' }) => {
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric'
+    }) + ', ' + now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    const newTransaction = {
+      id: 'pay_' + (paymentId || ('test_' + Date.now())),
+      razorpayPaymentId: paymentId || `pay_test_${Math.random().toString(36).substring(2, 9)}`,
+      user: currentUser.username || 'srilatha_16',
+      userName: currentUser.name || 'Srilatha Reddy',
+      userEmail: currentUser.email || 'srilatha@funflick.com',
+      userAvatar: currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+      planId: plan.id,
+      planName: plan.name,
+      planDuration: plan.duration || '30 Days',
+      amount: Number(plan.price),
+      formattedAmount: `₹${Number(plan.price).toLocaleString()}`,
+      currency: 'INR',
+      paymentGateway: paymentMethod,
+      status: 'Captured',
+      date: now.toISOString(),
+      formattedDate,
+      category: 'User Registration / Influencer Plan'
+    };
+
+    setSubscriptionTransactions(prev => [newTransaction, ...prev]);
+
+    // Activate Influencer Status for the user
+    setCurrentUser(prev => ({
+      ...prev,
+      isInfluencer: true,
+      hasInfluencerSubscription: true,
+      hasPublishingSubscription: true,
+      accountStatus: 'Influencer',
+      subscriptionPlan: plan.name
+    }));
+
+    // Record in user's wallet history
+    const walletTx = {
+      id: 'tx_rzp_' + Date.now(),
+      title: `Influencer ${plan.name} (Razorpay)`,
+      desc: `Payment ID: ${newTransaction.razorpayPaymentId}`,
+      type: 'debit',
+      amount: plan.price,
+      formattedAmount: `-₹${Number(plan.price).toLocaleString()}`,
+      date: 'Today',
+      status: 'Completed',
+      category: 'Subscription'
+    };
+    setTransactions(prev => [walletTx, ...prev]);
+
+    setSubscriptionGateModalOpen(false);
+    showToast(`🎉 Razorpay Test Payment Successful! Influencer Plan Activated (${plan.name})`, 'success');
+    return newTransaction;
   };
 
   // Admin: Update an existing plan globally
@@ -1380,6 +1455,9 @@ export const AppProvider = ({ children }) => {
         blockUser,
         unblockUser,
         purchasePublishingSubscription,
+        recordSubscriptionPayment,
+        subscriptionTransactions,
+        setSubscriptionTransactions,
         toggleUserSubscriptionStatus,
         publishNewPost,
         deleteUserPost,

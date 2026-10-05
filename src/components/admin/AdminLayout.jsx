@@ -16,6 +16,7 @@ import {
   Bell, 
   Smartphone,
   ShieldCheck,
+  ShieldAlert,
   Search,
   Sun,
   Moon,
@@ -106,6 +107,27 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
 
         {/* Bottom User Area Switcher */}
         <div className={`pt-4 border-t ${isLight ? 'border-slate-200' : 'border-white/10'} space-y-2`}>
+          {/* Admin Account Identity */}
+          <div className={`p-2.5 rounded-2xl ${isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/10'} border space-y-1`}>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-[11px] shadow-sm">
+                FF
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'} truncate block`}>
+                  Super Admin
+                </span>
+                <span className="text-[10px] text-pink-400 font-medium truncate block">
+                  funflick0308@gmail.com
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-[9px] pt-1 border-t border-white/5 text-gray-400">
+              <span>Status: Authenticated</span>
+              <span className="text-emerald-400 font-bold">Active 🛡️</span>
+            </div>
+          </div>
+
           <button
             onClick={() => navigate('/')}
             className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl ${
