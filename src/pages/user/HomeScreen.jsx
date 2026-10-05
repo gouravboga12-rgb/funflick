@@ -5,6 +5,7 @@ import { AppHeader } from '../../components/common/AppHeader';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
 import { StoryBar } from '../../components/feed/StoryBar';
 import { VideoPostCard } from '../../components/feed/VideoPostCard';
+import { StandardPostCard } from '../../components/feed/StandardPostCard';
 import { SubscriptionGateModal } from '../../components/common/SubscriptionGateModal';
 import { CreateChooserModal } from '../../components/user/create/CreateChooserModal';
 import { StoryViewerModal } from '../../components/feed/StoryViewerModal';
@@ -64,9 +65,13 @@ export const HomeScreen = () => {
               </button>
             </div>
           ) : (
-            filteredPosts.map(post => (
-              <VideoPostCard key={post.id} post={post} />
-            ))
+            filteredPosts.map(post => {
+              const isVideo = post.mediaType === 'video' || (post.mediaUrl && /\.(mp4|webm|mov|m4v)($|\?)/i.test(post.mediaUrl));
+              if (isVideo) {
+                return <VideoPostCard key={post.id} post={post} />;
+              }
+              return <StandardPostCard key={post.id} post={post} />;
+            })
           )}
         </div>
 

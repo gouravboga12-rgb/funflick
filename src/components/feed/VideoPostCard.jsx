@@ -182,6 +182,10 @@ export const VideoPostCard = ({ post }) => {
           <img
             src={post.posterUrl || post.mediaUrl}
             alt={post.title}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80';
+            }}
             className="w-full h-full object-cover"
           />
         )}

@@ -81,8 +81,12 @@ export const CreatePostScreen = () => {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      setMediaUrl(URL.createObjectURL(file));
-      showToast('Photo selected from device! 📸', 'info');
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setMediaUrl(event.target.result);
+        showToast('Photo selected from device! 📸', 'info');
+      };
+      reader.readAsDataURL(file);
     }
   };
 

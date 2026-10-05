@@ -229,6 +229,10 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : INITIAL_ADS;
   });
 
+  useEffect(() => {
+    localStorage.setItem('funflick_ads', JSON.stringify(adsList));
+  }, [adsList]);
+
   // Active Mobile Popup Ad
   const [activePopupAd, setActivePopupAd] = useState(null);
 
@@ -1009,12 +1013,78 @@ export const AppProvider = ({ children }) => {
     showToast('🚀 Your post has been published live to FunFlick!', 'success');
   };
 
+  // Update a User Post (Edit Caption, Title, Category, Media, Location, Hashtags)
+  const updateUserPost = (postId, updatedFields) => {
+    setPosts(prev => prev.map(p => {
+      if (String(p.id) === String(postId)) {
+        return {
+          ...p,
+          ...updatedFields,
+          title: updatedFields.title !== undefined ? updatedFields.title : p.title,
+          caption: updatedFields.caption !== undefined ? updatedFields.caption : p.caption,
+          category: updatedFields.category || p.category,
+          posterUrl: updatedFields.posterUrl || updatedFields.mediaUrl || p.posterUrl,
+          mediaUrl: updatedFields.mediaUrl || p.mediaUrl,
+          location: updatedFields.location !== undefined ? updatedFields.location : p.location
+        };
+      }
+      return p;
+    }));
+
+    setUserSubmissions(prev => prev.map(s => {
+      if (String(s.id) === String(postId) || s.title === postId) {
+        return {
+          ...s,
+          ...updatedFields,
+          title: updatedFields.title || s.title,
+          caption: updatedFields.caption || s.caption,
+          thumbnail: updatedFields.posterUrl || updatedFields.mediaUrl || s.thumbnail
+        };
+      }
+      return s;
+    }));
+
+    setCreatorVideos(prev => prev.map(cv => {
+      if (String(cv.id) === String(postId)) {
+        return {
+          ...cv,
+          ...updatedFields,
+          title: updatedFields.title || cv.title,
+          thumbnail: updatedFields.posterUrl || updatedFields.mediaUrl || cv.thumbnail
+        };
+      }
+      return cv;
+    }));
+
+    // If backend video token exists, also call backend PUT /api/videos/:id
+    const token = localStorage.getItem('funflick_token');
+    if (token) {
+      fetch(`/api/videos/${postId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: updatedFields.title,
+          description: updatedFields.caption,
+          category: updatedFields.category,
+          thumbnail_url: updatedFields.posterUrl || updatedFields.mediaUrl,
+          video_url: updatedFields.mediaUrl
+        })
+      }).catch(() => {});
+    }
+
+    showToast('✅ Post updated successfully!', 'success');
+  };
+
   // Delete a User Post (Instagram-Style Post Deletion)
   const deleteUserPost = (postId) => {
-    setPosts(prev => prev.filter(p => p.id !== postId));
-    setUserSubmissions(prev => prev.filter(s => s.id !== postId && s.title !== postId));
-    setPendingApprovals(prev => prev.filter(a => a.id !== postId));
-    setCreatorVideos(prev => prev.filter(cv => cv.id !== postId));
+    setPosts(prev => prev.filter(p => String(p.id) !== String(postId)));
+    setUserSubmissions(prev => prev.filter(s => String(s.id) !== String(postId) && s.title !== postId));
+    setPendingApprovals(prev => prev.filter(a => String(a.id) !== String(postId)));
+    setCreatorVideos(prev => prev.filter(cv => String(cv.id) !== String(postId)));
+    setInfluencerMedia(prev => prev.filter(m => String(m.id) !== String(postId) && String(m.postId) !== String(postId)));
     setCurrentUser(prev => ({
       ...prev,
       stats: {
@@ -1022,6 +1092,16 @@ export const AppProvider = ({ children }) => {
         posts: Math.max(0, (prev.stats?.posts || 1) - 1)
       }
     }));
+
+    // If backend video token exists, also call backend DELETE /api/videos/:id
+    const token = localStorage.getItem('funflick_token');
+    if (token) {
+      fetch(`/api/videos/${postId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {});
+    }
+
     showToast('🗑️ Post deleted successfully!', 'info');
   };
 
@@ -1781,6 +1861,7 @@ export const AppProvider = ({ children }) => {
         setSubscriptionTransactions,
         toggleUserSubscriptionStatus,
         publishNewPost,
+        updateUserPost,
         deleteUserPost,
         deleteUserSubmission,
         publishNewStory,

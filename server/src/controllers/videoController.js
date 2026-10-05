@@ -157,3 +157,41 @@ export async function recordView(req, res) {
     return res.status(500).json({ error: 'Failed to record view' });
   }
 }
+
+export async function updateVideo(req, res) {
+  try {
+    const { id } = req.params;
+    const { title, description, category, thumbnail_url, video_url } = req.body;
+    await pool.query(
+      `UPDATE videos SET 
+        title = COALESCE(?, title),
+        description = COALESCE(?, description),
+        category = COALESCE(?, category),
+        thumbnail_url = COALESCE(?, thumbnail_url),
+        video_url = COALESCE(?, video_url)
+      WHERE id = ? AND (user_id = ? OR ? = 1)`,
+      [title, description, category, thumbnail_url, video_url, id, req.user.id, req.user.role === 'admin' ? 1 : 0]
+    );
+    return res.json({ success: true, message: 'Video updated successfully' });
+  } catch (err) {
+    console.error('Update video error:', err);
+    return res.status(500).json({ error: 'Failed to update video' });
+  }
+}
+
+export async function deleteVideo(req, res) {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM comments WHERE video_id = ?', [id]);
+    await pool.query('DELETE FROM likes WHERE video_id = ?', [id]);
+    const [result] = await pool.query(
+      'DELETE FROM videos WHERE id = ? AND (user_id = ? OR ? = 1)',
+      [id, req.user.id, req.user.role === 'admin' ? 1 : 0]
+    );
+    return res.json({ success: true, message: 'Video deleted successfully', affectedRows: result.affectedRows });
+  } catch (err) {
+    console.error('Delete video error:', err);
+    return res.status(500).json({ error: 'Failed to delete video' });
+  }
+}
+

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useApp } from '../../context/AppContext';
+import api from '../../services/api';
 import { 
   Megaphone, 
   Plus, 
@@ -20,7 +21,10 @@ import {
   Calendar,
   X,
   Check,
-  AlertCircle
+  AlertCircle,
+  UploadCloud,
+  FolderUp,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -47,8 +51,81 @@ export const AdminAdsScreen = () => {
     actionText: 'Learn More'
   });
 
+  // Direct file upload states
+  const fileInputRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [uploadedFileSize, setUploadedFileSize] = useState('');
+  const [showUrlFallback, setShowUrlFallback] = useState(false);
+
+  const handleDirectFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processUploadedFile(file);
+  };
+
+  const handleFileDrop = async (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    await processUploadedFile(file);
+  };
+
+  const processUploadedFile = async (file) => {
+    setIsUploading(true);
+    const isVideo = file.type.startsWith('video');
+    const isImage = file.type.startsWith('image');
+    const targetType = isVideo ? 'video' : 'image';
+    const fileSizeFormatted = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+
+    try {
+      let fileUrl = '';
+      try {
+        const folder = isVideo ? 'videos' : 'images';
+        const res = await api.media.uploadFileToS3(file, folder);
+        if (res && res.publicUrl) {
+          fileUrl = res.publicUrl;
+        }
+      } catch (s3Err) {
+        console.warn('S3 upload fallback to local Data URL:', s3Err);
+      }
+
+      if (!fileUrl) {
+        fileUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => resolve(event.target.result);
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      setCurrentAd(prev => ({
+        ...prev,
+        type: targetType,
+        mediaUrl: fileUrl,
+        thumbnailUrl: isImage ? fileUrl : (prev.thumbnailUrl || fileUrl),
+        duration: isVideo ? prev.duration : 10,
+        allowCloseAfter: isVideo ? prev.allowCloseAfter : 0
+      }));
+
+      setUploadedFileName(file.name);
+      setUploadedFileSize(fileSizeFormatted);
+      showToast(`✅ ${isVideo ? 'Video' : 'Image'} uploaded successfully! (${fileSizeFormatted})`, 'success');
+    } catch (err) {
+      console.error('File process error:', err);
+      showToast('⚠️ Could not process file', 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleOpenCreate = () => {
     setModalMode('create');
+    setUploadedFileName('Young Guy Music Demo');
+    setUploadedFileSize('Video Preset');
+    setShowUrlFallback(false);
     setCurrentAd({
       id: '',
       title: 'Summer Fest Ad Campaign 🏖️',
@@ -69,6 +146,9 @@ export const AdminAdsScreen = () => {
 
   const handleOpenEdit = (ad) => {
     setModalMode('edit');
+    setUploadedFileName(ad.title || 'Current Media');
+    setUploadedFileSize(ad.type === 'video' ? 'Video File' : 'Image File');
+    setShowUrlFallback(false);
     setCurrentAd({ ...ad });
     setModalOpen(true);
   };
@@ -391,14 +471,18 @@ export const AdminAdsScreen = () => {
                       <button
                         key={preset.name}
                         type="button"
-                        onClick={() => setCurrentAd({
-                          ...currentAd,
-                          type: preset.type,
-                          mediaUrl: preset.url,
-                          thumbnailUrl: preset.thumb,
-                          duration: preset.duration,
-                          allowCloseAfter: preset.closeAfter
-                        })}
+                        onClick={() => {
+                          setCurrentAd({
+                            ...currentAd,
+                            type: preset.type,
+                            mediaUrl: preset.url,
+                            thumbnailUrl: preset.thumb,
+                            duration: preset.duration,
+                            allowCloseAfter: preset.closeAfter
+                          });
+                          setUploadedFileName(preset.name);
+                          setUploadedFileSize(preset.type === 'video' ? 'Video Preset' : 'Image Preset');
+                        }}
                         className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-white/5 hover:bg-white/10 border border-white/10 text-pink-300 transition"
                       >
                         {preset.name}
@@ -407,21 +491,160 @@ export const AdminAdsScreen = () => {
                   </div>
                 </div>
 
-                {/* Media URL */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold block">
-                    {currentAd.type === 'video' ? 'Video File URL (MP4 / WebM)' : 'Image File URL (JPG / PNG)'}
-                  </label>
+                {/* Direct Media File Upload Box (Replaces URL Input with Direct Upload) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold block flex items-center gap-1.5">
+                      <UploadCloud className="w-4 h-4 text-pink-500" />
+                      <span>
+                        {currentAd.type === 'video' 
+                          ? 'Upload Video File (Direct Upload: MP4 / WebM)' 
+                          : 'Upload Image File (Direct Upload: JPG / PNG / WEBP)'}
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowUrlFallback(!showUrlFallback)}
+                      className="text-[11px] text-pink-400 hover:text-pink-300 font-semibold transition"
+                    >
+                      {showUrlFallback ? 'Hide URL field' : 'Or paste URL'}
+                    </button>
+                  </div>
+
                   <input
-                    type="url"
-                    required
-                    value={currentAd.mediaUrl}
-                    onChange={(e) => setCurrentAd({ ...currentAd, mediaUrl: e.target.value })}
-                    placeholder="https://..."
-                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs ${
-                      isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#0a0618] border-white/10'
-                    } border focus:outline-none focus:border-pink-500`}
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleDirectFileUpload}
+                    accept={currentAd.type === 'video' ? 'video/mp4, video/webm, video/quicktime' : 'image/png, image/jpeg, image/webp, image/gif'}
+                    className="hidden"
                   />
+
+                  {/* Drag & Drop Upload Zone */}
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleFileDrop}
+                    className={`p-4 rounded-2xl border-2 border-dashed cursor-pointer transition flex flex-col items-center justify-center text-center gap-2 ${
+                      isDragging
+                        ? 'border-pink-500 bg-pink-500/10'
+                        : isLight 
+                          ? 'border-slate-300 hover:border-pink-500 bg-slate-50 hover:bg-pink-50/20' 
+                          : 'border-white/15 hover:border-pink-500/60 bg-[#0a0618] hover:bg-white/5'
+                    }`}
+                  >
+                    {isUploading ? (
+                      <div className="py-4 space-y-2 flex flex-col items-center">
+                        <div className="w-8 h-8 rounded-full border-2 border-pink-500 border-t-transparent animate-spin" />
+                        <span className="text-xs font-bold text-pink-400">Processing & uploading media...</span>
+                      </div>
+                    ) : currentAd.mediaUrl ? (
+                      <div className="w-full flex items-center gap-3 text-left">
+                        {/* Preview Media Container */}
+                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-black border border-white/10 shrink-0 relative flex items-center justify-center">
+                          {currentAd.type === 'video' ? (
+                            <video
+                              src={currentAd.mediaUrl}
+                              className="w-full h-full object-cover"
+                              muted
+                            />
+                          ) : (
+                            <img
+                              src={currentAd.mediaUrl}
+                              alt="ad media preview"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=300&q=80';
+                              }}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                          <span className="absolute bottom-1 right-1 px-1 py-0.2 rounded bg-black/80 text-[8px] font-extrabold text-white uppercase">
+                            {currentAd.type}
+                          </span>
+                        </div>
+
+                        {/* File Details & Action Buttons */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1 text-emerald-400 text-xs font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Media Attached & Live</span>
+                          </div>
+                          <p className="text-xs font-bold text-white truncate mt-0.5">
+                            {uploadedFileName || 'Selected Media Asset'}
+                          </p>
+                          <span className="text-[10px] text-gray-400 block mt-0.5">
+                            {uploadedFileSize || (currentAd.type === 'video' ? 'Video format' : 'Image banner')}
+                          </span>
+                          <div className="flex items-center gap-2 mt-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                fileInputRef.current?.click();
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/10 hover:bg-white/20 text-pink-300 transition"
+                            >
+                              Upload Different File
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentAd({ ...currentAd, mediaUrl: '', thumbnailUrl: '' });
+                                setUploadedFileName('');
+                                setUploadedFileSize('');
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500/20 to-purple-500/20 text-pink-400 flex items-center justify-center border border-pink-500/30">
+                          <UploadCloud className="w-6 h-6" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-white block">
+                            Click to upload {currentAd.type === 'video' ? 'video' : 'image'} file from computer
+                          </span>
+                          <span className="text-[10px] text-gray-400 block">
+                            {currentAd.type === 'video' 
+                              ? 'Supported: MP4, WebM (Recommended vertical/landscape, max 50MB)'
+                              : 'Supported: PNG, JPG, WEBP (High resolution, max 15MB)'}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Fallback URL input (toggled) */}
+                  {showUrlFallback && (
+                    <div className="pt-2 space-y-1">
+                      <label className="text-[11px] text-gray-400 block font-medium">
+                        Direct URL (CDN / S3 / Web Link):
+                      </label>
+                      <input
+                        type="url"
+                        value={currentAd.mediaUrl}
+                        onChange={(e) => {
+                          setCurrentAd({ 
+                            ...currentAd, 
+                            mediaUrl: e.target.value, 
+                            thumbnailUrl: currentAd.type === 'image' ? e.target.value : currentAd.thumbnailUrl 
+                          });
+                          setUploadedFileName('Custom URL Asset');
+                        }}
+                        placeholder="https://..."
+                        className={`w-full px-3.5 py-2 rounded-xl text-xs ${
+                          isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#0a0618] border-white/10'
+                        } border focus:outline-none focus:border-pink-500`}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Duration & Allow Close After (Requirement 4 & 5) */}

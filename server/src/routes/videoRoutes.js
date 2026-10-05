@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { listVideos, createVideo, toggleLike, getComments, addComment, recordView } from '../controllers/videoController.js';
+import { listVideos, createVideo, toggleLike, getComments, addComment, recordView, updateVideo, deleteVideo } from '../controllers/videoController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
 const router = Router();
@@ -9,6 +9,12 @@ router.get('/', listVideos);
 
 // Protected: Publish video to feed
 router.post('/', authenticateToken, createVideo);
+
+// Protected: Update video
+router.put('/:id', authenticateToken, updateVideo);
+
+// Protected: Delete video
+router.delete('/:id', authenticateToken, deleteVideo);
 
 // Protected: Like / Unlike video
 router.post('/:id/like', authenticateToken, toggleLike);
@@ -21,3 +27,4 @@ router.get('/:id/comments', getComments);
 router.post('/:id/comments', authenticateToken, addComment);
 
 export default router;
+
