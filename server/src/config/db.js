@@ -113,6 +113,23 @@ export async function initDatabase() {
       ) ENGINE=InnoDB;
     `);
 
+    // Global Platform Settings Table (Video lengths, durations, limits)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS platform_settings (
+        setting_key VARCHAR(100) PRIMARY KEY,
+        setting_value VARCHAR(255) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+
+    // Seed default limits (Reels 30s, Stories 15s, Posts 30s)
+    await connection.query(`
+      INSERT IGNORE INTO platform_settings (setting_key, setting_value) VALUES
+      ('max_reel_duration', '30'),
+      ('max_story_duration', '15'),
+      ('max_post_duration', '30');
+    `);
+
     connection.release();
     console.log('✅ MySQL schema initialized successfully');
   } catch (err) {

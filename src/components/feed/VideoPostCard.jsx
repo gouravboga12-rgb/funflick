@@ -33,12 +33,17 @@ import { PostInsightsModal } from './PostInsightsModal';
 
 export const VideoPostCard = ({ post }) => {
   const navigate = useNavigate();
-  const { toggleLikePost, recordPostView, toggleSavePost, toggleFollowCreator, deleteUserPost, blockUser, currentUser, showToast } = useApp();
+  const { toggleLikePost, recordPostView, toggleSavePost, toggleFollowCreator, deleteUserPost, blockUser, currentUser, mediaLimits, showToast } = useApp();
 
   const isOwner = post.creator?.username === currentUser?.username;
   const isPrivateAccount = !!post.creator?.isPrivate;
   const hasAccess = isOwner || post.isFollowing || post.isSubscribed;
   const isLocked = isPrivateAccount && !hasAccess;
+
+  // Dynamic showcase duration configured by admin (defaults: Reels 30s, Stories 15s)
+  const maxShowcaseDuration = post.contentType === 'story'
+    ? (mediaLimits?.maxStoryDuration || 15)
+    : (mediaLimits?.maxReelDuration || 30);
 
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -55,11 +60,15 @@ export const VideoPostCard = ({ post }) => {
   const lastTapRef = useRef(0);
   const hasRecordedViewRef = useRef(false);
 
-  // Record view after 2.5s of continuous watch
+  // Dynamic Playback Watcher: enforces admin max showcase length & records view
   const handleTimeUpdate = () => {
     if (isLocked) return;
-    if (!hasRecordedViewRef.current && videoRef.current) {
-      if (videoRef.current.currentTime >= 2.5) {
+    if (videoRef.current) {
+      // If the video reaches the admin-configured showcase limit, seamlessly loop back to 0s
+      if (videoRef.current.currentTime >= maxShowcaseDuration) {
+        videoRef.current.currentTime = 0;
+      }
+      if (!hasRecordedViewRef.current && videoRef.current.currentTime >= 2.5) {
         hasRecordedViewRef.current = true;
         recordPostView(post.id);
       }

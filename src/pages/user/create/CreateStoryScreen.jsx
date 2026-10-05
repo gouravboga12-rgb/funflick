@@ -28,8 +28,9 @@ const SAMPLE_STORY_PHOTOS = [
 
 export const CreateStoryScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, submitStoryForVerification, setSubscriptionGateModalOpen, showToast } = useApp();
+  const { currentUser, submitStoryForVerification, setSubscriptionGateModalOpen, mediaLimits, showToast } = useApp();
 
+  const maxStoryDuration = mediaLimits?.maxStoryDuration || 15;
   const fileInputRef = useRef(null);
 
   const [mediaUrl, setMediaUrl] = useState(SAMPLE_STORY_PHOTOS[0]);
@@ -101,7 +102,7 @@ export const CreateStoryScreen = () => {
             Add to Story
           </span>
           <span className="text-[10px] text-pink-400 font-semibold">
-            Admin Verification Queue
+            Max Length: {maxStoryDuration}s • Moderation
           </span>
         </div>
 

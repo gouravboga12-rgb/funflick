@@ -25,7 +25,8 @@ import {
   Sliders,
   X,
   Check,
-  Film
+  Film,
+  Info
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UploadSuccessMonetizationModal } from '../../../components/common/UploadSuccessMonetizationModal';
@@ -82,7 +83,10 @@ const POPULAR_SOUNDS = [
 
 export const UploadVideoScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, submitVideoForVerification, setSubscriptionGateModalOpen, showToast } = useApp();
+  const { currentUser, submitVideoForVerification, setSubscriptionGateModalOpen, mediaLimits, showToast } = useApp();
+
+  const maxReelLimit = mediaLimits?.maxReelDuration || 30;
+  const [videoDuration, setVideoDuration] = useState(0);
 
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -117,6 +121,18 @@ export const UploadVideoScreen = () => {
       setVideoSrc(blobUrl);
       setSelectedVideo(null);
       showToast(`Selected "${file.name}" for upload! 🎥`, 'info');
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setVideoDuration(videoRef.current.duration || 0);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current && videoRef.current.currentTime >= maxReelLimit) {
+      videoRef.current.currentTime = 0;
     }
   };
 
@@ -276,9 +292,17 @@ export const UploadVideoScreen = () => {
               loop
               playsInline
               muted={isMuted}
+              onLoadedMetadata={handleLoadedMetadata}
+              onTimeUpdate={handleTimeUpdate}
               className="w-full h-full object-cover cursor-pointer"
               onClick={togglePlay}
             />
+
+            {/* Platform Showcase Limit Badge */}
+            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[10px] font-bold text-pink-300 flex items-center gap-1 pointer-events-none">
+              <Clock className="w-3 h-3 text-pink-400" />
+              <span>Showcase Limit: {maxReelLimit}s</span>
+            </div>
 
             {/* Play/Pause Overlay */}
             <button
@@ -314,6 +338,21 @@ export const UploadVideoScreen = () => {
               <span className="text-[10px] text-gray-300 shrink-0">Reel Preview</span>
             </div>
           </div>
+
+          {/* Video Duration Notice for Lengthy Uploads */}
+          {videoDuration > maxReelLimit && (
+            <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5 shadow-md">
+              <Info className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+              <div className="space-y-0.5">
+                <span className="font-bold text-white block">
+                  Video Duration Notice ({Math.round(videoDuration)}s total length)
+                </span>
+                <p className="text-[11px] text-gray-300 leading-relaxed">
+                  Your full video will be safely uploaded. Per platform showcase rules, viewers will play the first <strong className="text-pink-400 font-bold">{maxReelLimit} seconds</strong>. If admins update the platform duration limit in the future, more of your video will automatically become playable!
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Video Selector Options: Choose from Device or Pick FunFlick Sample */}
           <div className="flex items-center gap-2 pt-1">

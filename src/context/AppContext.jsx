@@ -306,8 +306,60 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Global Media showcase limits (Admin configured: Reels 30s default, Stories 15s default, Posts 30s)
+  const [mediaLimits, setMediaLimits] = useState(() => {
+    const saved = localStorage.getItem('funflick_media_limits');
+    return saved ? JSON.parse(saved) : {
+      maxReelDuration: 30,
+      maxStoryDuration: 15,
+      maxPostDuration: 30
+    };
+  });
+
+  // Fetch settings from AWS MySQL backend
+  const fetchPlatformSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) {
+          setMediaLimits(data.settings);
+          try {
+            localStorage.setItem('funflick_media_limits', JSON.stringify(data.settings));
+          } catch (e) {}
+        }
+      }
+    } catch (err) {}
+  };
+
+  const updateMediaLimits = async (newLimits) => {
+    setMediaLimits(prev => {
+      const next = { ...prev, ...newLimits };
+      try {
+        localStorage.setItem('funflick_media_limits', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+
+    const token = localStorage.getItem('funflick_token');
+    try {
+      await fetch('/api/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(newLimits)
+      });
+      showToast('⚙️ Global media showcase limits updated and synced to AWS!', 'success');
+    } catch (err) {
+      showToast('Settings saved locally. Server sync pending.', 'info');
+    }
+  };
+
   useEffect(() => {
     fetchLiveVideos();
+    fetchPlatformSettings();
   }, []);
 
   // Toast helper
@@ -1718,6 +1770,8 @@ export const AppProvider = ({ children }) => {
         theme,
         setTheme,
         toggleTheme,
+        mediaLimits,
+        updateMediaLimits,
         isAuthenticated,
         loginUser,
         logoutUser
