@@ -31,10 +31,11 @@ export const SubscriptionScreen = () => {
   const [selectedPlanId, setSelectedPlanId] = useState(() => activePlans[0]?.id || 'monthly');
   const [processing, setProcessing] = useState(false);
 
-  const handlePurchase = () => {
-    const selectedPlan = activePlans.find(p => p.id === selectedPlanId) || activePlans[0];
+  const handlePurchase = (planToPurchase) => {
+    const selectedPlan = planToPurchase || activePlans.find(p => p.id === selectedPlanId) || activePlans[0];
     if (!selectedPlan) return;
 
+    setSelectedPlanId(selectedPlan.id);
     setProcessing(true);
 
     // Check if Razorpay Checkout SDK is loaded
@@ -228,6 +229,39 @@ export const SubscriptionScreen = () => {
                     </div>
                   ))}
                 </div>
+
+                {/* Direct 1-Click Pay & Subscribe Button for this Plan */}
+                <div className="mt-3.5 pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-400">Total payable</span>
+                    <span className="text-base font-extrabold text-white font-heading">
+                      {plan.formattedPrice}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePurchase(plan);
+                    }}
+                    disabled={processing && selectedPlanId === plan.id}
+                    className="py-2.5 px-4 sm:px-5 rounded-2xl bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca] text-white font-extrabold text-xs tracking-wide shadow-lg shadow-pink-500/25 hover:opacity-95 active:scale-[0.97] transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {processing && selectedPlanId === plan.id ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Opening Razorpay...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
+                        <span>Pay {plan.formattedPrice}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -259,37 +293,17 @@ export const SubscriptionScreen = () => {
           </div>
         </div>
 
-        {/* CTA Button */}
-        <div className="pt-2">
-          <button
-            onClick={handlePurchase}
-            disabled={processing}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca] text-white font-extrabold text-sm tracking-wide shadow-xl shadow-pink-500/30 hover:opacity-95 active:scale-[0.99] transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            {processing ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Processing Simulated Payment...</span>
-              </div>
-            ) : (
-              <>
-                <span>{currentUser.isInfluencer ? 'Renew / Upgrade Influencer Plan' : 'Activate Influencer Status'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-
-          <div className="flex flex-col items-center justify-center gap-1 mt-2.5">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 font-bold text-[10px]">
-                🔒 Secured by Razorpay
-              </span>
-              <span className="text-[10px] text-gray-400 font-medium">Test Mode Enabled (Key: rzp_test_...5VmT8)</span>
-            </div>
-            <p className="text-[10px] text-center text-gray-500">
-              Supports UPI (GPay, PhonePe, Paytm), Credit & Debit Cards, NetBanking
-            </p>
+        {/* Security & Instant Razorpay Checkout Guarantee */}
+        <div className="p-4 rounded-3xl bg-[#140e2b]/80 border border-white/10 space-y-2 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 font-bold text-[10px]">
+              🔒 Secured by Razorpay
+            </span>
+            <span className="text-[10px] text-gray-400 font-medium">Test Mode Enabled (Key: rzp_test_...5VmT8)</span>
           </div>
+          <p className="text-[10px] text-gray-400">
+            Tap <strong>Pay</strong> on any plan above for instant activation via UPI (GPay, PhonePe, Paytm), Cards, or NetBanking.
+          </p>
         </div>
 
       </div>
