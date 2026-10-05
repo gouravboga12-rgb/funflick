@@ -63,9 +63,10 @@ export const CreatorDashboardScreen = () => {
       <div className="sticky top-0 z-30 bg-[#090514]/90 backdrop-blur-md px-5 py-3.5 border-b border-white/5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img
-            src={creator.avatar}
+            src={creator.avatar || '/brand/default-avatar.svg'}
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
             alt={creator.name}
-            className="w-10 h-10 rounded-full object-cover border-2 border-pink-500"
+            className="w-10 h-10 rounded-full object-cover border-2 border-pink-500 bg-gray-900"
           />
           <div>
             <div className="flex items-center gap-1.5">

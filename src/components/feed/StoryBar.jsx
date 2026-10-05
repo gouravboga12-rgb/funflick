@@ -47,7 +47,8 @@ export const StoryBar = () => {
                   }`}>
                     <div className="w-full h-full rounded-full border-2 border-[#090614] overflow-hidden bg-gray-900">
                       <img 
-                        src={currentUser.avatar} 
+                        src={currentUser.avatar || currentUser.avatar_url || '/brand/default-avatar.svg'} 
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
                         alt="My Story" 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
                       />
@@ -79,7 +80,8 @@ export const StoryBar = () => {
               }`}>
                 <div className="w-full h-full rounded-full border-2 border-[#090614] overflow-hidden bg-gray-900">
                   <img 
-                    src={story.avatar} 
+                    src={story.avatar || '/brand/default-avatar.svg'} 
+                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
                     alt={story.username} 
                     className="w-full h-full object-cover" 
                   />

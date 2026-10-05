@@ -175,9 +175,10 @@ export const UserProfileScreen = () => {
           <div className="relative">
             {/* Same profile icon style for both Users and Influencers */}
             <img
-              src={currentUser.avatar}
+              src={currentUser.avatar || currentUser.avatar_url || '/brand/default-avatar.svg'}
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
               alt={currentUser.name}
-              className="w-20 h-20 rounded-full object-cover border-2 border-pink-500 shadow-xl"
+              className="w-20 h-20 rounded-full object-cover border-2 border-pink-500 shadow-xl bg-gray-900"
             />
             {currentUser.isInfluencer && (
               <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-gradient-to-r from-amber-400 to-pink-500 flex items-center justify-center text-xs shadow-md border-2 border-[#090514]" title="Active Influencer Subscription">

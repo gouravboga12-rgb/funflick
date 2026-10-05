@@ -99,9 +99,10 @@ export const CreatorProfileScreen = () => {
           <div className="flex items-end justify-between">
             <div className="relative">
               <img
-                src={creator.avatar}
+                src={creator.avatar || '/brand/default-avatar.svg'}
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
                 alt={creator.name}
-                className="w-22 h-22 rounded-full object-cover border-4 border-[#090514] shadow-2xl"
+                className="w-22 h-22 rounded-full object-cover border-4 border-[#090514] shadow-2xl bg-gray-900"
               />
               {creator.isVerified && (
                 <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-[#0070f3] border-2 border-[#090514] flex items-center justify-center text-white text-xs font-bold shadow">

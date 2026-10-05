@@ -135,13 +135,16 @@ export const CREATOR_BENEFITS = [
   'Direct fan engagement tools and subscriber-only content'
 ];
 
+export const DEFAULT_AVATAR = '/brand/default-avatar.svg';
+
 // Current logged in user - Clean State
 export const CURRENT_USER = {
   id: 'usr_me',
   name: 'New Creator',
   username: 'creator_1',
   email: 'creator@funflick.com',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+  avatar: '/brand/default-avatar.svg',
+  avatar_url: '/brand/default-avatar.svg',
   bio: 'FunFlick Creator | Living for laughs & entertainment 💃✨',
   location: 'Hyderabad, India',
   stats: {

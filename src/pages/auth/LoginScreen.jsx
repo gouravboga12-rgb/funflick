@@ -361,9 +361,10 @@ export const LoginScreen = () => {
                   >
                     <div className="flex items-center gap-3">
                       <img
-                        src={acc.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80'}
+                        src={acc.avatar_url || acc.avatar || '/brand/default-avatar.svg'}
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
                         alt={acc.name}
-                        className="w-10 h-10 rounded-full object-cover border border-pink-500"
+                        className="w-10 h-10 rounded-full object-cover border border-pink-500 bg-gray-900"
                       />
                       <div>
                         <span className="text-xs font-bold text-white font-heading block group-hover:text-pink-300 transition">

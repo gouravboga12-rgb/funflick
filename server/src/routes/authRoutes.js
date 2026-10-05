@@ -11,7 +11,8 @@ import {
   googleLogin,
   googleSelectAccount,
   googleSignupComplete,
-  updateContactInfo
+  updateContactInfo,
+  updateUserProfile
 } from '../controllers/authController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -38,6 +39,9 @@ router.post('/google-signup-complete', googleSignupComplete);
 
 // Protected session check
 router.get('/me', authenticateToken, getCurrentUser);
+
+// Update user profile (name, username, bio, avatar)
+router.put('/profile', authenticateToken, updateUserProfile);
 
 // Update email & phone from Account Settings
 router.put('/profile/contact', authenticateToken, updateContactInfo);

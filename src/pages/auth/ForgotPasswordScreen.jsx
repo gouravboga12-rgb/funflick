@@ -261,9 +261,10 @@ export const ForgotPasswordScreen = () => {
                     >
                       <div className="flex items-center gap-2.5">
                         <img
-                          src={acc.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80'}
+                          src={acc.avatar_url || acc.avatar || '/brand/default-avatar.svg'}
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
                           alt={acc.username}
-                          className="w-7 h-7 rounded-full object-cover border border-pink-400"
+                          className="w-7 h-7 rounded-full object-cover border border-pink-400 bg-gray-900"
                         />
                         <span className="text-xs">@{acc.username}</span>
                       </div>

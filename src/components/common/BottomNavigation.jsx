@@ -74,7 +74,8 @@ export const BottomNavigation = () => {
                       : (isLight ? 'border border-slate-300' : 'border border-gray-600')
                   }`}>
                     <img 
-                      src={currentUser.avatar} 
+                      src={currentUser.avatar || currentUser.avatar_url || '/brand/default-avatar.svg'} 
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
                       alt={currentUser.name} 
                       className="w-full h-full rounded-full object-cover" 
                     />

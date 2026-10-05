@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   CURRENT_USER,
+  DEFAULT_AVATAR,
   INITIAL_POSTS,
   INITIAL_STORIES,
   CREATORS,
@@ -21,8 +22,8 @@ import {
 
 const AppContext = createContext(null);
 
-// Automatic Cache Purge: ensures browser localStorage is wiped of old dummy data
-const DATA_VERSION = 'v6_clean_production_slate';
+// Automatic Cache Purge: cleans old mock feeds/stories without touching logged-in user data!
+const DATA_VERSION = 'v7_production_clean';
 if (typeof window !== 'undefined') {
   try {
     if (localStorage.getItem('funflick_data_version') !== DATA_VERSION) {
@@ -39,7 +40,8 @@ if (typeof window !== 'undefined') {
       localStorage.removeItem('funflick_ads');
       localStorage.removeItem('funflick_copyright_reports');
       localStorage.removeItem('funflick_user_likes');
-      localStorage.removeItem('funflick_user');
+      // NOTE: We deliberately do NOT remove 'funflick_user' or 'funflick_token'
+      // so user credentials, account photo, and sessions are never lost across deployments!
       localStorage.setItem('funflick_data_version', DATA_VERSION);
     }
   } catch (e) {}
@@ -47,8 +49,6 @@ if (typeof window !== 'undefined') {
 
 export const AppProvider = ({ children }) => {
   // Current user state (Unified Viewer + Influencer)
-  // Rule 1: Upload is free for everyone!
-  // Rule 2: Subscribing to an Influencer plan unlocks Influencer status & deep analytics
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('funflick_user');
     let userObj = CURRENT_USER;
@@ -57,8 +57,19 @@ export const AppProvider = ({ children }) => {
         userObj = { ...JSON.parse(saved) };
       } catch (e) {}
     }
+
+    // Clean any broken/expired blob URLs that cannot survive page refresh
+    let safeAvatar = userObj.avatar;
+    if (!safeAvatar || safeAvatar.startsWith('blob:')) {
+      safeAvatar = (userObj.avatar_url && !userObj.avatar_url.startsWith('blob:'))
+        ? userObj.avatar_url
+        : DEFAULT_AVATAR;
+    }
+
     const freshState = {
       ...userObj,
+      avatar: safeAvatar,
+      avatar_url: safeAvatar,
       hasPublishingSubscription: true, // Free upload for everyone!
       isInfluencer: !!userObj.isInfluencer,
       accountStatus: userObj.isInfluencer ? 'Influencer' : 'User',
@@ -75,14 +86,50 @@ export const AppProvider = ({ children }) => {
     return sessionStorage.getItem('funflick_authenticated') === 'true';
   });
 
+  // Sync profile data directly from AWS MySQL backend on app startup if authenticated
+  useEffect(() => {
+    const token = localStorage.getItem('funflick_token');
+    if (!token) return;
+
+    fetch('/api/auth/me', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (data && data.user) {
+          setCurrentUser(prev => {
+            const rawAvatar = data.user.avatar_url || data.user.avatar || prev.avatar;
+            const validAvatar = (rawAvatar && !rawAvatar.startsWith('blob:')) ? rawAvatar : DEFAULT_AVATAR;
+            const merged = {
+              ...prev,
+              ...data.user,
+              avatar: validAvatar,
+              avatar_url: validAvatar,
+            };
+            try {
+              localStorage.setItem('funflick_user', JSON.stringify(merged));
+            } catch (e) {}
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const loginUser = (customUser) => {
     setIsAuthenticated(true);
     sessionStorage.setItem('funflick_authenticated', 'true');
     if (customUser) {
       setCurrentUser(prev => {
+        const rawAvatar = customUser.avatar || customUser.avatar_url || prev.avatar || prev.avatar_url;
+        const validAvatar = (rawAvatar && !rawAvatar.startsWith('blob:')) ? rawAvatar : DEFAULT_AVATAR;
         const next = {
           ...prev,
           ...customUser,
+          avatar: validAvatar,
+          avatar_url: validAvatar,
           email: customUser.email || prev.email,
           phone: customUser.phone !== undefined ? customUser.phone : prev.phone
         };

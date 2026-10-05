@@ -84,8 +84,11 @@ export const SignUpScreen = () => {
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setAvatar(url);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAvatar(reader.result);
+      };
+      reader.readAsDataURL(file);
       showToast('Profile photo updated! 📸');
     }
   };
@@ -243,6 +246,7 @@ export const SignUpScreen = () => {
             {avatar ? (
               <img
                 src={avatar}
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
                 alt="Profile preview"
                 className="w-full h-full object-cover"
               />

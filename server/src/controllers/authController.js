@@ -293,7 +293,8 @@ export async function login(req, res) {
           username: user.username,
           email: user.email,
           phone: user.phone,
-          avatar_url: user.avatar_url,
+          avatar: user.avatar_url || '/brand/default-avatar.svg',
+          avatar_url: user.avatar_url || '/brand/default-avatar.svg',
           bio: user.bio,
           role: user.role,
         },
@@ -310,7 +311,8 @@ export async function login(req, res) {
         name: u.name,
         username: u.username,
         email: u.email,
-        avatar_url: u.avatar_url
+        avatar: u.avatar_url || '/brand/default-avatar.svg',
+        avatar_url: u.avatar_url || '/brand/default-avatar.svg'
       }))
     });
 
@@ -332,13 +334,14 @@ export async function selectAccountLogin(req, res) {
     }
 
     const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+
     const [rows] = await pool.query(
       'SELECT * FROM users WHERE username = ? LIMIT 1',
       [cleanUsername]
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Account not found' });
+      return res.status(401).json({ error: 'Account not found' });
     }
 
     const user = rows[0];
@@ -362,7 +365,8 @@ export async function selectAccountLogin(req, res) {
         username: user.username,
         email: user.email,
         phone: user.phone,
-        avatar_url: user.avatar_url,
+        avatar: user.avatar_url || '/brand/default-avatar.svg',
+        avatar_url: user.avatar_url || '/brand/default-avatar.svg',
         bio: user.bio,
         role: user.role,
       }
@@ -514,10 +518,81 @@ export async function getCurrentUser(req, res) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    return res.json({ user: rows[0] });
+    const u = rows[0];
+    const user = {
+      ...u,
+      avatar: u.avatar_url || '/brand/default-avatar.svg',
+      avatar_url: u.avatar_url || '/brand/default-avatar.svg'
+    };
+
+    return res.json({ user });
   } catch (err) {
     console.error('Get user error:', err);
     return res.status(500).json({ error: 'Failed to fetch user' });
+  }
+}
+
+/**
+ * Update Profile (Name, Username, Bio, Avatar URL) for the logged-in user
+ */
+export async function updateUserProfile(req, res) {
+  try {
+    const { name, username, bio, avatar_url } = req.body;
+    const userId = req.user.id;
+
+    // Check if user exists
+    const [existing] = await pool.query('SELECT id, username, avatar_url FROM users WHERE id = ?', [userId]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const current = existing[0];
+    let newUsername = current.username;
+
+    if (username && username.trim() !== '') {
+      const cleanUser = username.trim().toLowerCase().replace(/^@/, '');
+      if (cleanUser !== current.username) {
+        // Check if username already taken by another user
+        const [taken] = await pool.query('SELECT id FROM users WHERE username = ? AND id != ? LIMIT 1', [cleanUser, userId]);
+        if (taken.length > 0) {
+          return res.status(400).json({ error: 'This username is already taken. Please choose another.' });
+        }
+        newUsername = cleanUser;
+      }
+    }
+
+    const newName = name !== undefined && name.trim() !== '' ? name.trim() : null;
+    const newBio = bio !== undefined ? bio.trim() : null;
+    const newAvatar = (avatar_url !== undefined && avatar_url !== '' && !avatar_url.startsWith('blob:')) 
+      ? avatar_url 
+      : current.avatar_url;
+
+    await pool.query(
+      `UPDATE users 
+       SET name = COALESCE(?, name), 
+           username = ?, 
+           bio = ?, 
+           avatar_url = ? 
+       WHERE id = ?`,
+      [newName, newUsername, newBio, newAvatar, userId]
+    );
+
+    const [rows] = await pool.query(
+      'SELECT id, name, username, email, phone, avatar_url, bio, role FROM users WHERE id = ?',
+      [userId]
+    );
+
+    const u = rows[0];
+    const user = {
+      ...u,
+      avatar: u.avatar_url || '/brand/default-avatar.svg',
+      avatar_url: u.avatar_url || '/brand/default-avatar.svg'
+    };
+
+    return res.json({ success: true, message: 'Profile updated successfully', user });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    return res.status(500).json({ error: 'Failed to update profile' });
   }
 }
 
@@ -547,7 +622,14 @@ export async function updateContactInfo(req, res) {
       [req.user.id]
     );
 
-    return res.json({ user: rows[0] });
+    const u = rows[0];
+    const user = {
+      ...u,
+      avatar: u.avatar_url || '/brand/default-avatar.svg',
+      avatar_url: u.avatar_url || '/brand/default-avatar.svg'
+    };
+
+    return res.json({ user });
   } catch (err) {
     console.error('Update contact info error:', err);
     return res.status(500).json({ error: 'Failed to update contact info' });

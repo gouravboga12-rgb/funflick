@@ -49,6 +49,12 @@ export const api = {
       }),
 
     getProfile: () => apiRequest('/api/auth/me'),
+
+    updateProfile: (profileData) =>
+      apiRequest('/api/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(profileData),
+      }),
   },
 
   // Videos / Feed
