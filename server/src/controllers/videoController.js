@@ -87,3 +87,73 @@ export async function toggleLike(req, res) {
     return res.status(500).json({ error: 'Failed to toggle like' });
   }
 }
+
+export async function getComments(req, res) {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query(
+      `SELECT c.id, c.content, c.created_at, u.name, u.username, u.avatar_url
+       FROM comments c
+       JOIN users u ON c.user_id = u.id
+       WHERE c.video_id = ?
+       ORDER BY c.created_at ASC`,
+      [id]
+    );
+    return res.json({ comments: rows });
+  } catch (err) {
+    console.error('Get comments error:', err);
+    return res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+}
+
+export async function addComment(req, res) {
+  try {
+    const { id } = req.params;
+    const { text, content } = req.body;
+    const commentText = (text || content || '').trim();
+
+    if (!commentText) {
+      return res.status(400).json({ error: 'Comment text is required' });
+    }
+
+    const [result] = await pool.query(
+      `INSERT INTO comments (user_id, video_id, content) VALUES (?, ?, ?)`,
+      [req.user.id, id, commentText]
+    );
+
+    const [userRows] = await pool.query(
+      `SELECT id, name, username, avatar_url FROM users WHERE id = ?`,
+      [req.user.id]
+    );
+    const commenter = userRows[0] || {};
+
+    return res.status(201).json({
+      comment: {
+        id: result.insertId,
+        content: commentText,
+        text: commentText,
+        created_at: new Date().toISOString(),
+        user: {
+          id: commenter.id,
+          name: commenter.name,
+          username: commenter.username,
+          avatar: commenter.avatar_url,
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Add comment error:', err);
+    return res.status(500).json({ error: 'Failed to add comment' });
+  }
+}
+
+export async function recordView(req, res) {
+  try {
+    const { id } = req.params;
+    await pool.query('UPDATE videos SET views_count = views_count + 1 WHERE id = ?', [id]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Record view error:', err);
+    return res.status(500).json({ error: 'Failed to record view' });
+  }
+}

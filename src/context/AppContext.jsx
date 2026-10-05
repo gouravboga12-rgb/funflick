@@ -264,6 +264,52 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('funflick_publishing_plans', JSON.stringify(publishingPlans));
   }, [publishingPlans]);
 
+  // Live Feed & Videos synchronization with AWS MySQL backend
+  const fetchLiveVideos = async () => {
+    try {
+      const res = await fetch('/api/videos');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.videos && Array.isArray(data.videos) && data.videos.length > 0) {
+          const livePosts = data.videos.map(v => ({
+            id: v.id,
+            title: v.title,
+            caption: v.description || v.title,
+            category: v.category || 'Comedy',
+            mediaType: 'video',
+            mediaUrl: v.video_url,
+            posterUrl: v.thumbnail_url || v.video_url,
+            likesCount: Number(v.likes_count) || 0,
+            viewsCount: v.views_count ? String(v.views_count) : '0',
+            commentsCount: 0,
+            sharesCount: 0,
+            savesCount: 0,
+            creator: {
+              id: v.creator_id,
+              name: v.creator_name || 'Creator',
+              username: v.creator_username || 'creator',
+              avatar: v.creator_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+              isVerified: true,
+              isPrivate: false
+            },
+            timeAgo: 'Just now',
+            isLiked: false,
+            isFollowing: false,
+            isSaved: false,
+            comments: []
+          }));
+          setPosts(livePosts);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch live videos from AWS MySQL:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveVideos();
+  }, []);
+
   // Toast helper
   const showToast = (message, type = 'success') => {
     const id = Date.now();
@@ -329,6 +375,15 @@ export const AppProvider = ({ children }) => {
       }
       return m;
     }));
+
+    // Sync with AWS MySQL database
+    const token = localStorage.getItem('funflick_token');
+    if (token) {
+      fetch(`/api/videos/${postId}/like`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {});
+    }
   };
 
   // Helper to parse views count into number
@@ -349,6 +404,9 @@ export const AppProvider = ({ children }) => {
 
   // Real-Time View Counter Increment (Triggered after 2.5s continuous watch)
   const recordPostView = (postId) => {
+    // Sync with AWS MySQL database
+    fetch(`/api/videos/${postId}/view`, { method: 'POST' }).catch(() => {});
+
     setPosts(prev => prev.map(p => {
       if (p.id === postId) {
         const currentVal = parseViews(p.viewsCount || p.views || 0);
@@ -420,9 +478,24 @@ export const AppProvider = ({ children }) => {
     showToast(`Successfully subscribed to @${username}! 👑`, 'success');
   };
 
-  // Add Comment to Post
-  const addComment = (postId, text) => {
+  // Add Comment to Post (synced with AWS MySQL)
+  const addComment = async (postId, text) => {
     if (!text.trim()) return;
+
+    // Sync with AWS MySQL database
+    const token = localStorage.getItem('funflick_token');
+    if (token) {
+      try {
+        await fetch(`/api/videos/${postId}/comments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ content: text })
+        });
+      } catch (err) {}
+    }
     const newComment = {
       id: 'cm_' + Date.now(),
       user: currentUser.username,
@@ -1465,6 +1538,30 @@ export const AppProvider = ({ children }) => {
             comments: []
           };
           setPosts(prev => [livePost, ...prev]);
+
+          // Persist approved video directly into AWS MySQL database
+          const token = localStorage.getItem('funflick_token');
+          if (token && target.mediaUrl) {
+            fetch('/api/videos', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                title: target.title || 'New FunFlick Video',
+                description: target.caption || target.title || '',
+                category: target.category || 'Comedy',
+                video_url: target.mediaUrl,
+                thumbnail_url: target.thumbnail || target.mediaUrl,
+                duration: 30
+              })
+            }).then(r => r.json()).then(data => {
+              if (data?.videoId) {
+                fetchLiveVideos();
+              }
+            }).catch(() => {});
+          }
 
           // Also register under influencerMedia for admin engagement tracking & rewards
           const isCreatorInfluencer = (target.creator === currentUser.username) ? !!currentUser.isInfluencer : true;
