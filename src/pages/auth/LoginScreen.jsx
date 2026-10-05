@@ -156,11 +156,8 @@ export const LoginScreen = () => {
           <img
             src="/brand/funflick-logo.png"
             alt="FunFlick"
-            className="w-16 h-16 rounded-2xl object-contain drop-shadow-lg group-hover:scale-105 transition-transform"
+            className="w-24 h-24 rounded-2xl object-contain drop-shadow-xl group-hover:scale-105 transition-transform"
           />
-          <span className="font-extrabold text-2xl text-white font-heading mt-1">
-            fun<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca]">flick</span>
-          </span>
         </div>
 
         <div className="space-y-1">

@@ -39,7 +39,7 @@ export const SplashScreen = () => {
           <img
             src="/brand/funflick-logo.png"
             alt={BRAND.name}
-            className="relative w-36 h-36 rounded-3xl object-contain drop-shadow-2xl"
+            className="relative w-44 h-44 rounded-3xl object-contain drop-shadow-2xl hover:scale-105 transition-transform"
           />
         </motion.div>
 
@@ -47,13 +47,13 @@ export const SplashScreen = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="space-y-2 max-w-xs"
+          className="space-y-1.5 max-w-xs"
         >
-          <h1 className="text-4xl font-extrabold tracking-tight text-white font-heading">
-            fun<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca]">flick</span>
-          </h1>
-          <p className="text-sm font-semibold text-gray-300 tracking-wide">
+          <p className="text-base font-bold text-gray-200 tracking-wide font-heading">
             {BRAND.tagline}
+          </p>
+          <p className="text-xs text-pink-400 font-medium">
+            Watch, Share & Monetize Short Videos
           </p>
         </motion.div>
       </div>

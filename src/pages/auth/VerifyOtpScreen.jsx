@@ -155,9 +155,16 @@ export const VerifyOtpScreen = () => {
   return (
     <div className="w-full flex-1 flex flex-col justify-between px-6 py-8 bg-[#090514] select-none text-center">
       {/* Top Graphic */}
-      <div className="flex flex-col items-center mt-6 space-y-3">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-xl shadow-pink-500/25">
-          <ShieldCheck className="w-8 h-8" />
+      <div className="flex flex-col items-center mt-4 space-y-3">
+        <div 
+          onClick={() => navigate('/splash')}
+          className="cursor-pointer group flex flex-col items-center"
+        >
+          <img
+            src="/brand/funflick-logo.png"
+            alt="FunFlick"
+            className="w-16 h-16 rounded-2xl object-contain drop-shadow-xl group-hover:scale-105 transition-transform"
+          />
         </div>
 
         <div className="space-y-1 max-w-xs">

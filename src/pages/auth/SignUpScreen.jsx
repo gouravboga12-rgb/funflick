@@ -220,6 +220,16 @@ export const SignUpScreen = () => {
     <div className="w-full flex-1 flex flex-col justify-between px-6 py-6 bg-[#090514] overflow-y-auto no-scrollbar select-none">
       {/* Top Header */}
       <div className="flex flex-col items-center text-center space-y-1">
+        <div 
+          onClick={() => navigate('/splash')}
+          className="cursor-pointer group flex flex-col items-center mb-1"
+        >
+          <img
+            src="/brand/funflick-logo.png"
+            alt="FunFlick"
+            className="w-20 h-20 rounded-2xl object-contain drop-shadow-xl group-hover:scale-105 transition-transform"
+          />
+        </div>
         <h2 className="text-xl font-bold text-white font-heading">
           Create FunFlicks Account
         </h2>

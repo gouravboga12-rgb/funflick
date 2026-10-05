@@ -179,8 +179,19 @@ export const ForgotPasswordScreen = () => {
 
       {/* Main Content */}
       <div className="my-auto space-y-5 py-4">
-        <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-white mx-auto shadow-xl shadow-pink-500/20">
-          <KeyRound className="w-8 h-8 stroke-[2.2]" />
+        <div 
+          onClick={() => navigate('/splash')}
+          className="cursor-pointer group flex flex-col items-center mx-auto mb-1"
+        >
+          <img
+            src="/brand/funflick-logo.png"
+            alt="FunFlick"
+            className="w-16 h-16 rounded-2xl object-contain drop-shadow-xl group-hover:scale-105 transition-transform"
+          />
+        </div>
+
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-white mx-auto shadow-xl shadow-pink-500/20">
+          <KeyRound className="w-7 h-7 stroke-[2.2]" />
         </div>
 
         <div className="space-y-1">
