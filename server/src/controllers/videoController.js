@@ -2,17 +2,20 @@ import pool from '../config/db.js';
 
 export async function listVideos(req, res) {
   try {
-    const { category, limit = 20, offset = 0 } = req.query;
+    const { category, limit = 50, offset = 0 } = req.query;
+    const currentUserId = req.user?.id || 0;
 
     let query = `
       SELECT 
         v.id, v.title, v.description, v.category, v.video_url, v.thumbnail_url,
         v.duration, v.views_count, v.likes_count, v.created_at,
+        (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id) AS comments_count,
+        (SELECT COUNT(*) FROM likes l WHERE l.video_id = v.id AND l.user_id = ?) AS user_liked,
         u.id AS creator_id, u.name AS creator_name, u.username AS creator_username, u.avatar_url AS creator_avatar
       FROM videos v
       JOIN users u ON v.user_id = u.id
     `;
-    const params = [];
+    const params = [currentUserId];
 
     if (category && category !== 'All') {
       query += ' WHERE v.category = ?';
@@ -99,7 +102,17 @@ export async function getComments(req, res) {
        ORDER BY c.created_at ASC`,
       [id]
     );
-    return res.json({ comments: rows });
+    const comments = rows.map(r => ({
+      id: r.id,
+      text: r.content,
+      content: r.content,
+      user: r.username,
+      name: r.name,
+      avatar: r.avatar_url || '/brand/default-avatar.svg',
+      time: 'Recently',
+      created_at: r.created_at
+    }));
+    return res.json({ comments });
   } catch (err) {
     console.error('Get comments error:', err);
     return res.status(500).json({ error: 'Failed to fetch comments' });
@@ -132,13 +145,11 @@ export async function addComment(req, res) {
         id: result.insertId,
         content: commentText,
         text: commentText,
+        time: 'Just now',
         created_at: new Date().toISOString(),
-        user: {
-          id: commenter.id,
-          name: commenter.name,
-          username: commenter.username,
-          avatar: commenter.avatar_url,
-        }
+        user: commenter.username || req.user.username || 'User',
+        name: commenter.name || req.user.name || 'User',
+        avatar: commenter.avatar_url || '/brand/default-avatar.svg'
       }
     });
   } catch (err) {
@@ -194,4 +205,19 @@ export async function deleteVideo(req, res) {
     return res.status(500).json({ error: 'Failed to delete video' });
   }
 }
+
+export async function deleteComment(req, res) {
+  try {
+    const { id, commentId } = req.params;
+    const [result] = await pool.query(
+      'DELETE FROM comments WHERE id = ? AND video_id = ? AND (user_id = ? OR ? = 1)',
+      [commentId, id, req.user.id, req.user.role === 'admin' ? 1 : 0]
+    );
+    return res.json({ success: true, message: 'Comment deleted successfully', affectedRows: result.affectedRows });
+  } catch (err) {
+    console.error('Delete comment error:', err);
+    return res.status(500).json({ error: 'Failed to delete comment' });
+  }
+}
+
 

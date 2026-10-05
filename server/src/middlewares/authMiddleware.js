@@ -16,3 +16,19 @@ export function authenticateToken(req, res, next) {
     next();
   });
 }
+
+export function optionalAuth(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return next();
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET || 'funflick_secret', (err, user) => {
+    if (!err && user) {
+      req.user = user;
+    }
+    next();
+  });
+}

@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { listVideos, createVideo, toggleLike, getComments, addComment, recordView, updateVideo, deleteVideo } from '../controllers/videoController.js';
-import { authenticateToken } from '../middlewares/authMiddleware.js';
+import { listVideos, createVideo, toggleLike, getComments, addComment, deleteComment, recordView, updateVideo, deleteVideo } from '../controllers/videoController.js';
+import { authenticateToken, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
-// Public: Browse feed videos
-router.get('/', listVideos);
+// Public / Authenticated: Browse feed videos with personalized like state
+router.get('/', optionalAuth, listVideos);
 
 // Protected: Publish video to feed
 router.post('/', authenticateToken, createVideo);
@@ -25,6 +25,7 @@ router.post('/:id/view', recordView);
 // Public / Protected: Comments
 router.get('/:id/comments', getComments);
 router.post('/:id/comments', authenticateToken, addComment);
+router.delete('/:id/comments/:commentId', authenticateToken, deleteComment);
 
 export default router;
 

@@ -22,28 +22,21 @@ import {
 
 const AppContext = createContext(null);
 
-// Automatic Cache Purge: cleans old mock feeds/stories without touching logged-in user data!
-const DATA_VERSION = 'v7_production_clean';
+// Clean up all local storage data - all application state uses AWS MySQL database
 if (typeof window !== 'undefined') {
   try {
-    if (localStorage.getItem('funflick_data_version') !== DATA_VERSION) {
-      localStorage.removeItem('funflick_posts');
-      localStorage.removeItem('funflick_stories');
-      localStorage.removeItem('funflick_submissions');
-      localStorage.removeItem('funflick_influencer_media');
-      localStorage.removeItem('funflick_pending_approvals');
-      localStorage.removeItem('funflick_payouts');
-      localStorage.removeItem('funflick_conversations');
-      localStorage.removeItem('funflick_notifications');
-      localStorage.removeItem('funflick_subscription_transactions');
-      localStorage.removeItem('funflick_creators');
-      localStorage.removeItem('funflick_ads');
-      localStorage.removeItem('funflick_copyright_reports');
-      localStorage.removeItem('funflick_user_likes');
-      // NOTE: We deliberately do NOT remove 'funflick_user' or 'funflick_token'
-      // so user credentials, account photo, and sessions are never lost across deployments!
-      localStorage.setItem('funflick_data_version', DATA_VERSION);
-    }
+    const keysToClean = [
+      'funflick_posts', 'funflick_stories', 'funflick_submissions',
+      'funflick_influencer_media', 'funflick_pending_approvals',
+      'funflick_payouts', 'funflick_conversations', 'funflick_notifications',
+      'funflick_notifs', 'funflick_subscription_transactions',
+      'funflick_creators', 'funflick_ads', 'funflick_copyright_reports',
+      'funflick_user_likes', 'funflick_following_list',
+      'funflick_followers_list', 'funflick_follow_requests',
+      'funflick_txs', 'funflick_blocked', 'funflick_publishing_plans',
+      'funflick_media_limits'
+    ];
+    keysToClean.forEach(k => localStorage.removeItem(k));
   } catch (e) {}
 }
 
@@ -146,166 +139,78 @@ export const AppProvider = ({ children }) => {
     sessionStorage.removeItem('funflick_authenticated');
   };
 
-  // User video submissions (for Influencer Section verification tracker)
-  const [userSubmissions, setUserSubmissions] = useState(() => {
-    const saved = localStorage.getItem('funflick_submissions');
-    return saved ? JSON.parse(saved) : INITIAL_USER_SUBMISSIONS;
-  });
+  // User video submissions (in-memory session state)
+  const [userSubmissions, setUserSubmissions] = useState([]);
 
-  // Posts feed state
-  const [posts, setPosts] = useState(() => {
-    const saved = localStorage.getItem('funflick_posts');
-    return saved ? JSON.parse(saved) : INITIAL_POSTS;
-  });
+  // Posts feed state (Live from AWS MySQL database)
+  const [posts, setPosts] = useState([]);
 
   // Stories state
-  const [stories, setStories] = useState(() => {
-    const saved = localStorage.getItem('funflick_stories');
-    return saved ? JSON.parse(saved) : INITIAL_STORIES;
-  });
+  const [stories, setStories] = useState(INITIAL_STORIES);
 
   // Creators state
-  const [creators, setCreators] = useState(() => {
-    const saved = localStorage.getItem('funflick_creators');
-    return saved ? JSON.parse(saved) : CREATORS;
-  });
+  const [creators, setCreators] = useState(CREATORS);
 
   // Wallet & transactions
-  const [transactions, setTransactions] = useState(() => {
-    const saved = localStorage.getItem('funflick_txs');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
-  });
+  const [transactions, setTransactions] = useState([]);
 
   // Notifications
-  const [notifications, setNotifications] = useState(() => {
-    const saved = localStorage.getItem('funflick_notifs');
-    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
-  });
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
 
   // Inbox & Chat
-  const [conversations, setConversations] = useState(() => {
-    const saved = localStorage.getItem('funflick_chats');
-    return saved ? JSON.parse(saved) : INITIAL_CONVERSATIONS;
-  });
+  const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
 
   // Creator studio videos
-  const [creatorVideos, setCreatorVideos] = useState(CREATOR_VIDEOS);
+  const [creatorVideos, setCreatorVideos] = useState([]);
 
   // Admin payouts
-  const [adminPayouts, setAdminPayouts] = useState(() => {
-    const saved = localStorage.getItem('funflick_payouts');
-    return saved ? JSON.parse(saved) : INITIAL_PAYOUTS;
-  });
+  const [adminPayouts, setAdminPayouts] = useState(INITIAL_PAYOUTS);
 
-  // Global Influencer Subscription Plans (Admin Managed & Globally Synced)
-  const [publishingPlans, setPublishingPlans] = useState(() => {
-    const saved = localStorage.getItem('funflick_publishing_plans');
-    return saved ? JSON.parse(saved) : (INFLUENCER_SUBSCRIPTION_PLANS || PUBLISHING_PLANS);
-  });
+  // Global Influencer Subscription Plans
+  const [publishingPlans, setPublishingPlans] = useState(INFLUENCER_SUBSCRIPTION_PLANS || PUBLISHING_PLANS);
 
-  // User Registration & Influencer Subscription Transactions (Razorpay Test Payments)
-  const [subscriptionTransactions, setSubscriptionTransactions] = useState(() => {
-    const saved = localStorage.getItem('funflick_subscription_transactions');
-    return saved ? JSON.parse(saved) : INITIAL_SUBSCRIPTION_TRANSACTIONS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('funflick_subscription_transactions', JSON.stringify(subscriptionTransactions));
-  }, [subscriptionTransactions]);
+  // User Registration & Influencer Subscription Transactions
+  const [subscriptionTransactions, setSubscriptionTransactions] = useState([]);
 
   // Influencer Media Items (For Admin Review & Rewards)
-  const [influencerMedia, setInfluencerMedia] = useState(() => {
-    const saved = localStorage.getItem('funflick_influencer_media');
-    return saved ? JSON.parse(saved) : INITIAL_INFLUENCER_MEDIA;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('funflick_influencer_media', JSON.stringify(influencerMedia));
-  }, [influencerMedia]);
+  const [influencerMedia, setInfluencerMedia] = useState([]);
 
   // Ads & Promotions (For Admin Management & In-App Popups)
-  const [adsList, setAdsList] = useState(() => {
-    const saved = localStorage.getItem('funflick_ads');
-    return saved ? JSON.parse(saved) : INITIAL_ADS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('funflick_ads', JSON.stringify(adsList));
-  }, [adsList]);
+  const [adsList, setAdsList] = useState(INITIAL_ADS);
 
   // Active Mobile Popup Ad
   const [activePopupAd, setActivePopupAd] = useState(null);
 
   // Admin pending video approvals
-  const [pendingApprovals, setPendingApprovals] = useState(() => {
-    const saved = localStorage.getItem('funflick_pending_approvals');
-    return saved ? JSON.parse(saved) : ADMIN_PENDING_APPROVALS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('funflick_pending_approvals', JSON.stringify(pendingApprovals));
-  }, [pendingApprovals]);
+  const [pendingApprovals, setPendingApprovals] = useState([]);
 
   // Copyright & Plagiarism Dispute Reports
-  const [copyrightReports, setCopyrightReports] = useState(() => {
-    const saved = localStorage.getItem('funflick_copyright_reports');
-    return saved ? JSON.parse(saved) : INITIAL_COPYRIGHT_REPORTS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('funflick_copyright_reports', JSON.stringify(copyrightReports));
-  }, [copyrightReports]);
+  const [copyrightReports, setCopyrightReports] = useState([]);
 
   // Blocked users list (Instagram-style block feature)
-  const [blockedUsers, setBlockedUsers] = useState(() => {
-    const saved = localStorage.getItem('funflick_blocked');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [blockedUsers, setBlockedUsers] = useState([]);
 
   // Followers, Following, and Follow Requests (Instagram Style)
-  const [followingList, setFollowingList] = useState(() => {
-    const saved = localStorage.getItem('funflick_following_list');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [followersList, setFollowersList] = useState(() => {
-    const saved = localStorage.getItem('funflick_followers_list');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [followRequests, setFollowRequests] = useState(() => {
-    const saved = localStorage.getItem('funflick_follow_requests');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: 'fr_1',
-        username: 'rohan_comedy',
-        name: 'Rohan Sharma',
-        avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=100&q=80',
-        time: '2h ago',
-        category: 'Comedy'
-      },
-      {
-        id: 'fr_2',
-        username: 'priya_vines',
-        name: 'Priya Verma',
-        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80',
-        time: '5h ago',
-        category: 'Entertainment'
-      }
-    ];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('funflick_following_list', JSON.stringify(followingList));
-  }, [followingList]);
-
-  useEffect(() => {
-    localStorage.setItem('funflick_followers_list', JSON.stringify(followersList));
-  }, [followersList]);
-
-  useEffect(() => {
-    localStorage.setItem('funflick_follow_requests', JSON.stringify(followRequests));
-  }, [followRequests]);
+  const [followingList, setFollowingList] = useState([]);
+  const [followersList, setFollowersList] = useState([]);
+  const [followRequests, setFollowRequests] = useState([
+    {
+      id: 'fr_1',
+      username: 'rohan_comedy',
+      name: 'Rohan Sharma',
+      avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=100&q=80',
+      time: '2h ago',
+      category: 'Comedy'
+    },
+    {
+      id: 'fr_2',
+      username: 'priya_vines',
+      name: 'Priya Verma',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80',
+      time: '5h ago',
+      category: 'Entertainment'
+    }
+  ]);
 
   // View frame & demo switcher state
   const [phoneFrame, setPhoneFrame] = useState(true);
@@ -317,56 +222,34 @@ export const AppProvider = ({ children }) => {
   const [activeStoryGroup, setActiveStoryGroup] = useState(null);
 
   // App Theme state ('dark' | 'light')
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('funflick_theme');
-    return saved === 'light' ? 'light' : 'dark';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('funflick_theme', theme);
-    if (theme === 'light') {
-      document.documentElement.classList.add('light');
-      document.documentElement.classList.remove('dark');
-      document.documentElement.setAttribute('data-theme', 'light');
-    } else {
-      document.documentElement.classList.remove('light');
-      document.documentElement.classList.add('dark');
-      document.documentElement.setAttribute('data-theme', 'dark');
-    }
-  }, [theme]);
+  const [theme, setTheme] = useState('dark');
 
   const toggleTheme = () => {
-    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      if (next === 'light') {
+        document.documentElement.classList.add('light');
+        document.documentElement.classList.remove('dark');
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.classList.remove('light');
+        document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+      return next;
+    });
   };
-
-  // Save to localStorage when state changes
-  useEffect(() => {
-    localStorage.setItem('funflick_user', JSON.stringify(currentUser));
-  }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem('funflick_posts', JSON.stringify(posts));
-  }, [posts]);
-
-  useEffect(() => {
-    localStorage.setItem('funflick_payouts', JSON.stringify(adminPayouts));
-  }, [adminPayouts]);
-
-  useEffect(() => {
-    localStorage.setItem('funflick_submissions', JSON.stringify(userSubmissions));
-  }, [userSubmissions]);
-
-  useEffect(() => {
-    localStorage.setItem('funflick_publishing_plans', JSON.stringify(publishingPlans));
-  }, [publishingPlans]);
 
   // Live Feed & Videos synchronization with AWS MySQL backend
   const fetchLiveVideos = async () => {
     try {
-      const res = await fetch('/api/videos');
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const res = await fetch('/api/videos', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const data = await res.json();
-        if (data.videos && Array.isArray(data.videos) && data.videos.length > 0) {
+        if (data.videos && Array.isArray(data.videos)) {
           const livePosts = data.videos.map(v => {
             const url = v.video_url || '';
             const isImg = /\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i.test(url) ||
@@ -385,7 +268,7 @@ export const AppProvider = ({ children }) => {
               posterUrl: v.thumbnail_url || v.video_url,
               likesCount: Number(v.likes_count) || 0,
               viewsCount: v.views_count ? String(v.views_count) : '0',
-              commentsCount: 0,
+              commentsCount: Number(v.comments_count) || 0,
               sharesCount: 0,
               savesCount: 0,
               creator: {
@@ -397,7 +280,7 @@ export const AppProvider = ({ children }) => {
                 isPrivate: false
               },
               timeAgo: 'Just now',
-              isLiked: false,
+              isLiked: Boolean(v.user_liked),
               isFollowing: false,
               isSaved: false,
               comments: []
@@ -411,14 +294,122 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Global Media showcase limits (Admin configured: Reels 30s default, Stories 15s default, Posts 30s)
-  const [mediaLimits, setMediaLimits] = useState(() => {
-    const saved = localStorage.getItem('funflick_media_limits');
-    return saved ? JSON.parse(saved) : {
-      maxReelDuration: 30,
-      maxStoryDuration: 15,
-      maxPostDuration: 30
+  // Fetch comments for a specific post from AWS MySQL
+  const fetchComments = async (postId) => {
+    try {
+      const res = await fetch(`/api/videos/${postId}/comments`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.comments) {
+          setPosts(prev => prev.map(p => {
+            if (String(p.id) === String(postId)) {
+              return {
+                ...p,
+                comments: data.comments,
+                commentsCount: data.comments.length
+              };
+            }
+            return p;
+          }));
+          return data.comments;
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch comments from AWS MySQL:', err);
+    }
+    return [];
+  };
+
+  // Add a comment to a video/post on AWS MySQL
+  const addComment = async (postId, text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const tempId = 'temp_' + Date.now();
+    const optimisticComment = {
+      id: tempId,
+      text: trimmed,
+      content: trimmed,
+      time: 'Just now',
+      created_at: new Date().toISOString(),
+      user: currentUser.username,
+      name: currentUser.name,
+      avatar: currentUser.avatar || '/brand/default-avatar.svg'
     };
+
+    setPosts(prev => prev.map(p => {
+      if (String(p.id) === String(postId)) {
+        return {
+          ...p,
+          commentsCount: (p.commentsCount || 0) + 1,
+          comments: [...(p.comments || []), optimisticComment]
+        };
+      }
+      return p;
+    }));
+
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    try {
+      const res = await fetch(`/api/videos/${postId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ text: trimmed })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.comment) {
+          setPosts(prev => prev.map(p => {
+            if (String(p.id) === String(postId)) {
+              return {
+                ...p,
+                comments: (p.comments || []).map(c => c.id === tempId ? data.comment : c)
+              };
+            }
+            return p;
+          }));
+        }
+        showToast('Comment added! 💬', 'success');
+      }
+    } catch (err) {
+      console.error('Failed to post comment to AWS MySQL:', err);
+    }
+  };
+
+  // Delete a comment on AWS MySQL
+  const deleteComment = async (postId, commentId) => {
+    setPosts(prev => prev.map(p => {
+      if (String(p.id) === String(postId)) {
+        return {
+          ...p,
+          commentsCount: Math.max(0, (p.commentsCount || 1) - 1),
+          comments: (p.comments || []).filter(c => String(c.id) !== String(commentId))
+        };
+      }
+      return p;
+    }));
+
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    try {
+      await fetch(`/api/videos/${postId}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      showToast('Comment deleted', 'info');
+    } catch (err) {
+      console.error('Failed to delete comment from AWS MySQL:', err);
+    }
+  };
+
+  // Global Media showcase limits (Admin configured: Reels 30s default, Stories 15s default, Posts 30s)
+  const [mediaLimits, setMediaLimits] = useState({
+    maxReelDuration: 30,
+    maxStoryDuration: 15,
+    maxPostDuration: 30
   });
 
   // Fetch settings from AWS MySQL backend
@@ -429,23 +420,13 @@ export const AppProvider = ({ children }) => {
         const data = await res.json();
         if (data.settings) {
           setMediaLimits(data.settings);
-          try {
-            localStorage.setItem('funflick_media_limits', JSON.stringify(data.settings));
-          } catch (e) {}
         }
       }
     } catch (err) {}
   };
 
   const updateMediaLimits = async (newLimits) => {
-    setMediaLimits(prev => {
-      const next = { ...prev, ...newLimits };
-      try {
-        localStorage.setItem('funflick_media_limits', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-
+    setMediaLimits(prev => ({ ...prev, ...newLimits }));
     const token = localStorage.getItem('funflick_token');
     try {
       await fetch('/api/settings', {
@@ -476,70 +457,42 @@ export const AppProvider = ({ children }) => {
     }, 3500);
   };
 
-  // Liked posts per user account (stored by username)
-  const [userLikesMap, setUserLikesMap] = useState(() => {
-    const saved = localStorage.getItem('funflick_user_likes');
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  // Keep posts in sync with current user's liked posts
-  useEffect(() => {
-    const username = currentUser?.username || 'me';
-    const userLikes = userLikesMap[username] || [];
-    setPosts(prev => prev.map(p => ({
-      ...p,
-      isLiked: userLikes.includes(p.id)
-    })));
-  }, [currentUser?.username]);
-
-  // Toggle post like with per-account persistence
-  const toggleLikePost = (postId) => {
-    const username = currentUser?.username || 'me';
-    const userLikes = userLikesMap[username] || [];
-    const isCurrentlyLiked = userLikes.some(id => String(id) === String(postId));
-    const newLikedStatus = !isCurrentlyLiked;
-
-    const updatedUserLikes = newLikedStatus 
-      ? [...userLikes.filter(id => String(id) !== String(postId)), postId] 
-      : userLikes.filter(id => String(id) !== String(postId));
-
-    const nextMap = { ...userLikesMap, [username]: updatedUserLikes };
-    setUserLikesMap(nextMap);
-    try {
-      localStorage.setItem('funflick_user_likes', JSON.stringify(nextMap));
-    } catch (e) {}
-
+  // Toggle post like with AWS MySQL persistence
+  const toggleLikePost = async (postId) => {
+    let nowLiked = false;
     setPosts(prev => prev.map(p => {
       if (String(p.id) === String(postId)) {
+        nowLiked = !p.isLiked;
         return {
           ...p,
-          isLiked: newLikedStatus,
-          likesCount: newLikedStatus ? (p.likesCount || 0) + 1 : Math.max(0, (p.likesCount || 1) - 1)
+          isLiked: nowLiked,
+          likesCount: nowLiked ? (p.likesCount || 0) + 1 : Math.max(0, (p.likesCount || 1) - 1)
         };
       }
       return p;
     }));
 
-    setInfluencerMedia(prev => prev.map(m => {
-      if (String(m.id) === String(postId) || String(m.postId) === String(postId)) {
-        const nextLikes = newLikedStatus ? (m.likesCount || 0) + 1 : Math.max(0, (m.likesCount || 1) - 1);
-        const views = parseViews(m.viewsCount || 1);
-        return {
-          ...m,
-          likesCount: nextLikes,
-          engagementRate: ((nextLikes + (m.commentsCount || 0)) / Math.max(1, views) * 100).toFixed(1) + '%'
-        };
-      }
-      return m;
-    }));
-
-    // Sync with AWS MySQL database
-    const token = localStorage.getItem('funflick_token');
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
     if (token) {
-      fetch(`/api/videos/${postId}/like`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      }).catch(() => {});
+      try {
+        const res = await fetch(`/api/videos/${postId}/like`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (typeof data.liked === 'boolean') {
+            setPosts(prev => prev.map(p => {
+              if (String(p.id) === String(postId)) {
+                return { ...p, isLiked: data.liked };
+              }
+              return p;
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn('Like sync failed:', err);
+      }
     }
   };
 
@@ -710,87 +663,7 @@ export const AppProvider = ({ children }) => {
     showToast(`Successfully subscribed to @${username}! 👑`, 'success');
   };
 
-  // Add Comment to Post (synced with AWS MySQL)
-  const addComment = async (postId, text) => {
-    if (!text.trim()) return;
 
-    // Sync with AWS MySQL database
-    const token = localStorage.getItem('funflick_token');
-    if (token) {
-      try {
-        await fetch(`/api/videos/${postId}/comments`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ content: text })
-        });
-      } catch (err) {}
-    }
-    const newComment = {
-      id: 'cm_' + Date.now(),
-      user: currentUser.username,
-      avatar: currentUser.avatar,
-      text,
-      likes: 0,
-      time: 'Just now'
-    };
-    setPosts(prev => prev.map(p => {
-      if (String(p.id) === String(postId)) {
-        return {
-          ...p,
-          commentsCount: (p.commentsCount || 0) + 1,
-          comments: [newComment, ...(p.comments || [])]
-        };
-      }
-      return p;
-    }));
-
-    setInfluencerMedia(prev => prev.map(m => {
-      if (String(m.id) === String(postId) || String(m.postId) === String(postId)) {
-        const nextComments = (m.commentsCount || 0) + 1;
-        const views = parseViews(m.viewsCount || 1);
-        return {
-          ...m,
-          commentsCount: nextComments,
-          engagementRate: (((m.likesCount || 0) + nextComments) / Math.max(1, views) * 100).toFixed(1) + '%'
-        };
-      }
-      return m;
-    }));
-
-    showToast('Comment posted! 💬');
-  };
-
-  // Delete Comment (Allowed by Author, Post Creator, or Admin)
-  const deleteComment = (postId, commentId) => {
-    setPosts(prev => prev.map(p => {
-      if (String(p.id) === String(postId)) {
-        return {
-          ...p,
-          commentsCount: Math.max(0, (p.commentsCount || 1) - 1),
-          comments: (p.comments || []).filter(c => c.id !== commentId)
-        };
-      }
-      return p;
-    }));
-
-    setInfluencerMedia(prev => prev.map(m => {
-      if (m.id === postId || m.postId === postId) {
-        const nextComments = Math.max(0, (m.commentsCount || 1) - 1);
-        const views = parseViews(m.viewsCount || 1);
-        return {
-          ...m,
-          commentsCount: nextComments,
-          engagementRate: (((m.likesCount || 0) + nextComments) / Math.max(1, views) * 100).toFixed(1) + '%'
-        };
-      }
-      return m;
-    }));
-
-    showToast('🗑️ Comment deleted', 'info');
-  };
 
   // Block User (Instagram Style)
   const blockUser = (username) => {
@@ -1991,6 +1864,8 @@ export const AppProvider = ({ children }) => {
         subscribeToCreator,
         addComment,
         deleteComment,
+        fetchComments,
+        fetchLiveVideos,
         blockedUsers,
         blockUser,
         unblockUser,

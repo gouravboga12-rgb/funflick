@@ -4,9 +4,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, Send, Smile, Trash2 } from 'lucide-react';
 
 export const CommentSheet = ({ post, isOpen, onClose }) => {
-  const { currentUser, addComment, deleteComment } = useApp();
+  const { currentUser, addComment, deleteComment, fetchComments } = useApp();
   const [commentText, setCommentText] = useState('');
   const [likedComments, setLikedComments] = useState({});
+
+  React.useEffect(() => {
+    if (isOpen && post?.id && fetchComments) {
+      fetchComments(post.id);
+    }
+  }, [isOpen, post?.id]);
 
   if (!isOpen || !post) return null;
 
