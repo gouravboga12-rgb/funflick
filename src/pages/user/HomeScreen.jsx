@@ -10,10 +10,13 @@ import { StoryViewerModal } from '../../components/feed/StoryViewerModal';
 import { Sparkles, TrendingUp, Flame } from 'lucide-react';
 
 export const HomeScreen = () => {
-  const { posts } = useApp();
+  const { posts, blockedUsers } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
 
   const filteredPosts = posts.filter(post => {
+    // Exclude blocked users
+    if (blockedUsers?.includes(post.creator?.username)) return false;
+
     if (activeTab === 'Trending') return (post.likesCount || 0) > 30000;
     if (activeTab === 'Latest') return post.timeAgo?.includes('hour') || post.timeAgo?.includes('Just');
     return true; // For You shows all

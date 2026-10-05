@@ -8,14 +8,20 @@ import { ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const ReelsScreen = () => {
-  const { posts } = useApp();
+  const { posts, blockedUsers, showMobileAd, adsList } = useApp();
   const [currentIdx, setCurrentIdx] = useState(0);
 
-  const currentPost = posts[currentIdx] || posts[0];
+  const visiblePosts = posts.filter(p => !blockedUsers?.includes(p.creator?.username));
+  const currentPost = visiblePosts[currentIdx] || visiblePosts[0] || posts[0];
 
   const handleNext = () => {
-    if (currentIdx < posts.length - 1) {
-      setCurrentIdx(prev => prev + 1);
+    if (currentIdx < visiblePosts.length - 1) {
+      const nextIdx = currentIdx + 1;
+      setCurrentIdx(nextIdx);
+      // Automatically trigger Admin In-App Advertisement every 3 reels!
+      if (nextIdx > 0 && nextIdx % 3 === 0 && adsList?.some(a => a.active)) {
+        showMobileAd();
+      }
     }
   };
 
@@ -48,7 +54,7 @@ export const ReelsScreen = () => {
         </button>
         <button
           onClick={handleNext}
-          disabled={currentIdx === posts.length - 1}
+          disabled={currentIdx === visiblePosts.length - 1}
           className="p-2 rounded-full bg-black/50 backdrop-blur-md text-white border border-white/10 hover:bg-black/80 disabled:opacity-30 transition"
         >
           <ChevronDown className="w-5 h-5" />

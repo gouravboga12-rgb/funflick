@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { 
@@ -13,22 +13,26 @@ import {
   Volume2, 
   VolumeX, 
   Play, 
-  Pause,
-  Trash2,
-  Pin,
-  MessageSquareOff,
-  Copy,
-  AlertTriangle,
-  EyeOff
+  Pause, 
+  Trash2, 
+  Pin, 
+  MessageSquareOff, 
+  Copy, 
+  AlertTriangle, 
+  EyeOff, 
+  Eye, 
+  Ban,
+  BarChart3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CommentSheet } from './CommentSheet';
 import { ShareSheet } from './ShareSheet';
 import { ReportModal } from './ReportModal';
+import { PostInsightsModal } from './PostInsightsModal';
 
 export const VideoPostCard = ({ post }) => {
   const navigate = useNavigate();
-  const { toggleLikePost, toggleSavePost, toggleFollowCreator, deleteUserPost, currentUser, showToast } = useApp();
+  const { toggleLikePost, recordPostView, toggleSavePost, toggleFollowCreator, deleteUserPost, blockUser, currentUser, showToast } = useApp();
 
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -38,10 +42,33 @@ export const VideoPostCard = ({ post }) => {
   const [showReport, setShowReport] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
 
   const videoRef = useRef(null);
   const lastTapRef = useRef(0);
+  const hasRecordedViewRef = useRef(false);
+
+  // Record view after 2.5s of continuous watch
+  const handleTimeUpdate = () => {
+    if (!hasRecordedViewRef.current && videoRef.current) {
+      if (videoRef.current.currentTime >= 2.5) {
+        hasRecordedViewRef.current = true;
+        recordPostView(post.id);
+      }
+    }
+  };
+
+  // For image posts: record view after 2.5s of visibility
+  useEffect(() => {
+    if (post.mediaType !== 'video' && !hasRecordedViewRef.current) {
+      const timer = setTimeout(() => {
+        hasRecordedViewRef.current = true;
+        recordPostView(post.id);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [post.id, post.mediaType]);
 
   const handleVideoClick = () => {
     const now = Date.now();
@@ -72,9 +99,13 @@ export const VideoPostCard = ({ post }) => {
   };
 
   const formatNumber = (num) => {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return num;
+    if (!num) return '0';
+    if (typeof num === 'string' && (num.includes('K') || num.includes('M'))) return num;
+    const n = Number(num);
+    if (isNaN(n)) return String(num);
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return String(n);
   };
 
   return (
@@ -94,6 +125,7 @@ export const VideoPostCard = ({ post }) => {
             loop
             autoPlay
             muted={isMuted}
+            onTimeUpdate={handleTimeUpdate}
           />
         ) : (
           <img
@@ -281,6 +313,16 @@ export const VideoPostCard = ({ post }) => {
           </span>
         </button>
 
+        {/* Real-time View Count Indicator */}
+        <div className="flex flex-col items-center gap-0.5 pointer-events-none opacity-95" title="Live Video Views">
+          <div className="p-1.5 rounded-full text-white drop-shadow-md">
+            <Eye className="w-5 h-5 stroke-[2] text-pink-300" />
+          </div>
+          <span className="text-[10px] font-extrabold drop-shadow text-pink-200">
+            {formatNumber(post.viewsCount || post.views || 0)}
+          </span>
+        </div>
+
         {/* More Actions / Video Actions (Screen 8) */}
         <button
           onClick={() => setShowOptionsMenu(true)}
@@ -311,6 +353,12 @@ export const VideoPostCard = ({ post }) => {
         onClose={() => setShowReport(false)}
       />
 
+      <PostInsightsModal
+        post={post}
+        isOpen={showInsights}
+        onClose={() => setShowInsights(false)}
+      />
+
       {/* Instagram-Style Post Options Action Sheet */}
       <AnimatePresence>
         {showOptionsMenu && (
@@ -327,18 +375,32 @@ export const VideoPostCard = ({ post }) => {
             >
               <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-3" />
 
-              {/* If Own Post: Instagram Delete & Management Options */}
-              {post.creator?.username === currentUser.username ? (
+              {/* If Author or Admin: Delete Post / Reel */}
+              {(post.creator?.username === currentUser.username || currentUser.role === 'admin') && (
+                <button
+                  onClick={() => {
+                    setShowOptionsMenu(false);
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="w-full p-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center gap-2.5 transition"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-400" />
+                  <span>Delete Post / Reel {currentUser.role === 'admin' && post.creator?.username !== currentUser.username ? '(Admin)' : ''}</span>
+                </button>
+              )}
+
+              {/* Author-specific tools */}
+              {post.creator?.username === currentUser.username && (
                 <>
                   <button
                     onClick={() => {
                       setShowOptionsMenu(false);
-                      setShowDeleteConfirm(true);
+                      setShowInsights(true);
                     }}
-                    className="w-full p-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center gap-2.5 transition"
+                    className="w-full p-3 rounded-2xl bg-gradient-to-r from-purple-900/40 via-pink-900/40 to-indigo-900/40 hover:brightness-125 border border-pink-500/30 text-pink-300 font-bold text-xs flex items-center gap-2.5 transition shadow"
                   >
-                    <Trash2 className="w-4 h-4 text-rose-400" />
-                    <span>Delete Post / Reel</span>
+                    <BarChart3 className="w-4 h-4 text-pink-400" />
+                    <span>View Post Insights & Analytics 📊</span>
                   </button>
 
                   <button
@@ -363,16 +425,30 @@ export const VideoPostCard = ({ post }) => {
                     <span>Turn off commenting</span>
                   </button>
                 </>
-              ) : (
+              )}
+
+              {/* Other users' content tools: Block & Report */}
+              {post.creator?.username !== currentUser.username && (
                 <>
+                  <button
+                    onClick={() => {
+                      setShowOptionsMenu(false);
+                      blockUser(post.creator?.username);
+                    }}
+                    className="w-full p-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center gap-2.5 transition"
+                  >
+                    <Ban className="w-4 h-4 text-rose-400" />
+                    <span>Block @{post.creator?.username}</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       setShowOptionsMenu(false);
                       setShowReport(true);
                     }}
-                    className="w-full p-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center gap-2.5 transition"
+                    className="w-full p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-amber-400 font-bold text-xs flex items-center gap-2.5 transition"
                   >
-                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <AlertTriangle className="w-4 h-4 text-amber-400" />
                     <span>Report post</span>
                   </button>
 

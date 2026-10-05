@@ -148,6 +148,12 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('funflick_copyright_reports', JSON.stringify(copyrightReports));
   }, [copyrightReports]);
 
+  // Blocked users list (Instagram-style block feature)
+  const [blockedUsers, setBlockedUsers] = useState(() => {
+    const saved = localStorage.getItem('funflick_blocked');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   // View frame & demo switcher state
   const [phoneFrame, setPhoneFrame] = useState(true);
   const [subscriptionGateModalOpen, setSubscriptionGateModalOpen] = useState(false);
@@ -210,15 +216,77 @@ export const AppProvider = ({ children }) => {
     }, 3500);
   };
 
-  // Toggle post like
+  // Liked posts per user account (stored by username)
+  const [userLikesMap, setUserLikesMap] = useState(() => {
+    const saved = localStorage.getItem('funflick_user_likes');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // Keep posts in sync with current user's liked posts
+  useEffect(() => {
+    const username = currentUser?.username || 'me';
+    const userLikes = userLikesMap[username] || [];
+    setPosts(prev => prev.map(p => ({
+      ...p,
+      isLiked: userLikes.includes(p.id)
+    })));
+  }, [currentUser?.username]);
+
+  // Toggle post like with per-account persistence
   const toggleLikePost = (postId) => {
+    const username = currentUser?.username || 'me';
+    const userLikes = userLikesMap[username] || [];
+    const isCurrentlyLiked = userLikes.includes(postId);
+    const newLikedStatus = !isCurrentlyLiked;
+
+    const updatedUserLikes = newLikedStatus 
+      ? [...userLikes, postId] 
+      : userLikes.filter(id => id !== postId);
+
+    const nextMap = { ...userLikesMap, [username]: updatedUserLikes };
+    setUserLikesMap(nextMap);
+    try {
+      localStorage.setItem('funflick_user_likes', JSON.stringify(nextMap));
+    } catch (e) {}
+
     setPosts(prev => prev.map(p => {
       if (p.id === postId) {
-        const isLiked = !p.isLiked;
         return {
           ...p,
-          isLiked,
-          likesCount: isLiked ? p.likesCount + 1 : p.likesCount - 1
+          isLiked: newLikedStatus,
+          likesCount: newLikedStatus ? (p.likesCount || 0) + 1 : Math.max(0, (p.likesCount || 1) - 1)
+        };
+      }
+      return p;
+    }));
+  };
+
+  // Helper to parse views count into number
+  const parseViews = (views) => {
+    if (typeof views === 'number') return views;
+    if (!views) return 0;
+    const str = String(views).trim().toUpperCase();
+    if (str.endsWith('M')) return Math.round(parseFloat(str) * 1000000);
+    if (str.endsWith('K')) return Math.round(parseFloat(str) * 1000);
+    return parseInt(str, 10) || 0;
+  };
+
+  const formatViews = (count) => {
+    if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
+    if (count >= 1000) return (count / 1000).toFixed(1) + 'K';
+    return String(count);
+  };
+
+  // Real-Time View Counter Increment (Triggered after 2.5s continuous watch)
+  const recordPostView = (postId) => {
+    setPosts(prev => prev.map(p => {
+      if (p.id === postId) {
+        const currentVal = parseViews(p.viewsCount || p.views || 0);
+        const nextVal = currentVal + 1;
+        return {
+          ...p,
+          viewsCount: typeof p.viewsCount === 'number' ? nextVal : formatViews(nextVal),
+          views: typeof p.views === 'number' ? nextVal : formatViews(nextVal)
         };
       }
       return p;
@@ -291,6 +359,48 @@ export const AppProvider = ({ children }) => {
       return p;
     }));
     showToast('Comment posted! 💬');
+  };
+
+  // Delete Comment (Allowed by Author, Post Creator, or Admin)
+  const deleteComment = (postId, commentId) => {
+    setPosts(prev => prev.map(p => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          commentsCount: Math.max(0, (p.commentsCount || 1) - 1),
+          comments: (p.comments || []).filter(c => c.id !== commentId)
+        };
+      }
+      return p;
+    }));
+    showToast('🗑️ Comment deleted', 'info');
+  };
+
+  // Block User (Instagram Style)
+  const blockUser = (username) => {
+    if (!username || username === currentUser.username) return;
+    setBlockedUsers(prev => {
+      const updated = prev.includes(username) ? prev : [...prev, username];
+      try {
+        localStorage.setItem('funflick_blocked', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    // Automatically unfollow if followed
+    setCreators(prev => prev.map(c => c.username === username ? { ...c, isFollowing: false } : c));
+    showToast(`🚫 Blocked @${username}. Content & comments hidden.`, 'info');
+  };
+
+  // Unblock User
+  const unblockUser = (username) => {
+    setBlockedUsers(prev => {
+      const updated = prev.filter(u => u !== username);
+      try {
+        localStorage.setItem('funflick_blocked', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    showToast(`Unblocked @${username}`, 'success');
   };
 
   // Influencer Subscription Purchase (Free uploads for all; Subscription unlocks Influencer status & analytics)
@@ -627,13 +737,14 @@ export const AppProvider = ({ children }) => {
     });
   };
 
-  // Send message in chat
-  const sendMessage = (conversationId, text) => {
-    if (!text.trim()) return;
+  // Send message in chat (supports text & media up to 5MB)
+  const sendMessage = (conversationId, text, media = null) => {
+    if (!text?.trim() && !media) return;
     const myMsg = {
       id: 'm_' + Date.now(),
       sender: 'me',
-      text,
+      text: text?.trim() || '',
+      media: media || null,
       time: 'Just now'
     };
 
@@ -641,7 +752,7 @@ export const AppProvider = ({ children }) => {
       if (conv.id === conversationId) {
         return {
           ...conv,
-          lastMessage: text,
+          lastMessage: media ? (media.type === 'video' ? '🎥 Video' : '📷 Photo') : text,
           time: 'Just now',
           messages: [...conv.messages, myMsg]
         };
@@ -1259,10 +1370,15 @@ export const AppProvider = ({ children }) => {
         activeStoryGroup,
         setActiveStoryGroup,
         toggleLikePost,
+        recordPostView,
         toggleSavePost,
         toggleFollowCreator,
         subscribeToCreator,
         addComment,
+        deleteComment,
+        blockedUsers,
+        blockUser,
+        unblockUser,
         purchasePublishingSubscription,
         toggleUserSubscriptionStatus,
         publishNewPost,

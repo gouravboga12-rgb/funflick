@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, Send, Smile } from 'lucide-react';
+import { X, Heart, Send, Smile, Trash2 } from 'lucide-react';
 
 export const CommentSheet = ({ post, isOpen, onClose }) => {
-  const { currentUser, addComment } = useApp();
+  const { currentUser, addComment, deleteComment } = useApp();
   const [commentText, setCommentText] = useState('');
   const [likedComments, setLikedComments] = useState({});
 
@@ -74,10 +74,21 @@ export const CommentSheet = ({ post, isOpen, onClose }) => {
                         <span className="font-bold text-gray-200">@{c.user}</span>
                         <span className="text-[10px] text-gray-400">{c.time}</span>
                       </div>
-                      <p className="text-gray-300 mt-0.5 leading-relaxed">{c.text}</p>
-                      <button className="text-[10px] font-semibold text-gray-400 hover:text-pink-400 mt-1">
-                        Reply
-                      </button>
+                      <div className="flex items-center gap-3 mt-1">
+                        <button className="text-[10px] font-semibold text-gray-400 hover:text-pink-400">
+                          Reply
+                        </button>
+                        {(c.user === currentUser.username || post.creator?.username === currentUser.username || currentUser.role === 'admin') && (
+                          <button
+                            onClick={() => deleteComment(post.id, c.id)}
+                            className="text-[10px] font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition"
+                            title="Delete vulgar or unwanted comment"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Delete</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
