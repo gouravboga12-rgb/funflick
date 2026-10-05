@@ -74,7 +74,10 @@ export const CommentSheet = ({ post, isOpen, onClose }) => {
                         <span className="font-bold text-gray-200">@{c.user}</span>
                         <span className="text-[10px] text-gray-400">{c.time}</span>
                       </div>
-                      <div className="flex items-center gap-3 mt-1">
+                      <p className="text-gray-100 text-xs mt-1 leading-relaxed break-words">
+                        {c.text}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1.5">
                         <button className="text-[10px] font-semibold text-gray-400 hover:text-pink-400">
                           Reply
                         </button>

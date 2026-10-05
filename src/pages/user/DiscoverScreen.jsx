@@ -64,8 +64,8 @@ export const DiscoverScreen = () => {
     : creators;
 
   const filteredVideos = searchQuery.trim()
-    ? posts.filter(p => p.caption.toLowerCase().includes(searchQuery.toLowerCase()) || p.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : TRENDING_DISCOVER_VIDEOS;
+    ? posts.filter(p => (p.caption || '').toLowerCase().includes(searchQuery.toLowerCase()) || (p.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    : posts;
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#090514] min-h-full select-none">
@@ -218,38 +218,44 @@ export const DiscoverScreen = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-2.5">
-            {filteredVideos.slice(0, 3).map(video => (
-              <div
-                key={video.id}
-                onClick={() => navigate('/reels')}
-                className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-gray-900 cursor-pointer group shadow-lg"
-              >
-                <img
-                  src={video.image || video.posterUrl}
-                  alt={video.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
-                
-                {/* Views Badge */}
-                <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/50 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white">
-                  <Play className="w-2.5 h-2.5 fill-current text-pink-400" />
-                  <span>{video.views || video.viewsCount}</span>
-                </div>
+          {filteredVideos.length === 0 ? (
+            <div className="p-6 rounded-2xl bg-[#140c26] border border-white/5 text-center text-xs text-gray-400">
+              <p>No trending videos yet. Approved creator reels will appear here!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2.5">
+              {filteredVideos.slice(0, 3).map(video => (
+                <div
+                  key={video.id}
+                  onClick={() => navigate('/reels')}
+                  className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-gray-900 cursor-pointer group shadow-lg"
+                >
+                  <img
+                    src={video.posterUrl || video.mediaUrl || video.image}
+                    alt={video.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+                  
+                  {/* Views Badge */}
+                  <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/50 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white">
+                    <Play className="w-2.5 h-2.5 fill-current text-pink-400" />
+                    <span>{video.views || video.viewsCount || '1'}</span>
+                  </div>
 
-                {/* Bottom Title & Tag */}
-                <div className="absolute bottom-2 left-2 right-2 text-left">
-                  <p className="text-[11px] font-bold text-white truncate font-heading">
-                    {video.title}
-                  </p>
-                  <span className="text-[10px] text-pink-300 block truncate">
-                    {video.tag || '#comedy'}
-                  </span>
+                  {/* Bottom Title & Tag */}
+                  <div className="absolute bottom-2 left-2 right-2 text-left">
+                    <p className="text-[11px] font-bold text-white truncate font-heading">
+                      {video.title}
+                    </p>
+                    <span className="text-[10px] text-pink-300 block truncate">
+                      {video.category ? `#${video.category.toLowerCase()}` : '#comedy'}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Popular Creators Section (Screen 4) */}
@@ -261,48 +267,54 @@ export const DiscoverScreen = () => {
             <span className="text-xs font-bold text-pink-400">See All &gt;</span>
           </div>
 
-          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
-            {filteredCreators.map(creator => (
-              <div
-                key={creator.id}
-                className="w-32 bg-[#18122c] border border-white/10 rounded-2xl p-3 flex flex-col items-center text-center shrink-0 space-y-2 hover:border-pink-500/30 transition group"
-              >
-                <div 
-                  onClick={() => navigate(`/creator/${creator.username}`)}
-                  className="w-14 h-14 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 cursor-pointer group-hover:scale-105 transition-transform"
+          {filteredCreators.length === 0 ? (
+            <div className="p-4 rounded-2xl bg-[#140c26] border border-white/5 text-center text-xs text-gray-400">
+              <p>No creators registered yet. Start creating content to be featured here!</p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
+              {filteredCreators.map(creator => (
+                <div
+                  key={creator.id}
+                  className="w-32 bg-[#18122c] border border-white/10 rounded-2xl p-3 flex flex-col items-center text-center shrink-0 space-y-2 hover:border-pink-500/30 transition group"
                 >
-                  <img
-                    src={creator.avatar}
-                    alt={creator.name}
-                    className="w-full h-full rounded-full object-cover border border-[#18122c]"
-                  />
-                </div>
+                  <div 
+                    onClick={() => navigate(`/creator/${creator.username}`)}
+                    className="w-14 h-14 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 cursor-pointer group-hover:scale-105 transition-transform"
+                  >
+                    <img
+                      src={creator.avatar}
+                      alt={creator.name}
+                      className="w-full h-full rounded-full object-cover border border-[#18122c]"
+                    />
+                  </div>
 
-                <div 
-                  onClick={() => navigate(`/creator/${creator.username}`)}
-                  className="cursor-pointer"
-                >
-                  <h4 className="text-xs font-bold text-white truncate max-w-[100px] font-heading">
-                    {creator.username}
-                  </h4>
-                  <span className="text-[10px] text-gray-400 block">
-                    {creator.stats?.followers || '1.5M'}
-                  </span>
-                </div>
+                  <div 
+                    onClick={() => navigate(`/creator/${creator.username}`)}
+                    className="cursor-pointer"
+                  >
+                    <h4 className="text-xs font-bold text-white truncate max-w-[100px] font-heading">
+                      {creator.username}
+                    </h4>
+                    <span className="text-[10px] text-gray-400 block">
+                      {creator.stats?.followers || '1.5M'}
+                    </span>
+                  </div>
 
-                <button
-                  onClick={() => toggleFollowCreator(creator.username)}
-                  className={`w-full py-1.5 rounded-xl text-xs font-bold transition ${
-                    creator.isFollowing
-                      ? 'bg-white/15 text-white'
-                      : 'bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white hover:opacity-90'
-                  }`}
-                >
-                  {creator.isFollowing ? 'Following' : 'Follow'}
-                </button>
-              </div>
-            ))}
-          </div>
+                  <button
+                    onClick={() => toggleFollowCreator(creator.username)}
+                    className={`w-full py-1.5 rounded-xl text-xs font-bold transition ${
+                      creator.isFollowing
+                        ? 'bg-white/15 text-white'
+                        : 'bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white hover:opacity-90'
+                    }`}
+                  >
+                    {creator.isFollowing ? 'Following' : 'Follow'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Trending Hashtags Section */}

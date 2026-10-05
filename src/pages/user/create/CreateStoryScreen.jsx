@@ -33,7 +33,7 @@ export const CreateStoryScreen = () => {
   const fileInputRef = useRef(null);
 
   const [mediaUrl, setMediaUrl] = useState(SAMPLE_STORY_PHOTOS[0]);
-  const [caption, setCaption] = useState('On set shooting episode 4! 🎬✨ #FunFlickStory');
+  const [caption, setCaption] = useState('');
   const [selectedMusic, setSelectedMusic] = useState('🎵 Telugu Comedy Beats - Trending');
   const [selectedSticker, setSelectedSticker] = useState('😂');
 

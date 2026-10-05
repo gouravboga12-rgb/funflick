@@ -103,7 +103,8 @@ export const AdminInfluencerMediaScreen = () => {
   // Calculate high-level summary metrics
   const totalInfluencerPosts = (influencerMedia || []).filter(m => m.isInfluencer).length;
   const pendingRewardsCount = (influencerMedia || []).filter(m => m.paymentStatus === 'Pending Reward').length;
-  const totalPaidSum = (influencerMedia || []).reduce((acc, curr) => acc + (curr.paidAmount || 0), 9300);
+  const totalPaidSum = (influencerMedia || []).reduce((acc, curr) => acc + (curr.paidAmount || 0), 0);
+  const totalViewsCount = (influencerMedia || []).reduce((acc, curr) => acc + (typeof curr.viewsCount === 'number' ? curr.viewsCount : parseInt(curr.viewsCount) || 0), 0);
 
   return (
     <AdminLayout title="Influencer Media & Content Rewards">
@@ -147,13 +148,13 @@ export const AdminInfluencerMediaScreen = () => {
 
           <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
             <div className="flex items-center justify-between">
-              <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Top Views Tracked</span>
+              <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Total Views Tracked</span>
               <Eye className="w-4 h-4 text-blue-400" />
             </div>
             <div className={`text-2xl font-black font-heading mt-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              615.8K
+              {totalViewsCount >= 1000 ? (totalViewsCount / 1000).toFixed(1) + 'K' : totalViewsCount}
             </div>
-            <span className="text-[10px] text-blue-400 font-semibold mt-1 block">+28% viral surge this week</span>
+            <span className="text-[10px] text-blue-400 font-semibold mt-1 block">Live verified views</span>
           </div>
 
           <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>

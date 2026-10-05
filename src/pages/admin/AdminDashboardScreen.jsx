@@ -21,18 +21,32 @@ import {
 
 export const AdminDashboardScreen = () => {
   const navigate = useNavigate();
-  const { pendingApprovals, handlePendingApproval, showToast, theme } = useApp();
+  const { 
+    posts, 
+    creators, 
+    pendingApprovals, 
+    subscriptionTransactions, 
+    adminPayouts, 
+    copyrightReports, 
+    handlePendingApproval, 
+    currentUser,
+    showToast, 
+    theme 
+  } = useApp();
   const isLight = theme === 'light';
 
+  const totalRevenueNum = (subscriptionTransactions || []).reduce((acc, t) => acc + (t.amount || 0), 0);
+  const totalPayoutsNum = (adminPayouts || []).reduce((acc, p) => acc + (p.amount || 0), 0);
+
   const kpis = [
-    { title: 'Users', value: ADMIN_STATS.totalUsers, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/25', path: '/admin/users' },
-    { title: 'Creators', value: ADMIN_STATS.totalCreators, icon: Video, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/25', path: '/admin/creators' },
-    { title: 'Videos', value: ADMIN_STATS.totalVideos, icon: Play, color: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/25', path: '/admin/content' },
-    { title: 'Subscriptions', value: ADMIN_STATS.activeSubscriptions, icon: Crown, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/25', path: '/admin/subscriptions' },
-    { title: 'Total Revenue', value: ADMIN_STATS.subscriptionRevenue, icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/25', path: '/admin/revenue' },
-    { title: 'Creator Payments', value: ADMIN_STATS.creatorPayments, icon: ArrowUpRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/25', path: '/admin/payouts' },
-    { title: 'Pending Approvals', value: ADMIN_STATS.pendingApprovals, icon: Clock, color: 'text-amber-500', bg: 'bg-yellow-500/10 border-yellow-500/25', path: '/admin/content' },
-    { title: 'Reported Content', value: ADMIN_STATS.reportedContent, icon: Flag, color: 'text-rose-500', bg: 'bg-rose-500/10 border-rose-500/25', path: '/admin/reports' },
+    { title: 'Users', value: currentUser ? 1 : 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/25', path: '/admin/users' },
+    { title: 'Creators', value: (creators || []).length, icon: Video, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/25', path: '/admin/creators' },
+    { title: 'Videos', value: (posts || []).length, icon: Play, color: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/25', path: '/admin/content' },
+    { title: 'Subscriptions', value: (subscriptionTransactions || []).length, icon: Crown, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/25', path: '/admin/subscriptions' },
+    { title: 'Total Revenue', value: `₹${totalRevenueNum.toLocaleString()}`, icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/25', path: '/admin/revenue' },
+    { title: 'Creator Payments', value: `₹${totalPayoutsNum.toLocaleString()}`, icon: ArrowUpRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/25', path: '/admin/payouts' },
+    { title: 'Pending Approvals', value: (pendingApprovals || []).length, icon: Clock, color: 'text-amber-500', bg: 'bg-yellow-500/10 border-yellow-500/25', path: '/admin/content' },
+    { title: 'Reported Content', value: (copyrightReports || []).length, icon: Flag, color: 'text-rose-500', bg: 'bg-rose-500/10 border-rose-500/25', path: '/admin/reports' },
   ];
 
   return (
@@ -158,10 +172,10 @@ export const AdminDashboardScreen = () => {
 
           <div>
             <h3 className="text-base font-extrabold text-white font-heading">
-              Creator Payouts (Section 36)
+              Creator Payouts & Rewards
             </h3>
             <p className="text-xs text-gray-300 mt-1">
-              Demonstrate sending payment of ₹2,000 for "Comedy Video #102" to Pavani Official with instant status update.
+              Disburse direct monetary rewards to creators and subscribed influencers based on real video views and engagement.
             </p>
           </div>
         </div>
@@ -183,7 +197,7 @@ export const AdminDashboardScreen = () => {
               Platform Revenue Engine
             </h3>
             <p className="text-xs text-gray-300 mt-1">
-              Analyze subscription intake (₹12,45,320) vs creator disbursements (₹8,60,000) and net margins.
+              Track live Razorpay user subscription intake, filter by date ranges, and monitor creator disbursement margins.
             </p>
           </div>
         </div>

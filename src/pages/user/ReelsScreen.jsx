@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { VideoPostCard } from '../../components/feed/VideoPostCard';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
 import { SubscriptionGateModal } from '../../components/common/SubscriptionGateModal';
 import { CreateChooserModal } from '../../components/user/create/CreateChooserModal';
-import { ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
+import { ChevronUp, ChevronDown, Sparkles, Film, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const ReelsScreen = () => {
+  const navigate = useNavigate();
   const { posts, blockedUsers, showMobileAd, adsList } = useApp();
   const [currentIdx, setCurrentIdx] = useState(0);
 
@@ -63,18 +65,41 @@ export const ReelsScreen = () => {
 
       {/* Single Reel Container */}
       <div className="flex-1 relative flex items-center justify-center">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentPost.id}
-            initial={{ opacity: 0.8, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0.8, y: -20 }}
-            transition={{ duration: 0.25 }}
-            className="w-full h-full flex items-center justify-center"
-          >
-            <VideoPostCard post={currentPost} />
-          </motion.div>
-        </AnimatePresence>
+        {!currentPost ? (
+          <div className="text-center p-6 space-y-4 max-w-xs">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-500/20 via-purple-500/20 to-blue-500/20 text-pink-400 flex items-center justify-center mx-auto border border-pink-500/30">
+              <Film className="w-8 h-8" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-extrabold text-white font-heading">
+                No Reels Available Yet
+              </h3>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Be the first creator to upload a reel! Once approved by Admin, your reel will loop here for everyone.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/create/video')}
+              className="px-5 py-2.5 rounded-full bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca] text-white font-extrabold text-xs shadow-lg shadow-pink-500/30 hover:brightness-110 active:scale-95 transition inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>Upload a Reel</span>
+            </button>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentPost.id}
+              initial={{ opacity: 0.8, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0.8, y: -20 }}
+              transition={{ duration: 0.25 }}
+              className="w-full h-full flex items-center justify-center"
+            >
+              <VideoPostCard post={currentPost} />
+            </motion.div>
+          </AnimatePresence>
+        )}
       </div>
 
       {/* Bottom Navigation */}

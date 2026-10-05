@@ -66,11 +66,11 @@ export const CreatePostScreen = () => {
   const fileInputRef = useRef(null);
 
   const [mediaUrl, setMediaUrl] = useState(SAMPLE_POST_PHOTOS[0].url);
-  const [caption, setCaption] = useState('Behind the scenes of our new comedy episode! When you realize everyone forgot their lines 🤣🤣');
-  const [hashtags, setHashtags] = useState('#funflick #comedy #bts #shootday #teluguhumor');
-  const [location, setLocation] = useState('Hyderabad Film City');
+  const [caption, setCaption] = useState('');
+  const [hashtags, setHashtags] = useState('#funflick #post');
+  const [location, setLocation] = useState('Hyderabad, India');
   const [category, setCategory] = useState('Comedy');
-  const [taggedUsers, setTaggedUsers] = useState(['pavani_official']);
+  const [taggedUsers, setTaggedUsers] = useState([]);
   const [enableComments, setEnableComments] = useState(true);
 
   // Upload simulation states: 'idle' | 'uploading' | 'submitted'

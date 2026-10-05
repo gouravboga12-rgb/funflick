@@ -21,6 +21,30 @@ import {
 
 const AppContext = createContext(null);
 
+// Automatic Cache Purge: ensures browser localStorage is wiped of old dummy data
+const DATA_VERSION = 'v6_clean_production_slate';
+if (typeof window !== 'undefined') {
+  try {
+    if (localStorage.getItem('funflick_data_version') !== DATA_VERSION) {
+      localStorage.removeItem('funflick_posts');
+      localStorage.removeItem('funflick_stories');
+      localStorage.removeItem('funflick_submissions');
+      localStorage.removeItem('funflick_influencer_media');
+      localStorage.removeItem('funflick_pending_approvals');
+      localStorage.removeItem('funflick_payouts');
+      localStorage.removeItem('funflick_conversations');
+      localStorage.removeItem('funflick_notifications');
+      localStorage.removeItem('funflick_subscription_transactions');
+      localStorage.removeItem('funflick_creators');
+      localStorage.removeItem('funflick_ads');
+      localStorage.removeItem('funflick_copyright_reports');
+      localStorage.removeItem('funflick_user_likes');
+      localStorage.removeItem('funflick_user');
+      localStorage.setItem('funflick_data_version', DATA_VERSION);
+    }
+  } catch (e) {}
+}
+
 export const AppProvider = ({ children }) => {
   // Current user state (Unified Viewer + Influencer)
   // Rule 1: Upload is free for everyone!
@@ -137,6 +161,10 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : INITIAL_INFLUENCER_MEDIA;
   });
 
+  useEffect(() => {
+    localStorage.setItem('funflick_influencer_media', JSON.stringify(influencerMedia));
+  }, [influencerMedia]);
+
   // Ads & Promotions (For Admin Management & In-App Popups)
   const [adsList, setAdsList] = useState(() => {
     const saved = localStorage.getItem('funflick_ads');
@@ -147,7 +175,14 @@ export const AppProvider = ({ children }) => {
   const [activePopupAd, setActivePopupAd] = useState(null);
 
   // Admin pending video approvals
-  const [pendingApprovals, setPendingApprovals] = useState(ADMIN_PENDING_APPROVALS);
+  const [pendingApprovals, setPendingApprovals] = useState(() => {
+    const saved = localStorage.getItem('funflick_pending_approvals');
+    return saved ? JSON.parse(saved) : ADMIN_PENDING_APPROVALS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('funflick_pending_approvals', JSON.stringify(pendingApprovals));
+  }, [pendingApprovals]);
 
   // Copyright & Plagiarism Dispute Reports
   const [copyrightReports, setCopyrightReports] = useState(() => {
@@ -270,6 +305,19 @@ export const AppProvider = ({ children }) => {
       }
       return p;
     }));
+
+    setInfluencerMedia(prev => prev.map(m => {
+      if (m.id === postId || m.postId === postId) {
+        const nextLikes = newLikedStatus ? (m.likesCount || 0) + 1 : Math.max(0, (m.likesCount || 1) - 1);
+        const views = parseViews(m.viewsCount || 1);
+        return {
+          ...m,
+          likesCount: nextLikes,
+          engagementRate: ((nextLikes + (m.commentsCount || 0)) / Math.max(1, views) * 100).toFixed(1) + '%'
+        };
+      }
+      return m;
+    }));
   };
 
   // Helper to parse views count into number
@@ -301,6 +349,19 @@ export const AppProvider = ({ children }) => {
         };
       }
       return p;
+    }));
+
+    setInfluencerMedia(prev => prev.map(m => {
+      if (m.id === postId || m.postId === postId) {
+        const currentVal = parseViews(m.viewsCount || 0);
+        const nextVal = currentVal + 1;
+        return {
+          ...m,
+          viewsCount: nextVal,
+          engagementRate: (((m.likesCount || 0) + (m.commentsCount || 0)) / Math.max(1, nextVal) * 100).toFixed(1) + '%'
+        };
+      }
+      return m;
     }));
   };
 
@@ -369,6 +430,20 @@ export const AppProvider = ({ children }) => {
       }
       return p;
     }));
+
+    setInfluencerMedia(prev => prev.map(m => {
+      if (m.id === postId || m.postId === postId) {
+        const nextComments = (m.commentsCount || 0) + 1;
+        const views = parseViews(m.viewsCount || 1);
+        return {
+          ...m,
+          commentsCount: nextComments,
+          engagementRate: (((m.likesCount || 0) + nextComments) / Math.max(1, views) * 100).toFixed(1) + '%'
+        };
+      }
+      return m;
+    }));
+
     showToast('Comment posted! 💬');
   };
 
@@ -384,6 +459,20 @@ export const AppProvider = ({ children }) => {
       }
       return p;
     }));
+
+    setInfluencerMedia(prev => prev.map(m => {
+      if (m.id === postId || m.postId === postId) {
+        const nextComments = Math.max(0, (m.commentsCount || 1) - 1);
+        const views = parseViews(m.viewsCount || 1);
+        return {
+          ...m,
+          commentsCount: nextComments,
+          engagementRate: (((m.likesCount || 0) + nextComments) / Math.max(1, views) * 100).toFixed(1) + '%'
+        };
+      }
+      return m;
+    }));
+
     showToast('🗑️ Comment deleted', 'info');
   };
 
@@ -1351,12 +1440,11 @@ export const AppProvider = ({ children }) => {
             posterUrl: target.thumbnail || target.mediaUrl,
             audioTitle: target.audioTitle || ('🎵 Original Sound - ' + (target.creator || currentUser.username)),
             location: target.location || '',
-            tags: target.tags || [],
-            likesCount: 1,
+            likesCount: 0,
             commentsCount: 0,
             sharesCount: 0,
             savesCount: 0,
-            viewsCount: '1',
+            viewsCount: '0',
             timeAgo: 'Just now',
             category: target.category || 'Comedy',
             isLiked: false,
@@ -1365,6 +1453,31 @@ export const AppProvider = ({ children }) => {
             comments: []
           };
           setPosts(prev => [livePost, ...prev]);
+
+          // Also register under influencerMedia for admin engagement tracking & rewards
+          const isCreatorInfluencer = (target.creator === currentUser.username) ? !!currentUser.isInfluencer : true;
+          const newInfluencerItem = {
+            id: livePost.id,
+            postId: livePost.id,
+            influencerName: livePost.creator.name,
+            username: livePost.creator.username,
+            avatar: livePost.creator.avatar,
+            isInfluencer: isCreatorInfluencer,
+            followersCount: (target.creator === currentUser.username ? currentUser.stats?.followers : 1000) || 1000,
+            title: livePost.title,
+            contentType: livePost.mediaType,
+            mediaUrl: livePost.mediaUrl,
+            thumbnail: livePost.posterUrl,
+            viewsCount: 0,
+            likesCount: 0,
+            commentsCount: 0,
+            engagementRate: '0.0%',
+            paymentStatus: isCreatorInfluencer ? 'Pending Reward' : 'Eligible for Reward',
+            suggestedReward: 500,
+            paidAmount: 0,
+            publishedDate: 'Today'
+          };
+          setInfluencerMedia(prev => [newInfluencerItem, ...prev]);
 
           if (target.creator === currentUser.username) {
             setCurrentUser(prev => ({

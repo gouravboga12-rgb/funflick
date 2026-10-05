@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { AppHeader } from '../../components/common/AppHeader';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
@@ -7,9 +8,10 @@ import { VideoPostCard } from '../../components/feed/VideoPostCard';
 import { SubscriptionGateModal } from '../../components/common/SubscriptionGateModal';
 import { CreateChooserModal } from '../../components/user/create/CreateChooserModal';
 import { StoryViewerModal } from '../../components/feed/StoryViewerModal';
-import { Sparkles, TrendingUp, Flame } from 'lucide-react';
+import { Sparkles, TrendingUp, Flame, Video, Plus } from 'lucide-react';
 
 export const HomeScreen = () => {
+  const navigate = useNavigate();
   const { posts, blockedUsers } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
 
@@ -40,19 +42,44 @@ export const HomeScreen = () => {
 
         {/* Video Posts Feed */}
         <div className="px-0 sm:px-2 space-y-4">
-          {filteredPosts.map(post => (
-            <VideoPostCard key={post.id} post={post} />
-          ))}
+          {filteredPosts.length === 0 ? (
+            <div className="mx-4 my-6 p-8 rounded-3xl bg-[#130b26] border border-white/10 text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-500/20 via-purple-500/20 to-blue-500/20 text-pink-400 flex items-center justify-center mx-auto border border-pink-500/30">
+                <Video className="w-8 h-8" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-base font-extrabold text-white font-heading">
+                  No Posts or Reels Yet
+                </h3>
+                <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
+                  Be the first creator on FunFlick! Upload a video or photo, and once approved by Admin, it will appear globally right here.
+                </p>
+              </div>
+              <button
+                onClick={() => navigate('/create')}
+                className="px-5 py-2.5 rounded-full bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca] text-white font-extrabold text-xs shadow-lg shadow-pink-500/25 hover:brightness-110 active:scale-95 transition inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>Upload First Reel / Post</span>
+              </button>
+            </div>
+          ) : (
+            filteredPosts.map(post => (
+              <VideoPostCard key={post.id} post={post} />
+            ))
+          )}
         </div>
 
         {/* Feed End Celebration */}
-        <div className="py-8 px-4 text-center space-y-2">
-          <div className="w-10 h-10 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center mx-auto">
-            <Sparkles className="w-5 h-5" />
+        {filteredPosts.length > 0 && (
+          <div className="py-8 px-4 text-center space-y-2">
+            <div className="w-10 h-10 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center mx-auto">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <p className="text-xs font-bold text-gray-300">You're all caught up!</p>
+            <p className="text-[11px] text-gray-500">More viral reels are being processed by creators.</p>
           </div>
-          <p className="text-xs font-bold text-gray-300">You're all caught up with top comedy!</p>
-          <p className="text-[11px] text-gray-500">More viral reels are being processed by creators.</p>
-        </div>
+        )}
       </div>
 
       {/* Bottom Navigation */}

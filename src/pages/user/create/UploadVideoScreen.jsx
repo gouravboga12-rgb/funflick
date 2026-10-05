@@ -92,13 +92,13 @@ export const UploadVideoScreen = () => {
   const [videoSrc, setVideoSrc] = useState(SAMPLE_COMEDY_VIDEOS[0].videoUrl);
   const [thumbnailUrl, setThumbnailUrl] = useState(SAMPLE_COMEDY_VIDEOS[0].thumbnail);
   
-  const [title, setTitle] = useState('Office Appraisal Nightmare Part 3');
-  const [description, setDescription] = useState('When the manager asks what you achieved this quarter and you only have memes to show! 🤣🤣');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Comedy');
   const [selectedLocation, setSelectedLocation] = useState('Hyderabad, India');
   const [selectedSound, setSelectedSound] = useState(POPULAR_SOUNDS[0]);
-  const [taggedUsers, setTaggedUsers] = useState(['pavani_official']);
-  const [hashtags, setHashtags] = useState('#funflick #comedy #viralreels #standup');
+  const [taggedUsers, setTaggedUsers] = useState([]);
+  const [hashtags, setHashtags] = useState('#funflick #reels');
 
   // Video playback state
   const [isPlaying, setIsPlaying] = useState(false);
