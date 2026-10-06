@@ -434,6 +434,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Live Conversations synchronization with AWS MySQL backend
+  // MERGE strategy: keep local conversations not yet in DB, preserve locally loaded messages
   const fetchLiveConversations = async () => {
     try {
       const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
@@ -445,13 +446,50 @@ export const AppProvider = ({ children }) => {
         const data = await res.json();
         if (data.conversations && Array.isArray(data.conversations)) {
           setConversations(prev => {
-            return data.conversations.map(conv => {
-              const existing = prev.find(p => p.id === conv.id || p.userId === conv.userId || p.user?.username === conv.user?.username);
-              return {
-                ...conv,
-                messages: existing?.messages && existing.messages.length > 0 ? existing.messages : []
+            // Build a map of DB conversations by their canonical ID (conv_userId)
+            const dbMap = new Map();
+            for (const conv of data.conversations) {
+              dbMap.set(conv.id, conv); // conv.id is 'conv_<userId>'
+              if (conv.userId) dbMap.set(String(conv.userId), conv);
+              if (conv.user?.username) dbMap.set(conv.user.username, conv);
+            }
+
+            // Merge DB conversations with local ones that don't exist in DB yet
+            const merged = [];
+            const seenIds = new Set();
+
+            // First insert all DB conversations (authoritative), preserving local messages
+            for (const dbConv of data.conversations) {
+              const existingLocal = prev.find(p =>
+                p.id === dbConv.id ||
+                (p.userId && p.userId === dbConv.userId) ||
+                p.user?.username === dbConv.user?.username
+              );
+              const mergedConv = {
+                ...dbConv,
+                // Keep locally loaded message list if available and more complete than nothing
+                messages: existingLocal?.messages && existingLocal.messages.length > 0
+                  ? existingLocal.messages
+                  : (dbConv.messages || [])
               };
-            });
+              merged.push(mergedConv);
+              seenIds.add(dbConv.id);
+              if (dbConv.userId) seenIds.add(String(dbConv.userId));
+              if (dbConv.user?.username) seenIds.add(dbConv.user.username);
+            }
+
+            // Append any locally-created conversations not yet stored in DB
+            for (const localConv of prev) {
+              const alreadyInDb =
+                seenIds.has(localConv.id) ||
+                (localConv.userId && seenIds.has(String(localConv.userId))) ||
+                (localConv.user?.username && seenIds.has(localConv.user.username));
+              if (!alreadyInDb) {
+                merged.push(localConv); // Preserve local-only conversation
+              }
+            }
+
+            return merged;
           });
         }
       }

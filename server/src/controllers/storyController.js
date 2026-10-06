@@ -8,7 +8,7 @@ export async function listStories(req, res) {
         u.name, u.username, u.avatar_url
       FROM stories s
       JOIN users u ON s.user_id = u.id
-      WHERE (s.expires_at IS NULL OR s.expires_at > NOW()) AND s.status = 'Approved'
+      WHERE (s.expires_at IS NULL OR s.expires_at > NOW()) AND (s.status = 'Approved' OR s.status IS NULL) AND (u.status IS NULL OR u.status != 'Suspended')
       ORDER BY s.created_at DESC
     `);
 
@@ -53,7 +53,8 @@ export async function createStory(req, res) {
       return res.status(400).json({ error: 'media_url is required' });
     }
 
-    const initialStatus = req.user.role === 'admin' ? 'Approved' : 'Pending';
+    // Stories publish immediately without waiting for admin approval (expires in 24h)
+    const initialStatus = 'Approved';
 
     const [result] = await pool.query(
       `INSERT INTO stories (user_id, media_url, media_type, caption, music, sticker, expires_at, status)
@@ -61,18 +62,18 @@ export async function createStory(req, res) {
       [req.user.id, media_url, media_type, caption, music, sticker, initialStatus]
     );
 
-    // Notify user of submission
+    // Notify user that story is live
     try {
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, message)
-         VALUES (?, 'system', 'Story Submitted for Review', 'Your story has been submitted for Admin Verification.')`,
+         VALUES (?, 'system', 'Story Published Live! 🌟', 'Your story is now live and will automatically expire in 24 hours.')`,
         [req.user.id]
       );
     } catch (e) {}
 
     return res.status(201).json({
-      message: initialStatus === 'Approved' ? 'Story published live' : 'Story submitted for Admin Verification',
-      status: initialStatus,
+      message: 'Story published live',
+      status: 'Approved',
       storyId: result.insertId,
       story: {
         id: result.insertId,

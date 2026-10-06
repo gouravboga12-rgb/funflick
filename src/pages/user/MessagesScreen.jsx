@@ -39,6 +39,7 @@ export const MessagesScreen = () => {
   const [attachedMedia, setAttachedMedia] = useState(null); // { file, type, url, name, size }
   const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef(null);
+  const messagesEndRef = useRef(null); // auto-scroll anchor
 
   // Database searched users
   const [dbUsers, setDbUsers] = useState([]);
@@ -86,6 +87,14 @@ export const MessagesScreen = () => {
     }, 3000);
     return () => clearInterval(interval);
   }, [activeConvId]);
+
+  // Auto-scroll to bottom when messages change
+  const activeConvMessages = conversations.find(c => c.id === activeConvId)?.messages;
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [activeConvMessages]);
 
   // Live search users in MySQL database when user types in search box
   useEffect(() => {
@@ -266,7 +275,14 @@ export const MessagesScreen = () => {
           </div>
 
           {/* Messages Flow */}
-          <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-3 flex flex-col justify-end">
+          <div className="flex-1 overflow-y-auto no-scrollbar px-4 pt-4 pb-2 flex flex-col gap-3">
+            {activeConv.messages.length === 0 && (
+              <div className="flex-1 flex items-center justify-center py-10">
+                <p className="text-xs text-gray-500 text-center">
+                  No messages yet. Say hello! 👋
+                </p>
+              </div>
+            )}
             {activeConv.messages.map(msg => {
               const isMe = msg.sender === 'me';
               return (
@@ -315,6 +331,8 @@ export const MessagesScreen = () => {
                 </div>
               );
             })}
+            {/* Auto-scroll anchor */}
+            <div ref={messagesEndRef} className="h-0 shrink-0" />
           </div>
 
           {/* Attached Media Preview Bar */}

@@ -126,7 +126,7 @@ export const CreateStoryScreen = () => {
           origin: { y: 0.6 }
         });
       } catch (e) {}
-      showToast('⏳ Story submitted for Admin Approval! Once verified, it will be published.', 'info');
+      showToast('🌟 Story is live! Visible to everyone and expires automatically in 24 hours.', 'success');
     } catch (err) {
       console.error('Story upload error:', err);
       showToast(err.message || 'Story upload failed', 'error');
@@ -151,7 +151,7 @@ export const CreateStoryScreen = () => {
             Add to Story
           </span>
           <span className="text-[10px] text-pink-400 font-semibold">
-            Max Length: {maxStoryDuration}s • Moderation
+            Max Length: {maxStoryDuration}s • Goes Live Instantly • Expires in 24h
           </span>
         </div>
 

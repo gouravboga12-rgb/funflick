@@ -40,6 +40,7 @@ import { AdminDashboardScreen } from './pages/admin/AdminDashboardScreen';
 import { AdminUsersScreen } from './pages/admin/AdminUsersScreen';
 import { AdminCreatorsScreen } from './pages/admin/AdminCreatorsScreen';
 import { AdminContentScreen } from './pages/admin/AdminContentScreen';
+import { AdminStoryScreen } from './pages/admin/AdminStoryScreen';
 import { AdminSubscriptionsScreen } from './pages/admin/AdminSubscriptionsScreen';
 import { AdminPayoutsScreen } from './pages/admin/AdminPayoutsScreen';
 import { AdminRevenueScreen } from './pages/admin/AdminRevenueScreen';
@@ -123,6 +124,7 @@ function AppRoutes() {
           <Route path="/admin/users" element={<AdminRouteGuard><AdminUsersScreen /></AdminRouteGuard>} />
           <Route path="/admin/creators" element={<AdminRouteGuard><AdminCreatorsScreen /></AdminRouteGuard>} />
           <Route path="/admin/content" element={<AdminRouteGuard><AdminContentScreen /></AdminRouteGuard>} />
+          <Route path="/admin/stories" element={<AdminRouteGuard><AdminStoryScreen /></AdminRouteGuard>} />
           <Route path="/admin/subscriptions" element={<AdminRouteGuard><AdminSubscriptionsScreen /></AdminRouteGuard>} />
           <Route path="/admin/manage-subscriptions" element={<AdminRouteGuard><AdminSubscriptionsScreen /></AdminRouteGuard>} />
           <Route path="/admin/payouts" element={<AdminRouteGuard><AdminPayoutsScreen /></AdminRouteGuard>} />

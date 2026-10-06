@@ -15,7 +15,7 @@ export async function listVideos(req, res) {
         u.id AS creator_id, u.name AS creator_name, u.username AS creator_username, u.avatar_url AS creator_avatar
       FROM videos v
       JOIN users u ON v.user_id = u.id
-      WHERE v.status = 'Approved'
+      WHERE v.status = 'Approved' AND (u.status IS NULL OR u.status != 'Suspended')
     `;
     const params = [currentUserId];
 

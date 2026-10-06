@@ -41,6 +41,7 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
     { label: 'Users', icon: Users, path: '/admin/users' },
     { label: 'Creators', icon: Video, path: '/admin/creators' },
     { label: 'Content Moderation', icon: Video, path: '/admin/content', badge: pendingApprovals.length },
+    { label: 'Story Moderation', icon: Sparkles, path: '/admin/stories' },
     { label: 'Copyright & Plagiarism', icon: ShieldAlert, path: '/admin/copyright-claims', badge: pendingCopyrightCount },
     { label: 'Manage Subscriptions', icon: Crown, path: '/admin/manage-subscriptions' },
     { label: 'Creator Payouts', icon: DollarSign, path: '/admin/payouts', badge: pendingPayoutCount },
