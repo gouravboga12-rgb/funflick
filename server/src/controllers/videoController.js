@@ -9,17 +9,18 @@ export async function listVideos(req, res) {
       SELECT 
         v.id, v.title, v.description, v.category, v.video_url, v.thumbnail_url,
         v.media_type, v.hashtags, v.location, v.audio_title,
-        v.duration, v.views_count, v.likes_count, v.created_at,
+        v.duration, v.views_count, v.likes_count, v.created_at, v.status,
         (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id) AS comments_count,
         (SELECT COUNT(*) FROM likes l WHERE l.video_id = v.id AND l.user_id = ?) AS user_liked,
         u.id AS creator_id, u.name AS creator_name, u.username AS creator_username, u.avatar_url AS creator_avatar
       FROM videos v
       JOIN users u ON v.user_id = u.id
+      WHERE v.status = 'Approved'
     `;
     const params = [currentUserId];
 
     if (category && category !== 'All') {
-      query += ' WHERE v.category = ?';
+      query += ' AND v.category = ?';
       params.push(category);
     }
 
@@ -49,16 +50,21 @@ export async function createVideo(req, res) {
       audio_title = ''
     } = req.body;
 
-    if (!title || !video_url) {
-      return res.status(400).json({ error: 'Title and media URL are required' });
+    if (!video_url) {
+      return res.status(400).json({ error: 'Media URL is required' });
     }
 
+    const videoTitle = (title && title.trim()) || (description && description.trim().slice(0, 40)) || 'Untitled Video';
+
+    // Normal users go to 'Pending' verification queue; admin goes straight to 'Approved'
+    const initialStatus = req.user.role === 'admin' ? 'Approved' : 'Pending';
+
     const [result] = await pool.query(
-      `INSERT INTO videos (user_id, title, description, category, video_url, thumbnail_url, duration, media_type, hashtags, location, audio_title)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO videos (user_id, title, description, category, video_url, thumbnail_url, duration, media_type, hashtags, location, audio_title, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user.id,
-        title,
+        videoTitle,
         description || '',
         category || 'Comedy',
         video_url,
@@ -67,23 +73,35 @@ export async function createVideo(req, res) {
         media_type || 'video',
         hashtags || '',
         location || '',
-        audio_title || ''
+        audio_title || '',
+        initialStatus
       ]
     );
 
+    // Create in-app notification informing user of submission
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message)
+         VALUES (?, 'system', 'Reel Submitted for Review', ?)`,
+        [req.user.id, `Your reel "${videoTitle}" has been submitted for Admin Verification.`]
+      );
+    } catch (e) {}
+
     return res.status(201).json({
-      message: 'Published successfully to FunFlick live feed',
+      message: initialStatus === 'Approved' ? 'Published live to FunFlick' : 'Submitted for Central Admin Verification',
+      status: initialStatus,
       videoId: result.insertId,
       video: {
         id: result.insertId,
         user_id: req.user.id,
-        title,
+        title: videoTitle,
         description,
         category,
         video_url,
         thumbnail_url: thumbnail_url || video_url,
         media_type,
         duration,
+        status: initialStatus,
         likes_count: 0,
         views_count: 0,
         created_at: new Date().toISOString()

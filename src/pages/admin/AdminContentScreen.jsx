@@ -22,13 +22,19 @@ import {
 import confetti from 'canvas-confetti';
 
 export const AdminContentScreen = () => {
-  const { posts, pendingApprovals, handlePendingApproval, sendPerformanceReward, showToast } = useApp();
+  const { posts, pendingApprovals, handlePendingApproval, sendPerformanceReward, showToast, fetchAdminPendingContent } = useApp();
   const [tab, setTab] = useState('Pending');
   const [rewardModalPost, setRewardModalPost] = useState(null);
   const [bonusAmount, setBonusAmount] = useState(2500);
 
   // Preview modal for pending review item
   const [previewItem, setPreviewItem] = useState(null);
+
+  React.useEffect(() => {
+    if (fetchAdminPendingContent) {
+      fetchAdminPendingContent();
+    }
+  }, [tab]);
 
   const handleGrantReward = (e) => {
     e.preventDefault();

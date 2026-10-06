@@ -34,7 +34,7 @@ const SUGGESTED_LOCATIONS = [
 
 export const CreatePostScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, setSubscriptionGateModalOpen, showToast, fetchLiveVideos } = useApp();
+  const { currentUser, posts, setSubscriptionGateModalOpen, showToast, fetchLiveVideos } = useApp();
 
   const fileInputRef = useRef(null);
 
@@ -78,11 +78,39 @@ export const CreatePostScreen = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [mediaUrl, setMediaUrl] = useState('');
   const [caption, setCaption] = useState('');
-  const [hashtags, setHashtags] = useState('#funflick #post');
+  const [selectedTags, setSelectedTags] = useState(['funflick', 'post']);
+  const [tagSearchInput, setTagSearchInput] = useState('');
   const [location, setLocation] = useState('Hyderabad, India');
   const [category, setCategory] = useState('Comedy');
   const [taggedUsers, setTaggedUsers] = useState([]);
   const [enableComments, setEnableComments] = useState(true);
+
+  // Extract base trending tags + dynamic tags from platform posts feed
+  const baseTrendingTags = [
+    'funflick', 'post', 'comedy', 'bts', 'shootday', 'teluguhumor', 
+    'memes', 'entertainment', 'photography', 'trending', 'creators'
+  ];
+  const dynamicFeedTags = (posts || []).flatMap(p => 
+    (p.tags || []).map(t => t.replace(/^#/, '').toLowerCase())
+  );
+  const allAvailableTags = Array.from(new Set([...baseTrendingTags, ...dynamicFeedTags]));
+  const cleanTagQuery = tagSearchInput.trim().replace(/^#/, '').toLowerCase().replace(/\s+/g, '');
+  const filteredHashtagSuggestions = cleanTagQuery
+    ? allAvailableTags.filter(t => t.toLowerCase().includes(cleanTagQuery) && !selectedTags.includes(t))
+    : allAvailableTags.filter(t => !selectedTags.includes(t)).slice(0, 8);
+  const isExactTagMatch = allAvailableTags.some(t => t.toLowerCase() === cleanTagQuery);
+
+  const handleAddTag = (tag) => {
+    const clean = tag.trim().replace(/^#/, '').toLowerCase().replace(/\s+/g, '');
+    if (clean && !selectedTags.includes(clean)) {
+      setSelectedTags(prev => [...prev, clean]);
+    }
+    setTagSearchInput('');
+  };
+
+  const handleRemoveTag = (tagToRemove) => {
+    setSelectedTags(prev => prev.filter(t => t !== tagToRemove));
+  };
 
   // Upload states
   const [isUploading, setIsUploading] = useState(false);
@@ -112,12 +140,6 @@ export const CreatePostScreen = () => {
     setTaggedUserObjects(prev => prev.filter(u => u.username !== username));
   };
 
-  const handleAddHashtag = (tag) => {
-    if (!hashtags.includes(tag)) {
-      setHashtags(prev => (prev ? `${prev} ${tag}` : tag));
-    }
-  };
-
   const handlePublish = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!selectedFile && !mediaUrl) {
@@ -145,6 +167,8 @@ export const CreatePostScreen = () => {
         });
       }
 
+      const finalHashtags = selectedTags.map(t => `#${t}`).join(' ');
+
       // Save into MySQL database
       const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
       const res = await fetch('/api/videos', {
@@ -161,7 +185,7 @@ export const CreatePostScreen = () => {
           thumbnail_url: finalMediaUrl,
           duration: 0,
           media_type: 'image',
-          hashtags,
+          hashtags: finalHashtags,
           location
         })
       });
@@ -191,7 +215,7 @@ export const CreatePostScreen = () => {
           origin: { y: 0.6 }
         });
       } catch (err) {}
-      showToast('📸 Photo uploaded to AWS S3 & published live!', 'success');
+      showToast('📸 Photo uploaded & submitted to Admin Approval Desk!', 'success');
     } catch (err) {
       console.error('Post upload error:', err);
       showToast(err.message || 'Upload failed', 'error');
@@ -346,30 +370,117 @@ export const CreatePostScreen = () => {
           />
         </div>
 
-        {/* Hashtags */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
-            <Hash className="w-3.5 h-3.5 text-pink-400" />
-            <span>Hashtags</span>
-          </label>
-          <div className="flex flex-wrap gap-1.5 mb-1.5">
-            {['#funflick', '#comedy', '#bts', '#shootday', '#teluguhumor', '#memes'].map(t => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => handleAddHashtag(t)}
-                className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-pink-500/20 border border-white/10 text-[10px] font-semibold text-pink-300 transition"
-              >
-                + {t}
-              </button>
-            ))}
+        {/* Hashtags Section - Search & Custom Tag Creation */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+              <Hash className="w-3.5 h-3.5 text-pink-400" />
+              <span>Hashtags</span>
+              <span className="text-[10px] text-gray-500 font-normal">({selectedTags.length} added)</span>
+            </label>
+            <span className="text-[10px] text-pink-400 font-medium">Trending Discovery</span>
           </div>
-          <input
-            type="text"
-            value={hashtags}
-            onChange={e => setHashtags(e.target.value)}
-            className="w-full bg-[#150f2c] text-pink-300 font-medium text-xs px-3.5 py-2.5 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500 transition"
-          />
+
+          {/* Selected Hashtags Chips */}
+          {selectedTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 p-2 rounded-2xl bg-[#120b24] border border-white/5">
+              {selectedTags.map(tag => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/30 text-pink-300 font-semibold text-xs animate-in fade-in"
+                >
+                  <span>#{tag}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTag(tag)}
+                    className="p-0.5 rounded-full hover:bg-white/10 text-pink-300 hover:text-white transition"
+                    title={`Remove #${tag}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Hashtag Search & Create Input */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={tagSearchInput}
+              onChange={e => setTagSearchInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (cleanTagQuery) handleAddTag(cleanTagQuery);
+                }
+              }}
+              placeholder="Search or add custom hashtag (e.g. comedy, shootday)..."
+              className="w-full bg-[#150f2c] text-white placeholder-gray-400 text-xs pl-9 pr-24 py-2.5 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500 transition"
+            />
+            {cleanTagQuery && (
+              <button
+                type="button"
+                onClick={() => handleAddTag(cleanTagQuery)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white font-bold text-[10px] hover:brightness-110 transition shadow-sm"
+              >
+                + Add #{cleanTagQuery}
+              </button>
+            )}
+          </div>
+
+          {/* Hashtag Suggestions & Custom Tag Prompt */}
+          {cleanTagQuery ? (
+            <div className="p-2.5 rounded-2xl bg-[#120b24] border border-white/10 space-y-2">
+              <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">
+                Matching Hashtags
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {filteredHashtagSuggestions.map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => handleAddTag(tag)}
+                    className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-pink-500/20 border border-white/10 hover:border-pink-500/40 text-[11px] font-semibold text-pink-300 transition flex items-center gap-1"
+                  >
+                    <span>#{tag}</span>
+                    <span className="text-[9px] text-gray-400">+</span>
+                  </button>
+                ))}
+
+                {/* Always offer custom hashtag addition if not an exact existing tag */}
+                {!isExactTagMatch && (
+                  <button
+                    type="button"
+                    onClick={() => handleAddTag(cleanTagQuery)}
+                    className="px-2.5 py-1 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 border border-pink-500/50 text-[11px] font-bold text-pink-200 transition flex items-center gap-1"
+                  >
+                    <span>✨ Add custom "#{cleanTagQuery}"</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1 pt-0.5">
+              <span className="text-[10px] text-gray-400 font-semibold flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>Trending on FunFlick (tap to add):</span>
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {filteredHashtagSuggestions.slice(0, 6).map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => handleAddTag(tag)}
+                    className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-pink-500/20 border border-white/10 text-[10px] font-medium text-gray-300 hover:text-pink-300 transition"
+                  >
+                    + #{tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tag People (Search-driven, optional) */}

@@ -4,7 +4,9 @@ import {
   toggleUserStatus, 
   getAdminCreators, 
   getAdminReports, 
-  resolveAdminReport 
+  resolveAdminReport,
+  getAdminPendingContent,
+  handleContentModeration
 } from '../controllers/adminController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -23,5 +25,7 @@ router.put('/users/:id/status', authenticateToken, requireAdmin, toggleUserStatu
 router.get('/creators', authenticateToken, requireAdmin, getAdminCreators);
 router.get('/reports', authenticateToken, requireAdmin, getAdminReports);
 router.put('/reports/:id/resolve', authenticateToken, requireAdmin, resolveAdminReport);
+router.get('/content/pending', authenticateToken, requireAdmin, getAdminPendingContent);
+router.put('/content/:id/moderate', authenticateToken, requireAdmin, handleContentModeration);
 
 export default router;

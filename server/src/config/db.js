@@ -134,7 +134,8 @@ export async function initDatabase() {
       { name: 'media_type', def: "ENUM('video', 'image') DEFAULT 'video'" },
       { name: 'hashtags', def: 'TEXT DEFAULT NULL' },
       { name: 'location', def: 'VARCHAR(150) DEFAULT NULL' },
-      { name: 'audio_title', def: 'VARCHAR(150) DEFAULT NULL' }
+      { name: 'audio_title', def: 'VARCHAR(150) DEFAULT NULL' },
+      { name: 'status', def: "ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending'" }
     ];
     for (const col of videoCols) {
       try {
@@ -144,6 +145,10 @@ export async function initDatabase() {
         }
       } catch (e) {}
     }
+
+    try {
+      await connection.query("UPDATE videos SET status = 'Approved' WHERE status IS NULL");
+    } catch (e) {}
 
     // Follows table (Instagram-style real following/follower graph)
     await connection.query(`

@@ -144,3 +144,74 @@ export async function resolveAdminReport(req, res) {
     return res.status(500).json({ error: 'Failed to resolve report' });
   }
 }
+
+// Get pending videos awaiting admin verification
+export async function getAdminPendingContent(req, res) {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        v.id, v.title, v.description AS caption, v.category, v.video_url, v.thumbnail_url,
+        v.media_type, v.hashtags, v.location, v.audio_title, v.created_at, v.status,
+        u.id AS user_id, u.name AS creator_name, u.username AS creator, u.avatar_url AS avatar
+      FROM videos v
+      JOIN users u ON v.user_id = u.id
+      WHERE v.status = 'Pending'
+      ORDER BY v.created_at DESC
+    `);
+
+    const pending = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      caption: r.caption,
+      category: r.category,
+      mediaUrl: r.video_url,
+      thumbnail: r.thumbnail_url || r.video_url,
+      contentType: r.media_type,
+      hashtags: r.hashtags,
+      location: r.location,
+      audioTitle: r.audio_title,
+      creator: r.creator,
+      creatorName: r.creator_name,
+      avatar: r.avatar || '/brand/default-avatar.svg',
+      date: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      status: r.status
+    }));
+
+    return res.json({ pending, count: pending.length });
+  } catch (err) {
+    console.error('Get admin pending content error:', err);
+    return res.status(500).json({ error: 'Failed to fetch pending content' });
+  }
+}
+
+// Approve or reject pending video
+export async function handleContentModeration(req, res) {
+  try {
+    const { id } = req.params;
+    const { action } = req.body; // 'approve' | 'reject'
+
+    if (action === 'approve') {
+      await pool.query("UPDATE videos SET status = 'Approved' WHERE id = ?", [id]);
+
+      // Notify the creator that their content was approved
+      try {
+        const [vRows] = await pool.query('SELECT user_id, title FROM videos WHERE id = ?', [id]);
+        if (vRows.length > 0) {
+          await pool.query(
+            `INSERT INTO notifications (user_id, type, title, message)
+             VALUES (?, 'system', 'Reel Approved & Live! 🎉', ?)`,
+            [vRows[0].user_id, `Your reel "${vRows[0].title}" has been approved by admin and is now live!`]
+          );
+        }
+      } catch (e) {}
+
+      return res.json({ success: true, message: 'Content approved and published live!' });
+    } else {
+      await pool.query("UPDATE videos SET status = 'Rejected' WHERE id = ?", [id]);
+      return res.json({ success: true, message: 'Content rejected.' });
+    }
+  } catch (err) {
+    console.error('Content moderation error:', err);
+    return res.status(500).json({ error: 'Failed to moderate content' });
+  }
+}

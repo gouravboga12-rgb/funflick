@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { DISCOVER_CATEGORIES, TRENDING_DISCOVER_VIDEOS, TRENDING_HASHTAGS } from '../../data/mockData';
@@ -25,7 +25,8 @@ import {
   Eye, 
   Heart,
   MessageCircle,
-  UserPlus
+  UserPlus,
+  Hash
 } from 'lucide-react';
 
 export const DiscoverScreen = () => {
@@ -87,6 +88,31 @@ export const DiscoverScreen = () => {
     return (views * 1.0) + (likes * 2.0) + (comments * 3.0) + (shares * 2.0) + recencyBonus;
   };
 
+  // Dynamic trending hashtags aggregated from posts, views, and defaults
+  const trendingHashtags = useMemo(() => {
+    const tagMap = {};
+    (posts || []).forEach(p => {
+      const allPostTags = (p.tags || []).concat(
+        (p.hashtags || '').split(/[\s,]+/).filter(Boolean).map(t => t.startsWith('#') ? t : `#${t}`)
+      );
+      const views = parseViewsNum(p.viewsCount || p.views || 0);
+      allPostTags.forEach(t => {
+        const clean = t.toLowerCase();
+        if (clean.length > 1) {
+          tagMap[clean] = (tagMap[clean] || 0) + views + 10;
+        }
+      });
+    });
+    // Default fallback trending hashtags
+    ['#funflick', '#reels', '#comedy', '#viralreels', '#teluguhumor', '#memes', '#standup'].forEach(t => {
+      if (!tagMap[t]) tagMap[t] = 50;
+    });
+
+    return Object.entries(tagMap)
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag]) => tag);
+  }, [posts]);
+
   // Filtered creators when searching
   const filteredCreators = searchQuery.trim() 
     ? creators.filter(c => c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || c.username?.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -95,15 +121,21 @@ export const DiscoverScreen = () => {
   // Filtered and Trending-Ranked Videos
   const filteredVideos = posts
     .filter(p => {
-      // 1. Search Query filter (matches title, caption, tags, creator username, category)
+      // 1. Search Query filter (matches title, caption, hashtags, tags, creator username, category)
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchTitle = (p.title || '').toLowerCase().includes(q);
-        const matchCaption = (p.caption || '').toLowerCase().includes(q);
+        const q = searchQuery.toLowerCase().trim();
+        const cleanQ = q.startsWith('#') ? q.slice(1) : q;
+        const matchTitle = (p.title || '').toLowerCase().includes(q) || (p.title || '').toLowerCase().includes(cleanQ);
+        const matchCaption = (p.caption || '').toLowerCase().includes(q) || (p.caption || '').toLowerCase().includes(cleanQ);
+        const matchHashtags = (p.hashtags || '').toLowerCase().includes(q) || (p.hashtags || '').toLowerCase().includes(cleanQ);
         const matchCategory = (p.category || '').toLowerCase().includes(q);
         const matchCreator = (p.creator?.name || p.creator?.username || '').toLowerCase().includes(q);
-        const matchTags = (p.tags || []).some(t => t.toLowerCase().includes(q));
-        if (!matchTitle && !matchCaption && !matchCategory && !matchCreator && !matchTags) {
+        const matchTags = (p.tags || []).some(t => {
+          const lower = t.toLowerCase();
+          return lower.includes(q) || lower.replace('#', '').includes(cleanQ);
+        });
+
+        if (!matchTitle && !matchCaption && !matchHashtags && !matchCategory && !matchCreator && !matchTags) {
           return false;
         }
       }
@@ -170,10 +202,60 @@ export const DiscoverScreen = () => {
             </button>
           )}
         </div>
+
+        {/* Trending Hashtags Quick Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+          <span className="text-[10px] text-pink-400 font-bold uppercase tracking-wider shrink-0 flex items-center gap-0.5">
+            <Hash className="w-2.5 h-2.5" />
+            <span>Trending:</span>
+          </span>
+          {trendingHashtags.slice(0, 10).map(tag => {
+            const isSelected = searchQuery.toLowerCase().trim() === tag.toLowerCase() || 
+                               searchQuery.toLowerCase().trim() === tag.replace(/^#/, '').toLowerCase();
+            return (
+              <button
+                key={tag}
+                onClick={() => setSearchQuery(isSelected ? '' : tag)}
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0 transition ${
+                  isSelected
+                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-sm'
+                    : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/5'
+                }`}
+              >
+                {tag}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Main Discover Content */}
       <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-6">
+
+        {/* Active Search / Hashtag feedback banner */}
+        {searchQuery && (
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-pink-500/15 via-purple-500/10 to-transparent border border-pink-500/30 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center font-bold text-xs">
+                #
+              </div>
+              <div>
+                <span className="text-xs font-bold text-white block">
+                  Results for "{searchQuery}"
+                </span>
+                <span className="text-[10px] text-gray-300">
+                  {filteredVideos.length} {filteredVideos.length === 1 ? 'reel / post' : 'reels / posts'} found
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="text-[11px] text-pink-400 font-bold hover:underline px-2 py-1 rounded-lg hover:bg-pink-500/10 transition"
+            >
+              Clear
+            </button>
+          </div>
+        )}
         
         {/* Featured Hero Banner: "Trending Comedy Videos" (Screen 4 top) */}
         {!searchQuery && (

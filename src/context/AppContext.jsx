@@ -79,10 +79,17 @@ export const AppProvider = ({ children }) => {
     return sessionStorage.getItem('funflick_authenticated') === 'true';
   });
 
-  // Sync profile data directly from AWS MySQL backend on app startup if authenticated
+  // Sync profile data and live feeds directly from AWS MySQL backend on app startup
   useEffect(() => {
+    fetchLiveVideos();
+    fetchLiveStories();
+    fetchLiveCreators();
+
     const token = localStorage.getItem('funflick_token');
     if (!token) return;
+
+    fetchLiveNotifications();
+    fetchAdminPendingContent();
 
     fetch('/api/auth/me', {
       headers: {
@@ -106,6 +113,9 @@ export const AppProvider = ({ children }) => {
             } catch (e) {}
             return merged;
           });
+          if (data.user.role === 'admin') {
+            fetchAdminPendingContent();
+          }
         }
       })
       .catch(() => {});
@@ -241,6 +251,9 @@ export const AppProvider = ({ children }) => {
                           v.category === 'Post';
             const determinedType = isImg ? 'image' : 'video';
 
+            const rawTags = (v.hashtags || '').split(/[\s,]+/).filter(Boolean);
+            const formattedTags = rawTags.map(t => t.startsWith('#') ? t : `#${t}`);
+
             return {
               id: v.id,
               title: v.title || 'FunFlick Post',
@@ -249,6 +262,8 @@ export const AppProvider = ({ children }) => {
               mediaType: determinedType,
               mediaUrl: v.video_url,
               posterUrl: v.thumbnail_url || v.video_url,
+              hashtags: v.hashtags || '',
+              tags: formattedTags,
               likesCount: Number(v.likes_count) || 0,
               viewsCount: v.views_count ? String(v.views_count) : '0',
               commentsCount: Number(v.comments_count) || 0,
@@ -274,6 +289,25 @@ export const AppProvider = ({ children }) => {
       }
     } catch (err) {
       console.warn('Could not fetch live videos from AWS MySQL:', err);
+    }
+  };
+
+  // Live Admin Pending Content synchronization with AWS MySQL backend
+  const fetchAdminPendingContent = async () => {
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (!token) return;
+      const res = await fetch('/api/admin/content/pending', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.pending && Array.isArray(data.pending)) {
+          setPendingApprovals(data.pending);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch live pending approvals:', err);
     }
   };
 
@@ -1844,13 +1878,28 @@ export const AppProvider = ({ children }) => {
     showToast(`Disbursed ₹${amount.toLocaleString()} reward to @${creatorUsername}'s wallet!`, 'success');
   };
 
-  // Admin Approve / Reject Pending Video
-  const handlePendingApproval = (approvalId, action) => {
+  // Admin Approve / Reject Pending Video (AWS Backend Integration)
+  const handlePendingApproval = async (approvalId, action) => {
     const target = pendingApprovals.find(a => a.id === approvalId);
     setPendingApprovals(prev => prev.filter(a => a.id !== approvalId));
 
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (token) {
+        await fetch(`/api/admin/content/${approvalId}/moderate`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ action }) // 'approve' | 'reject'
+        });
+      }
+    } catch (err) {
+      console.error('Error moderating content on backend:', err);
+    }
+
     if (action === 'approve') {
-      // Update status in user submissions if matching
       setUserSubmissions(prev => prev.map(s => {
         if (s.id === approvalId) {
           return {
@@ -1863,130 +1912,22 @@ export const AppProvider = ({ children }) => {
         return s;
       }));
 
-      // If there's an item, add to public feed posts or stories
-      if (target) {
-        if (target.contentType === 'story') {
-          const newStoryItem = {
-            id: 'st_item_' + Date.now(),
-            mediaUrl: target.mediaUrl,
-            caption: target.caption || target.title,
-            time: 'Just now'
-          };
-          setStories(prev => {
-            const myIndex = prev.findIndex(s => s.isUser);
-            if (myIndex >= 0) {
-              const updated = [...prev];
-              updated[myIndex] = {
-                ...updated[myIndex],
-                hasUnseen: true,
-                stories: [newStoryItem, ...(updated[myIndex].stories || [])]
-              };
-              return updated;
-            }
-            return prev;
-          });
-        } else {
-          const livePost = {
-            id: 'post_' + Date.now(),
-            creator: {
-              name: target.creatorName || (target.creator === currentUser.username ? currentUser.name : target.creator),
-              username: target.creator || currentUser.username,
-              avatar: target.avatar || currentUser.avatar,
-              isVerified: true,
-              isPrivate: (target.creator === currentUser.username) ? !!currentUser.isPrivate : false
-            },
-            title: target.title || 'New FunFlick Post',
-            caption: target.caption || `${target.title} ${target.hashtags || ''}`,
-            mediaType: target.contentType === 'image' ? 'image' : 'video',
-            mediaUrl: target.mediaUrl || 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-on-video-call-with-phone-41445-large.mp4',
-            posterUrl: target.thumbnail || target.mediaUrl,
-            audioTitle: target.audioTitle || ('🎵 Original Sound - ' + (target.creator || currentUser.username)),
-            location: target.location || '',
-            likesCount: 0,
-            commentsCount: 0,
-            sharesCount: 0,
-            savesCount: 0,
-            viewsCount: '0',
-            timeAgo: 'Just now',
-            category: target.category || 'Comedy',
-            isLiked: false,
-            isSaved: false,
-            isFollowing: false,
-            comments: []
-          };
-          setPosts(prev => [livePost, ...prev]);
+      // Add user notification
+      const approvedNotif = {
+        id: 'notif_' + Date.now(),
+        type: 'like',
+        user: 'Admin Approval Desk',
+        avatar: '/brand/funflick-logo.png',
+        text: `🎉 Good news! Your reel "${target?.title || 'content'}" was verified & approved by Admin! It is now live on FunFlick globally.`,
+        time: 'Just now',
+        unread: true
+      };
+      setNotifications(prev => [approvedNotif, ...prev]);
 
-          // Persist approved video directly into AWS MySQL database
-          const token = localStorage.getItem('funflick_token');
-          if (token && target.mediaUrl) {
-            fetch('/api/videos', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                title: target.title || 'New FunFlick Video',
-                description: target.caption || target.title || '',
-                category: target.category || 'Comedy',
-                video_url: target.mediaUrl,
-                thumbnail_url: target.thumbnail || target.mediaUrl,
-                duration: 30
-              })
-            }).then(r => r.json()).then(data => {
-              if (data?.videoId) {
-                fetchLiveVideos();
-              }
-            }).catch(() => {});
-          }
+      showToast(`✅ Content approved and published live across FunFlick!`, 'success');
 
-          // Also register under influencerMedia for admin engagement tracking & rewards
-          const isCreatorInfluencer = (target.creator === currentUser.username) ? !!currentUser.isInfluencer : true;
-          const newInfluencerItem = {
-            id: livePost.id,
-            postId: livePost.id,
-            influencerName: livePost.creator.name,
-            username: livePost.creator.username,
-            avatar: livePost.creator.avatar,
-            isInfluencer: isCreatorInfluencer,
-            followersCount: (target.creator === currentUser.username ? currentUser.stats?.followers : 1000) || 1000,
-            title: livePost.title,
-            contentType: livePost.mediaType,
-            mediaUrl: livePost.mediaUrl,
-            thumbnail: livePost.posterUrl,
-            viewsCount: 0,
-            likesCount: 0,
-            commentsCount: 0,
-            engagementRate: '0.0%',
-            paymentStatus: isCreatorInfluencer ? 'Pending Reward' : 'Eligible for Reward',
-            suggestedReward: 500,
-            paidAmount: 0,
-            publishedDate: 'Today'
-          };
-          setInfluencerMedia(prev => [newInfluencerItem, ...prev]);
-
-          if (target.creator === currentUser.username) {
-            setCurrentUser(prev => ({
-              ...prev,
-              stats: { ...prev.stats, posts: (prev.stats?.posts || 0) + 1 }
-            }));
-          }
-        }
-
-        // Add user notification
-        const approvedNotif = {
-          id: 'notif_' + Date.now(),
-          type: 'like',
-          user: 'Admin Approval Desk',
-          avatar: '/brand/funflick-logo.png',
-          text: `🎉 Good news! Your ${target.contentType || 'content'} "${target.title}" was verified & approved by Admin! It is now live on FunFlick.`,
-          time: 'Just now',
-          unread: true
-        };
-        setNotifications(prev => [approvedNotif, ...prev]);
-      }
-
-      showToast(`✅ ${target?.contentType === 'story' ? 'Story' : 'Content'} approved and published live to FunFlick!`, 'success');
+      // Refresh live feed so approved post appears for everyone immediately
+      await fetchLiveVideos();
     } else {
       setUserSubmissions(prev => prev.map(s => {
         if (s.id === approvalId) {
@@ -2065,6 +2006,7 @@ export const AppProvider = ({ children }) => {
         fetchLiveStories,
         fetchLiveNotifications,
         fetchLiveCreators,
+        fetchAdminPendingContent,
         blockedUsers,
         blockUser,
         unblockUser,

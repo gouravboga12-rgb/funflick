@@ -29,11 +29,18 @@ export const AdminDashboardScreen = () => {
     adminPayouts, 
     copyrightReports, 
     handlePendingApproval, 
+    fetchAdminPendingContent,
     currentUser,
     showToast, 
     theme 
   } = useApp();
   const isLight = theme === 'light';
+
+  React.useEffect(() => {
+    if (fetchAdminPendingContent) {
+      fetchAdminPendingContent();
+    }
+  }, []);
 
   const totalRevenueNum = (subscriptionTransactions || []).reduce((acc, t) => acc + (t.amount || 0), 0);
   const totalPayoutsNum = (adminPayouts || []).reduce((acc, p) => acc + (p.amount || 0), 0);
