@@ -167,6 +167,11 @@ export const CreatePostScreen = () => {
         });
       }
 
+      // Permanent media safety check: never commit temporary blob URLs
+      if (!finalMediaUrl || finalMediaUrl.startsWith('blob:')) {
+        throw new Error('Please wait for the photo to upload to AWS S3 storage before submitting.');
+      }
+
       const finalHashtags = selectedTags.map(t => `#${t}`).join(' ');
 
       // Save into MySQL database

@@ -23,7 +23,9 @@ import {
   Eye, 
   Ban,
   BarChart3,
-  Lock
+  Lock,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CommentSheet } from './CommentSheet';
@@ -45,8 +47,10 @@ export const VideoPostCard = ({ post }) => {
     ? (mediaLimits?.maxStoryDuration || 15)
     : (mediaLimits?.maxReelDuration || 30);
 
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [showHeartBurst, setShowHeartBurst] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -59,6 +63,34 @@ export const VideoPostCard = ({ post }) => {
   const videoRef = useRef(null);
   const lastTapRef = useRef(0);
   const hasRecordedViewRef = useRef(false);
+
+  // Check if poster is an actual image (not an mp4/mov video URL)
+  const isVideoExt = (url) => typeof url === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(url);
+  const validPosterUrl = (!isVideoExt(post.posterUrl) && post.posterUrl) ? post.posterUrl : undefined;
+
+  // Seamless Autoplay & Load Watcher: prevents black screen upon mounting or switching reels
+  useEffect(() => {
+    if (post.mediaType === 'video' && post.mediaUrl) {
+      setIsLoading(true);
+      setHasError(false);
+      if (videoRef.current) {
+        videoRef.current.load();
+        const playPromise = videoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(true);
+              setIsLoading(false);
+            })
+            .catch(() => {
+              // Browser restricted autoPlay without user interaction - show play button cleanly
+              setIsPlaying(false);
+              setIsLoading(false);
+            });
+        }
+      }
+    }
+  }, [post.mediaUrl, post.mediaType]);
 
   // Dynamic Playback Watcher: enforces admin max showcase length & records view
   const handleTimeUpdate = () => {
@@ -104,8 +136,9 @@ export const VideoPostCard = ({ post }) => {
           videoRef.current.pause();
           setIsPlaying(false);
         } else {
-          videoRef.current.play().catch(() => {});
-          setIsPlaying(true);
+          videoRef.current.play()
+            .then(() => setIsPlaying(true))
+            .catch(() => {});
         }
       } else {
         setIsPlaying(!isPlaying);
@@ -167,17 +200,76 @@ export const VideoPostCard = ({ post }) => {
             </div>
           </div>
         ) : post.mediaType === 'video' && post.mediaUrl ? (
-          <video
-            ref={videoRef}
-            src={post.mediaUrl}
-            poster={post.posterUrl}
-            className="w-full h-full object-cover"
-            playsInline
-            loop
-            autoPlay
-            muted={isMuted}
-            onTimeUpdate={handleTimeUpdate}
-          />
+          <>
+            {/* Real Video Element with Error & Playback Watchers */}
+            <video
+              ref={videoRef}
+              src={post.mediaUrl}
+              poster={validPosterUrl}
+              className="w-full h-full object-cover"
+              playsInline
+              loop
+              autoPlay
+              preload="auto"
+              crossOrigin="anonymous"
+              muted={isMuted}
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedData={() => setIsLoading(false)}
+              onCanPlay={() => setIsLoading(false)}
+              onWaiting={() => setIsLoading(true)}
+              onPlaying={() => {
+                setIsLoading(false);
+                setIsPlaying(true);
+              }}
+              onPause={() => setIsPlaying(false)}
+              onError={(e) => {
+                console.warn('Video failed to load or play:', post.mediaUrl, e);
+                setHasError(true);
+                setIsLoading(false);
+              }}
+            />
+
+            {/* Buffering/Loading Spinner Indicator */}
+            {isLoading && !hasError && (
+              <div className="absolute z-10 flex flex-col items-center gap-2 pointer-events-none">
+                <div className="w-10 h-10 rounded-full border-2 border-pink-500 border-t-transparent animate-spin shadow-lg shadow-pink-500/20" />
+                <span className="text-[10px] font-semibold text-pink-300 drop-shadow">Buffering media...</span>
+              </div>
+            )}
+
+            {/* Error Fallback Card: Prevents persistent black screen */}
+            {hasError && (
+              <div className="absolute inset-0 z-10 bg-gradient-to-br from-purple-950/90 via-[#120826] to-pink-950/90 flex flex-col items-center justify-center p-6 text-center space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-pink-500/20 border border-pink-500/30 flex items-center justify-center text-pink-400 shadow-xl">
+                  <Play className="w-7 h-7 ml-1" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white font-heading">
+                    {post.title || 'Reel Media'}
+                  </h4>
+                  <p className="text-xs text-gray-300 max-w-[240px] mt-0.5 leading-relaxed">
+                    Media stream is loading or ready to play
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setHasError(false);
+                    setIsLoading(true);
+                    if (videoRef.current) {
+                      videoRef.current.load();
+                      videoRef.current.play().catch(() => {});
+                    }
+                  }}
+                  className="px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xs shadow-lg shadow-pink-500/20 active:scale-95 transition flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Tap to Play Media</span>
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <img
             src={post.posterUrl || post.mediaUrl}
@@ -194,8 +286,8 @@ export const VideoPostCard = ({ post }) => {
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/90 pointer-events-none" />
 
         {/* Center Pause/Play overlay indicator when paused */}
-        {!isPlaying && (
-          <div className="absolute z-10 w-16 h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white/90 border border-white/20 pointer-events-none">
+        {!isPlaying && !isLoading && !hasError && (
+          <div className="absolute z-10 w-16 h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white/90 border border-white/20 pointer-events-none shadow-xl">
             <Play className="w-8 h-8 fill-current ml-1" />
           </div>
         )}

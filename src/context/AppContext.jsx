@@ -254,6 +254,9 @@ export const AppProvider = ({ children }) => {
             const rawTags = (v.hashtags || '').split(/[\s,]+/).filter(Boolean);
             const formattedTags = rawTags.map(t => t.startsWith('#') ? t : `#${t}`);
 
+            const isVideoUrl = (u) => typeof u === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(u);
+            const safePoster = (!isVideoUrl(v.thumbnail_url) && v.thumbnail_url) ? v.thumbnail_url : null;
+
             return {
               id: v.id,
               title: v.title || 'FunFlick Post',
@@ -261,7 +264,7 @@ export const AppProvider = ({ children }) => {
               category: v.category || 'Comedy',
               mediaType: determinedType,
               mediaUrl: v.video_url,
-              posterUrl: v.thumbnail_url || v.video_url,
+              posterUrl: safePoster,
               hashtags: v.hashtags || '',
               tags: formattedTags,
               likesCount: Number(v.likes_count) || 0,

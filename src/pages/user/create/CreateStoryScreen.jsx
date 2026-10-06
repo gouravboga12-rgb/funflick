@@ -78,6 +78,11 @@ export const CreateStoryScreen = () => {
         });
       }
 
+      // Permanent media safety check: never commit temporary blob URLs
+      if (!finalMediaUrl || finalMediaUrl.startsWith('blob:')) {
+        throw new Error('Please wait for the story media to upload to AWS S3 storage before submitting.');
+      }
+
       const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
       const isVideo = selectedFile?.type?.startsWith('video');
 

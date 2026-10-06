@@ -48,14 +48,29 @@ export const StoryViewerModal = () => {
     <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-0 select-none">
       <div className="relative w-full max-w-[420px] h-full max-h-[920px] bg-black flex flex-col justify-between overflow-hidden sm:rounded-3xl shadow-2xl border border-white/10">
         
-        {/* Story Media Background */}
+        {/* Story Media Background (Video or Image) */}
         <div className="absolute inset-0 z-0">
-          <img 
-            src={currentStory.mediaUrl} 
-            alt="Story" 
-            className="w-full h-full object-cover" 
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
+          {(currentStory.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(currentStory.mediaUrl || '')) ? (
+            <video
+              src={currentStory.mediaUrl}
+              autoPlay
+              playsInline
+              loop
+              muted
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <img 
+              src={currentStory.mediaUrl} 
+              alt="Story" 
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80';
+              }}
+              className="w-full h-full object-cover" 
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none" />
         </div>
 
         {/* Top Story Controls */}

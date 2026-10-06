@@ -167,6 +167,31 @@ export const UploadVideoScreen = () => {
         setTitle(cleanName);
       }
       showToast(`Selected "${file.name}" for upload! 🎥`, 'info');
+
+      // Automatically capture first frame as visual thumbnail image
+      try {
+        const tempVideo = document.createElement('video');
+        tempVideo.preload = 'metadata';
+        tempVideo.muted = true;
+        tempVideo.playsInline = true;
+        tempVideo.src = blobUrl;
+        tempVideo.onloadeddata = () => {
+          tempVideo.currentTime = Math.min(0.5, (tempVideo.duration || 1) / 2);
+        };
+        tempVideo.onseeked = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.min(640, tempVideo.videoWidth || 480);
+            canvas.height = Math.min(1136, tempVideo.videoHeight || 854);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            if (dataUrl && dataUrl.length > 200) {
+              setThumbnailUrl(dataUrl);
+            }
+          } catch (err) {}
+        };
+      } catch (e) {}
     }
   };
 
@@ -234,6 +259,11 @@ export const UploadVideoScreen = () => {
         });
       }
 
+      // Permanent media safety check: never commit temporary blob URLs
+      if (!finalMediaUrl || finalMediaUrl.startsWith('blob:')) {
+        throw new Error('Please wait for the media file to upload to AWS S3 storage before submitting.');
+      }
+
       const finalTitle = title.trim() || description.trim().slice(0, 40) || 'Untitled Reel';
       const finalHashtags = selectedTags.map(t => `#${t}`).join(' ');
 
@@ -250,7 +280,7 @@ export const UploadVideoScreen = () => {
           description: description.trim(),
           category,
           video_url: finalMediaUrl,
-          thumbnail_url: finalMediaUrl,
+          thumbnail_url: thumbnailUrl || finalMediaUrl,
           duration: Math.round(videoDuration) || 30,
           media_type: 'video',
           hashtags: finalHashtags,

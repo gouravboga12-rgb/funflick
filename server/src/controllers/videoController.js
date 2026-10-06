@@ -50,8 +50,8 @@ export async function createVideo(req, res) {
       audio_title = ''
     } = req.body;
 
-    if (!video_url) {
-      return res.status(400).json({ error: 'Media URL is required' });
+    if (!video_url || video_url.startsWith('blob:')) {
+      return res.status(400).json({ error: 'Valid permanent media URL from AWS S3 is required' });
     }
 
     const videoTitle = (title && title.trim()) || (description && description.trim().slice(0, 40)) || 'Untitled Video';
