@@ -587,7 +587,61 @@ export async function suspendStoryCreator(req, res) {
   }
 }
 
-// 7. Get live platform overview statistics for admin dashboard
+// 7. Get all subscription payment transactions for admin revenue page
+export async function getAdminTransactions(req, res) {
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        us.id,
+        us.plan_id,
+        us.plan_name,
+        us.price,
+        us.duration_days,
+        us.payment_id,
+        us.payment_status,
+        us.start_date,
+        us.end_date,
+        us.created_at,
+        u.id AS user_id,
+        u.name AS user_name,
+        u.username,
+        u.email AS user_email,
+        u.avatar_url AS user_avatar
+      FROM user_subscriptions us
+      JOIN users u ON us.user_id = u.id
+      ORDER BY us.created_at DESC
+      LIMIT 500
+    `);
+
+    const transactions = rows.map(r => ({
+      id: r.id,
+      razorpayPaymentId: r.payment_id || `PAY_${r.id}`,
+      planId: r.plan_id || 'monthly',
+      planName: r.plan_name || 'Monthly Influencer Pro',
+      planDuration: r.duration_days ? `${r.duration_days} Days` : '30 Days',
+      amount: Number(r.price) || 199,
+      status: r.payment_status || 'success',
+      date: r.created_at,
+      formattedDate: new Date(r.created_at).toLocaleDateString('en-IN', {
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      }),
+      userName: r.user_name || 'User',
+      user: r.username || 'user',
+      userEmail: r.user_email || '',
+      userAvatar: r.user_avatar || '/brand/default-avatar.svg',
+      paymentGateway: 'Razorpay Test',
+      userId: r.user_id
+    }));
+
+    return res.json({ transactions, totalCount: transactions.length });
+  } catch (err) {
+    console.error('Get admin transactions error:', err);
+    return res.status(500).json({ error: 'Failed to fetch subscription transactions' });
+  }
+}
+
+// 8. Get live platform overview statistics for admin dashboard
 export async function getAdminStats(req, res) {
   try {
     const [[{ totalUsers }]] = await pool.query("SELECT COUNT(*) AS totalUsers FROM users WHERE role != 'admin'");
@@ -595,7 +649,8 @@ export async function getAdminStats(req, res) {
     const [[{ totalVideos }]] = await pool.query("SELECT COUNT(*) AS totalVideos FROM videos WHERE status = 'Approved'");
     const [[{ pendingVideos }]] = await pool.query("SELECT COUNT(*) AS pendingVideos FROM videos WHERE status = 'Pending'");
     const [[{ activeStories }]] = await pool.query("SELECT COUNT(*) AS activeStories FROM stories WHERE expires_at IS NULL OR expires_at > NOW()");
-    const [[{ activeSubscriptions }]] = await pool.query("SELECT COUNT(*) AS activeSubscriptions FROM users WHERE subscription_plan IS NOT NULL");
+    const [[{ activeSubscriptions }]] = await pool.query("SELECT COUNT(*) AS activeSubscriptions FROM users WHERE is_influencer = 1 AND subscription_expires_at > NOW()");
+    const [[{ totalRevenue }]] = await pool.query("SELECT COALESCE(SUM(price), 0) AS totalRevenue FROM user_subscriptions WHERE payment_status = 'success'");
     const [[{ creatorPayments }]] = await pool.query("SELECT COALESCE(SUM(amount), 0) AS creatorPayments FROM creator_payouts WHERE status = 'Paid'");
     const [[{ reportedContent }]] = await pool.query("SELECT COUNT(*) AS reportedContent FROM content_reports WHERE status = 'Pending'");
 
@@ -604,10 +659,10 @@ export async function getAdminStats(req, res) {
         totalUsers,
         totalCreators,
         totalVideos,
-        pendingApprovals: Number(pendingVideos), // only permanent content requires pending approval
+        pendingApprovals: Number(pendingVideos),
         activeStories: Number(activeStories),
         activeSubscriptions,
-        totalRevenue: Number(activeSubscriptions) * 199,
+        totalRevenue: Number(totalRevenue),
         creatorPayments: Number(creatorPayments),
         reportedContent: Number(reportedContent)
       }

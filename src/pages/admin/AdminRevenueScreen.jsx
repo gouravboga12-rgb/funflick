@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { 
@@ -27,8 +27,26 @@ import {
 } from 'lucide-react';
 
 export const AdminRevenueScreen = () => {
-  const { subscriptionTransactions, theme, showToast, recordSubscriptionPayment, publishingPlans } = useApp();
+  const { subscriptionTransactions, theme, showToast, recordSubscriptionPayment, publishingPlans, fetchAdminTransactions } = useApp();
   const isLight = theme === 'light';
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Fetch real subscription transactions from MySQL on mount
+  useEffect(() => {
+    const load = async () => {
+      setIsRefreshing(true);
+      if (fetchAdminTransactions) await fetchAdminTransactions();
+      setIsRefreshing(false);
+    };
+    load();
+  }, []);
+
+  const handleRefreshTransactions = async () => {
+    setIsRefreshing(true);
+    if (fetchAdminTransactions) await fetchAdminTransactions();
+    setIsRefreshing(false);
+    showToast('✅ Revenue data refreshed from database!', 'success');
+  };
 
   // Filters State
   const [dateFilter, setDateFilter] = useState('All Time'); // 'Today' | 'Yesterday' | 'This Week' | 'This Month' | 'Last Month' | 'Fiscal Q3' | 'Custom' | 'All Time'
@@ -294,6 +312,16 @@ export const AdminRevenueScreen = () => {
         </div>
 
         <div className="flex items-center gap-2.5 self-start md:self-center shrink-0">
+          <button
+            onClick={handleRefreshTransactions}
+            disabled={isRefreshing}
+            className="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-60"
+            title="Refresh revenue from database"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+          </button>
+
           <button
             onClick={handleSimulateNewPayment}
             className="px-3.5 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-bold transition flex items-center gap-1.5"

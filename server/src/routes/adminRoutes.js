@@ -13,7 +13,8 @@ import {
   deleteAdminContent,
   getAdminActiveStories,
   deleteAdminStory,
-  getAdminStats
+  getAdminStats,
+  getAdminTransactions
 } from '../controllers/adminController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -47,5 +48,8 @@ router.get('/stories', authenticateToken, requireAdmin, getAdminActiveStories);
 router.delete('/stories/:id', authenticateToken, requireAdmin, deleteAdminStory);
 router.put('/stories/users/:userId/suspend', authenticateToken, requireAdmin, suspendUserWithDuration);
 router.put('/stories/users/:userId/reactivate', authenticateToken, requireAdmin, reactivateUser);
+
+// Admin subscription transaction ledger for revenue page
+router.get('/transactions', authenticateToken, requireAdmin, getAdminTransactions);
 
 export default router;

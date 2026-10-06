@@ -384,6 +384,25 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Admin Revenue — fetch real subscription payment transactions from MySQL
+  const fetchAdminTransactions = async () => {
+    try {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (!token) return;
+      const res = await fetch('/api/admin/transactions', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.transactions && Array.isArray(data.transactions)) {
+          setSubscriptionTransactions(data.transactions);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch admin subscription transactions:', err);
+    }
+  };
+
   // Authenticated user's private media library synchronization
   const fetchMyMedia = async () => {
     try {
@@ -2386,6 +2405,7 @@ export const AppProvider = ({ children }) => {
         adminStats,
         setAdminStats,
         fetchAdminStats,
+        fetchAdminTransactions,
         activePlayingVideoId,
         setActivePlayingVideoId
       }}

@@ -168,8 +168,9 @@ export const AdminStoryScreen = () => {
           {stories.map(story => {
             const isVideo = story.mediaType === 'video';
             const isDeleting = isDeletingId === story.id;
-            const isSuspending = isSuspendingUserId === story.userId;
+            const isSuspending = suspendingUser?.id === story.userId;
             const isSuspended = story.userStatus === 'Suspended';
+
 
             return (
               <div
