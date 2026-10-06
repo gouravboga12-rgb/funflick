@@ -1,11 +1,25 @@
 import { Router } from 'express';
-import { listVideos, createVideo, toggleLike, getComments, addComment, deleteComment, recordView, updateVideo, deleteVideo } from '../controllers/videoController.js';
+import { 
+  listVideos, 
+  getMyMedia,
+  createVideo, 
+  toggleLike, 
+  getComments, 
+  addComment, 
+  deleteComment, 
+  recordView, 
+  updateVideo, 
+  deleteVideo 
+} from '../controllers/videoController.js';
 import { authenticateToken, optionalAuth } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
 // Public / Authenticated: Browse feed videos with personalized like state
 router.get('/', optionalAuth, listVideos);
+
+// Protected: Get authenticated user's own media library (independent per account)
+router.get('/my-media', authenticateToken, getMyMedia);
 
 // Protected: Publish video to feed
 router.post('/', authenticateToken, createVideo);

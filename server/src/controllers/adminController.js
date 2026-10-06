@@ -145,10 +145,10 @@ export async function resolveAdminReport(req, res) {
   }
 }
 
-// Get pending videos awaiting admin verification
+// Get pending videos & stories awaiting admin verification
 export async function getAdminPendingContent(req, res) {
   try {
-    const [rows] = await pool.query(`
+    const [videoRows] = await pool.query(`
       SELECT 
         v.id, v.title, v.description AS caption, v.category, v.video_url, v.thumbnail_url,
         v.media_type, v.hashtags, v.location, v.audio_title, v.created_at, v.status,
@@ -159,23 +159,44 @@ export async function getAdminPendingContent(req, res) {
       ORDER BY v.created_at DESC
     `);
 
-    const pending = rows.map(r => ({
+    let storyRows = [];
+    try {
+      const [sRows] = await pool.query(`
+        SELECT 
+          s.id, 'Story' AS title, s.caption, 'Story' AS category, s.media_url AS video_url, s.media_url AS thumbnail_url,
+          s.media_type, '#Story' AS hashtags, '' AS location, s.music AS audio_title, s.created_at, s.status,
+          u.id AS user_id, u.name AS creator_name, u.username AS creator, u.avatar_url AS avatar
+        FROM stories s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.status = 'Pending'
+        ORDER BY s.created_at DESC
+      `);
+      storyRows = sRows;
+    } catch (e) {}
+
+    const mapRow = (r, type = 'video') => ({
       id: r.id,
+      itemType: type,
       title: r.title,
-      caption: r.caption,
-      category: r.category,
+      caption: r.caption || '',
+      category: r.category || 'Reel',
       mediaUrl: r.video_url,
       thumbnail: r.thumbnail_url || r.video_url,
-      contentType: r.media_type,
-      hashtags: r.hashtags,
-      location: r.location,
-      audioTitle: r.audio_title,
+      contentType: r.media_type || 'video',
+      hashtags: r.hashtags || '',
+      location: r.location || '',
+      audioTitle: r.audio_title || '',
       creator: r.creator,
       creatorName: r.creator_name,
       avatar: r.avatar || '/brand/default-avatar.svg',
       date: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
       status: r.status
-    }));
+    });
+
+    const pending = [
+      ...videoRows.map(r => mapRow(r, 'video')),
+      ...storyRows.map(r => mapRow(r, 'story'))
+    ];
 
     return res.json({ pending, count: pending.length });
   } catch (err) {
@@ -184,34 +205,75 @@ export async function getAdminPendingContent(req, res) {
   }
 }
 
-// Approve or reject pending video
+// Approve or reject pending video / story
 export async function handleContentModeration(req, res) {
   try {
     const { id } = req.params;
-    const { action } = req.body; // 'approve' | 'reject'
+    const { action, itemType = 'video' } = req.body; // 'approve' | 'reject'
+    const newStatus = action === 'approve' ? 'Approved' : 'Rejected';
+
+    if (itemType === 'story') {
+      await pool.query("UPDATE stories SET status = ? WHERE id = ?", [newStatus, id]);
+    } else {
+      await pool.query("UPDATE videos SET status = ? WHERE id = ?", [newStatus, id]);
+    }
 
     if (action === 'approve') {
-      await pool.query("UPDATE videos SET status = 'Approved' WHERE id = ?", [id]);
-
-      // Notify the creator that their content was approved
       try {
-        const [vRows] = await pool.query('SELECT user_id, title FROM videos WHERE id = ?', [id]);
-        if (vRows.length > 0) {
+        const table = itemType === 'story' ? 'stories' : 'videos';
+        const [rows] = await pool.query(
+          `SELECT user_id, ${itemType === 'story' ? 'caption AS title' : 'title'} FROM ${table} WHERE id = ?`,
+          [id]
+        );
+        if (rows.length > 0) {
           await pool.query(
             `INSERT INTO notifications (user_id, type, title, message)
-             VALUES (?, 'system', 'Reel Approved & Live! 🎉', ?)`,
-            [vRows[0].user_id, `Your reel "${vRows[0].title}" has been approved by admin and is now live!`]
+             VALUES (?, 'system', 'Content Approved & Live! 🎉', ?)`,
+            [rows[0].user_id, `Your ${itemType} "${rows[0].title || 'upload'}" has been approved by admin and is now live!`]
           );
         }
       } catch (e) {}
 
       return res.json({ success: true, message: 'Content approved and published live!' });
     } else {
-      await pool.query("UPDATE videos SET status = 'Rejected' WHERE id = ?", [id]);
       return res.json({ success: true, message: 'Content rejected.' });
     }
   } catch (err) {
     console.error('Content moderation error:', err);
     return res.status(500).json({ error: 'Failed to moderate content' });
+  }
+}
+
+// Get live platform overview statistics for admin dashboard
+export async function getAdminStats(req, res) {
+  try {
+    const [[{ totalUsers }]] = await pool.query("SELECT COUNT(*) AS totalUsers FROM users WHERE role != 'admin'");
+    const [[{ totalCreators }]] = await pool.query("SELECT COUNT(*) AS totalCreators FROM users WHERE role = 'creator' OR is_influencer = 1");
+    const [[{ totalVideos }]] = await pool.query("SELECT COUNT(*) AS totalVideos FROM videos WHERE status = 'Approved'");
+    const [[{ pendingVideos }]] = await pool.query("SELECT COUNT(*) AS pendingVideos FROM videos WHERE status = 'Pending'");
+    let pendingStories = 0;
+    try {
+      const [[sRow]] = await pool.query("SELECT COUNT(*) AS pendingStories FROM stories WHERE status = 'Pending'");
+      pendingStories = sRow.pendingStories || 0;
+    } catch (e) {}
+    const [[{ activeSubscriptions }]] = await pool.query("SELECT COUNT(*) AS activeSubscriptions FROM users WHERE subscription_plan IS NOT NULL");
+    const [[{ creatorPayments }]] = await pool.query("SELECT COALESCE(SUM(amount), 0) AS creatorPayments FROM creator_payouts WHERE status = 'Paid'");
+    const [[{ reportedContent }]] = await pool.query("SELECT COUNT(*) AS reportedContent FROM content_reports WHERE status = 'Pending'");
+
+    return res.json({
+      stats: {
+        totalUsers,
+        totalCreators,
+        totalVideos,
+        pendingApprovals: Number(pendingVideos) + Number(pendingStories),
+        activeSubscriptions,
+        totalRevenue: Number(activeSubscriptions) * 199,
+        creatorPayments: Number(creatorPayments),
+        reportedContent: Number(reportedContent)
+      }
+    });
+  } catch (err) {
+    console.error('Get admin stats error:', err);
+    return res.status(500).json({ error: 'Failed to load platform stats' });
   }
 }

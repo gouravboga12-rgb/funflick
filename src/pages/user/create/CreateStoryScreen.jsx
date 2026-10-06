@@ -126,7 +126,7 @@ export const CreateStoryScreen = () => {
           origin: { y: 0.6 }
         });
       } catch (e) {}
-      showToast('📤 Story uploaded to AWS S3 & published live!', 'success');
+      showToast('⏳ Story submitted for Admin Approval! Once verified, it will be published.', 'info');
     } catch (err) {
       console.error('Story upload error:', err);
       showToast(err.message || 'Story upload failed', 'error');

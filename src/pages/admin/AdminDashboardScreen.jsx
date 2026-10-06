@@ -30,6 +30,8 @@ export const AdminDashboardScreen = () => {
     copyrightReports, 
     handlePendingApproval, 
     fetchAdminPendingContent,
+    adminStats,
+    fetchAdminStats,
     currentUser,
     showToast, 
     theme 
@@ -40,20 +42,23 @@ export const AdminDashboardScreen = () => {
     if (fetchAdminPendingContent) {
       fetchAdminPendingContent();
     }
+    if (fetchAdminStats) {
+      fetchAdminStats();
+    }
   }, []);
 
-  const totalRevenueNum = (subscriptionTransactions || []).reduce((acc, t) => acc + (t.amount || 0), 0);
-  const totalPayoutsNum = (adminPayouts || []).reduce((acc, p) => acc + (p.amount || 0), 0);
+  const totalRevenueNum = adminStats?.totalRevenue ?? (subscriptionTransactions || []).reduce((acc, t) => acc + (t.amount || 0), 0);
+  const totalPayoutsNum = adminStats?.creatorPayments ?? (adminPayouts || []).reduce((acc, p) => acc + (p.amount || 0), 0);
 
   const kpis = [
-    { title: 'Users', value: currentUser ? 1 : 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/25', path: '/admin/users' },
-    { title: 'Creators', value: (creators || []).length, icon: Video, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/25', path: '/admin/creators' },
-    { title: 'Videos', value: (posts || []).length, icon: Play, color: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/25', path: '/admin/content' },
-    { title: 'Subscriptions', value: (subscriptionTransactions || []).length, icon: Crown, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/25', path: '/admin/subscriptions' },
+    { title: 'Users', value: adminStats?.totalUsers ?? (currentUser ? 1 : 0), icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/25', path: '/admin/users' },
+    { title: 'Creators', value: adminStats?.totalCreators ?? (creators || []).length, icon: Video, color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/25', path: '/admin/creators' },
+    { title: 'Videos', value: adminStats?.totalVideos ?? (posts || []).length, icon: Play, color: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/25', path: '/admin/content' },
+    { title: 'Subscriptions', value: adminStats?.activeSubscriptions ?? (subscriptionTransactions || []).length, icon: Crown, color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/25', path: '/admin/subscriptions' },
     { title: 'Total Revenue', value: `₹${totalRevenueNum.toLocaleString()}`, icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/25', path: '/admin/revenue' },
     { title: 'Creator Payments', value: `₹${totalPayoutsNum.toLocaleString()}`, icon: ArrowUpRight, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/25', path: '/admin/payouts' },
     { title: 'Pending Approvals', value: (pendingApprovals || []).length, icon: Clock, color: 'text-amber-500', bg: 'bg-yellow-500/10 border-yellow-500/25', path: '/admin/content' },
-    { title: 'Reported Content', value: (copyrightReports || []).length, icon: Flag, color: 'text-rose-500', bg: 'bg-rose-500/10 border-rose-500/25', path: '/admin/reports' },
+    { title: 'Reported Content', value: adminStats?.reportedContent ?? (copyrightReports || []).length, icon: Flag, color: 'text-rose-500', bg: 'bg-rose-500/10 border-rose-500/25', path: '/admin/reports' },
   ];
 
   return (

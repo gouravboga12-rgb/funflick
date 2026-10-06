@@ -12,7 +12,7 @@ export const ReelsScreen = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const targetId = searchParams.get('id');
-  const { posts, blockedUsers, showMobileAd, adsList } = useApp();
+  const { posts, blockedUsers, showMobileAd, adsList, setActivePlayingVideoId } = useApp();
 
   const visiblePosts = posts.filter(p => !blockedUsers?.includes(p.creator?.username));
 
@@ -32,6 +32,15 @@ export const ReelsScreen = () => {
   }, [targetId, visiblePosts]);
 
   const currentPost = visiblePosts[currentIdx] || visiblePosts[0] || posts[0];
+
+  useEffect(() => {
+    if (currentPost?.id && setActivePlayingVideoId) {
+      setActivePlayingVideoId(currentPost.id);
+    }
+    return () => {
+      if (setActivePlayingVideoId) setActivePlayingVideoId(null);
+    };
+  }, [currentPost?.id, setActivePlayingVideoId]);
 
   const handleNext = () => {
     if (currentIdx < visiblePosts.length - 1) {

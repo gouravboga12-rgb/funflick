@@ -35,6 +35,49 @@ export async function listVideos(req, res) {
   }
 }
 
+// Authenticated user's private media library (all statuses: Pending, Approved, Rejected)
+export async function getMyMedia(req, res) {
+  try {
+    const currentUserId = req.user.id;
+
+    const [rows] = await pool.query(`
+      SELECT 
+        v.id, v.title, v.description, v.category, v.video_url, v.thumbnail_url,
+        v.media_type, v.hashtags, v.location, v.audio_title,
+        v.duration, v.views_count, v.likes_count, v.created_at, v.status,
+        (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id) AS comments_count,
+        (SELECT COUNT(*) FROM likes l WHERE l.video_id = v.id AND l.user_id = ?) AS user_liked
+      FROM videos v
+      WHERE v.user_id = ?
+      ORDER BY v.created_at DESC
+    `, [currentUserId, currentUserId]);
+
+    const media = rows.map(v => ({
+      id: v.id,
+      title: v.title,
+      caption: v.description || v.title,
+      category: v.category,
+      mediaType: v.media_type,
+      mediaUrl: v.video_url,
+      thumbnail: v.thumbnail_url || v.video_url,
+      posterUrl: v.thumbnail_url || v.video_url,
+      hashtags: v.hashtags || '',
+      duration: v.duration,
+      views: String(v.views_count || 0),
+      likes: Number(v.likes_count || 0),
+      commentsCount: Number(v.comments_count || 0),
+      status: v.status || 'Pending',
+      date: new Date(v.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      createdAt: v.created_at
+    }));
+
+    return res.json({ media, count: media.length });
+  } catch (err) {
+    console.error('Get my media error:', err);
+    return res.status(500).json({ error: 'Failed to load your media' });
+  }
+}
+
 export async function createVideo(req, res) {
   try {
     const { 

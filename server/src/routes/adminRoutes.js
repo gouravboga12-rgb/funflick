@@ -6,7 +6,8 @@ import {
   getAdminReports, 
   resolveAdminReport,
   getAdminPendingContent,
-  handleContentModeration
+  handleContentModeration,
+  getAdminStats
 } from '../controllers/adminController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -20,6 +21,7 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+router.get('/stats', authenticateToken, requireAdmin, getAdminStats);
 router.get('/users', authenticateToken, requireAdmin, getAdminUsers);
 router.put('/users/:id/status', authenticateToken, requireAdmin, toggleUserStatus);
 router.get('/creators', authenticateToken, requireAdmin, getAdminCreators);

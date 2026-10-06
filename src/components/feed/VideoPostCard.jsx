@@ -35,7 +35,19 @@ import { PostInsightsModal } from './PostInsightsModal';
 
 export const VideoPostCard = ({ post }) => {
   const navigate = useNavigate();
-  const { toggleLikePost, recordPostView, toggleSavePost, toggleFollowCreator, deleteUserPost, blockUser, currentUser, mediaLimits, showToast } = useApp();
+  const { 
+    toggleLikePost, 
+    recordPostView, 
+    toggleSavePost, 
+    toggleFollowCreator, 
+    deleteUserPost, 
+    blockUser, 
+    currentUser, 
+    mediaLimits, 
+    showToast,
+    activePlayingVideoId,
+    setActivePlayingVideoId
+  } = useApp();
 
   const isOwner = post.creator?.username === currentUser?.username;
   const isPrivateAccount = !!post.creator?.isPrivate;
@@ -60,6 +72,7 @@ export const VideoPostCard = ({ post }) => {
   const [showInsights, setShowInsights] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
 
+  const cardRef = useRef(null);
   const videoRef = useRef(null);
   const lastTapRef = useRef(0);
   const hasRecordedViewRef = useRef(false);
@@ -68,29 +81,73 @@ export const VideoPostCard = ({ post }) => {
   const isVideoExt = (url) => typeof url === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(url);
   const validPosterUrl = (!isVideoExt(post.posterUrl) && post.posterUrl) ? post.posterUrl : undefined;
 
-  // Seamless Autoplay & Load Watcher: prevents black screen upon mounting or switching reels
+  const isCardActive = activePlayingVideoId === post.id;
+
+  // Viewport Intersection Observer: activate reel ONLY when >=50% in view; pause immediately when scrolling away
   useEffect(() => {
-    if (post.mediaType === 'video' && post.mediaUrl) {
+    const el = cardRef.current;
+    if (!el || post.mediaType !== 'video') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            if (setActivePlayingVideoId) setActivePlayingVideoId(post.id);
+          } else if (entry.intersectionRatio < 0.25) {
+            if (setActivePlayingVideoId) {
+              setActivePlayingVideoId((prev) => (prev === post.id ? null : prev));
+            }
+          }
+        });
+      },
+      {
+        threshold: [0.1, 0.3, 0.5, 0.75]
+      }
+    );
+
+    observer.observe(el);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [post.id, post.mediaType, setActivePlayingVideoId]);
+
+  // Centralized Playback state enforcement: guarantee only the active reel plays and produces sound
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || post.mediaType !== 'video') return;
+
+    if (isCardActive && !isLocked) {
       setIsLoading(true);
       setHasError(false);
-      if (videoRef.current) {
-        videoRef.current.load();
-        const playPromise = videoRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              setIsPlaying(true);
-              setIsLoading(false);
-            })
-            .catch(() => {
-              // Browser restricted autoPlay without user interaction - show play button cleanly
-              setIsPlaying(false);
-              setIsLoading(false);
-            });
-        }
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+            setIsLoading(false);
+          })
+          .catch(() => {
+            setIsPlaying(false);
+            setIsLoading(false);
+          });
       }
+    } else {
+      // Immediately pause and stop audio completely
+      video.pause();
+      setIsPlaying(false);
+      setIsLoading(false);
     }
-  }, [post.mediaUrl, post.mediaType]);
+  }, [isCardActive, isLocked, post.mediaType, post.mediaUrl]);
+
+  // Clean pause on unmount
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
+    };
+  }, []);
 
   // Dynamic Playback Watcher: enforces admin max showcase length & records view
   const handleTimeUpdate = () => {
@@ -135,7 +192,9 @@ export const VideoPostCard = ({ post }) => {
         if (isPlaying) {
           videoRef.current.pause();
           setIsPlaying(false);
+          if (setActivePlayingVideoId) setActivePlayingVideoId(null);
         } else {
+          if (setActivePlayingVideoId) setActivePlayingVideoId(post.id);
           videoRef.current.play()
             .then(() => setIsPlaying(true))
             .catch(() => {});
@@ -158,7 +217,7 @@ export const VideoPostCard = ({ post }) => {
   };
 
   return (
-    <article className="relative w-full aspect-[9/16] max-h-[720px] bg-black overflow-hidden select-none border-b border-white/10 sm:rounded-3xl sm:mb-4 sm:border sm:border-white/10 shadow-2xl">
+    <article ref={cardRef} className="relative w-full aspect-[9/16] max-h-[720px] bg-black overflow-hidden select-none border-b border-white/10 sm:rounded-3xl sm:mb-4 sm:border sm:border-white/10 shadow-2xl">
       {/* Video / Media Player */}
       <div 
         className="absolute inset-0 z-0 cursor-pointer flex items-center justify-center bg-black"
@@ -209,7 +268,6 @@ export const VideoPostCard = ({ post }) => {
               className="w-full h-full object-cover"
               playsInline
               loop
-              autoPlay
               preload="auto"
               crossOrigin="anonymous"
               muted={isMuted}

@@ -43,6 +43,8 @@ export const UserProfileScreen = () => {
   
   const { 
     currentUser, 
+    myMedia,
+    fetchMyMedia,
     userSubmissions, 
     deleteUserSubmission,
     deleteUserPost,
@@ -90,10 +92,11 @@ export const UserProfileScreen = () => {
 
   React.useEffect(() => {
     fetchLiveFollowCounts();
+    if (fetchMyMedia) fetchMyMedia();
   }, [currentUser?.username]);
 
   // Compute real dynamic stats from database
-  const realPostCount = posts.filter(p => p.creator?.username === currentUser.username).length;
+  const realPostCount = (myMedia && myMedia.length > 0) ? myMedia.length : posts.filter(p => p.creator?.username === currentUser.username).length;
   const realFollowing = liveFollowCounts.following;
   const realFollowers = liveFollowCounts.followers;
   const realWallet = currentUser.walletBalance || 0;
@@ -532,112 +535,117 @@ export const UserProfileScreen = () => {
             </div>
 
             {/* Live Submissions & Admin Central Verification Tracker */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-pink-400" />
-                  <span className="text-xs font-bold text-white font-heading">
-                    My Submissions & Admin Approvals ({userSubmissions?.length || 0})
-                  </span>
-                </div>
-                <button 
-                  onClick={() => navigate('/upload-video')}
-                  className="text-[11px] font-bold text-pink-400 hover:text-pink-300"
-                >
-                  + Submit Reel
-                </button>
-              </div>
-
-              {/* Workflow notice */}
-              <div className="p-3 rounded-2xl bg-purple-950/30 border border-purple-500/20 flex items-start gap-2.5 text-xs text-gray-300">
-                <Info className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                <p className="text-[10px] leading-relaxed">
-                  <strong className="text-white">Admin Approval Rule:</strong> When you post a video, central admin verifies it for community guidelines. Once approved, it appears live on the FunFlick feed and you become eligible for view-based wallet payouts.
-                </p>
-              </div>
-
-              {/* Submissions List */}
-              <div className="space-y-2.5">
-                {userSubmissions && userSubmissions.length > 0 ? (
-                  userSubmissions.map(item => (
-                    <div 
-                      key={item.id} 
-                      className="p-3.5 rounded-2xl bg-[#130d29] border border-white/5 space-y-2.5 hover:border-pink-500/30 transition shadow-md"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <img 
-                            src={item.thumbnail} 
-                            alt={item.title} 
-                            className="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0" 
-                          />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-xs font-bold text-white font-heading line-clamp-1">
-                              {item.title}
-                            </h4>
-                            <span className="text-[10px] text-pink-300 block mt-0.5">
-                              {item.category} · {item.date}
-                            </span>
-                            <span className="text-[10px] text-gray-400 block mt-0.5">
-                              Views: <strong className="text-white">{item.views}</strong> · Likes: {item.likes}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Delete / Withdraw Button */}
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Delete "${item.title}"? This will permanently remove it from your profile and platform feed.`)) {
-                              deleteUserSubmission(item.id);
-                            }
-                          }}
-                          className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 border border-white/5 transition shrink-0"
-                          title="Delete submission"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Admin Status Badge */}
-                      <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px]">
-                        <span className="text-gray-400">Central Admin Verification:</span>
-                        {item.status.includes('Pending') ? (
-                          <span className="px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                            <span>In Admin Review</span>
-                          </span>
-                        ) : item.status.includes('Approved') ? (
-                          <span className="px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                            <span>Approved & Live</span>
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-0.5 rounded-full font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                            {item.status}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Performance Reward from Admin if granted */}
-                      {item.rewardGranted && (
-                        <div className="p-2 rounded-xl bg-gradient-to-r from-emerald-950/40 to-teal-950/30 border border-emerald-500/30 flex items-center justify-between text-[11px]">
-                          <span className="text-gray-300">
-                            🎉 High Reach Bonus Awarded:
-                          </span>
-                          <span className="font-extrabold text-emerald-300 font-heading">
-                            +₹{item.rewardGranted.toLocaleString()} in Wallet
-                          </span>
-                        </div>
-                      )}
+            {/* Live Submissions & Admin Central Verification Tracker */}
+            {(() => {
+              const displaySubmissions = (myMedia && myMedia.length > 0) ? myMedia : (userSubmissions || []);
+              return (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-pink-400" />
+                      <span className="text-xs font-bold text-white font-heading">
+                        My Submissions & Admin Approvals ({displaySubmissions.length})
+                      </span>
                     </div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center text-xs text-gray-400 bg-[#130d29] rounded-2xl border border-white/5">
-                    <p>No video submissions yet. Upload your first reel above!</p>
+                    <button 
+                      onClick={() => navigate('/upload-video')}
+                      className="text-[11px] font-bold text-pink-400 hover:text-pink-300"
+                    >
+                      + Submit Reel
+                    </button>
                   </div>
-                )}
-              </div>
-            </div>
+
+                  {/* Workflow notice */}
+                  <div className="p-3 rounded-2xl bg-purple-950/30 border border-purple-500/20 flex items-start gap-2.5 text-xs text-gray-300">
+                    <Info className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                    <p className="text-[10px] leading-relaxed">
+                      <strong className="text-white">Admin Approval Rule:</strong> When you post a video, central admin verifies it for community guidelines. Once approved, it appears live on the FunFlick feed and you become eligible for view-based wallet payouts.
+                    </p>
+                  </div>
+
+                  {/* Submissions List */}
+                  <div className="space-y-2.5">
+                    {displaySubmissions.length > 0 ? (
+                      displaySubmissions.map(item => (
+                        <div 
+                          key={item.id} 
+                          className="p-3.5 rounded-2xl bg-[#130d29] border border-white/5 space-y-2.5 hover:border-pink-500/30 transition shadow-md"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <img 
+                                src={item.thumbnail || item.posterUrl || item.mediaUrl} 
+                                alt={item.title} 
+                                onError={(e) => {
+                                  e.currentTarget.onerror = null;
+                                  e.currentTarget.src = 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80';
+                                }}
+                                className="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0" 
+                              />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-xs font-bold text-white font-heading line-clamp-1">
+                                  {item.title || item.caption || 'My Video'}
+                                </h4>
+                                <span className="text-[10px] text-pink-300 block mt-0.5">
+                                  {item.category || 'Reel'} · {item.date || 'Recently'}
+                                </span>
+                                <span className="text-[10px] text-gray-400 block mt-0.5">
+                                  Views: <strong className="text-white">{item.views || 0}</strong> · Likes: {item.likes || 0}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Delete / Withdraw Button */}
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete "${item.title || 'this media'}"? This will permanently remove it from your profile and platform feed.`)) {
+                                  deleteUserPost(item.id);
+                                }
+                              }}
+                              className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 border border-white/5 transition shrink-0"
+                              title="Delete submission"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Admin Status Badge */}
+                          <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px]">
+                            <span className="text-gray-400">Central Admin Verification:</span>
+                            {item.status === 'Approved' ? (
+                              <span className="px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>Approved & Live</span>
+                              </span>
+                            ) : item.status === 'Rejected' ? (
+                              <span className="px-2.5 py-0.5 rounded-full font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                ❌ Rejected
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                <span>In Admin Review (Pending)</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Performance Reward from Admin if granted */}
+                          {item.rewardGranted && (
+                            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                              <span className="text-xs font-bold text-emerald-400">🎉 Bonus: ₹{item.rewardGranted}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-6 text-center text-xs text-gray-400 bg-white/5 rounded-2xl border border-white/5">
+                        No submissions yet. Post your first reel to send it for admin approval!
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
           </div>
         )}

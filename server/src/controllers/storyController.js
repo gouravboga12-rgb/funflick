@@ -4,11 +4,11 @@ export async function listStories(req, res) {
   try {
     const [rows] = await pool.query(`
       SELECT 
-        s.id, s.user_id, s.media_url, s.media_type, s.caption, s.music, s.sticker, s.created_at,
+        s.id, s.user_id, s.media_url, s.media_type, s.caption, s.music, s.sticker, s.created_at, s.status,
         u.name, u.username, u.avatar_url
       FROM stories s
       JOIN users u ON s.user_id = u.id
-      WHERE s.expires_at IS NULL OR s.expires_at > NOW()
+      WHERE (s.expires_at IS NULL OR s.expires_at > NOW()) AND s.status = 'Approved'
       ORDER BY s.created_at DESC
     `);
 
@@ -53,14 +53,26 @@ export async function createStory(req, res) {
       return res.status(400).json({ error: 'media_url is required' });
     }
 
+    const initialStatus = req.user.role === 'admin' ? 'Approved' : 'Pending';
+
     const [result] = await pool.query(
-      `INSERT INTO stories (user_id, media_url, media_type, caption, music, sticker, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))`,
-      [req.user.id, media_url, media_type, caption, music, sticker]
+      `INSERT INTO stories (user_id, media_url, media_type, caption, music, sticker, expires_at, status)
+       VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR), ?)`,
+      [req.user.id, media_url, media_type, caption, music, sticker, initialStatus]
     );
 
+    // Notify user of submission
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message)
+         VALUES (?, 'system', 'Story Submitted for Review', 'Your story has been submitted for Admin Verification.')`,
+        [req.user.id]
+      );
+    } catch (e) {}
+
     return res.status(201).json({
-      message: 'Story published successfully',
+      message: initialStatus === 'Approved' ? 'Story published live' : 'Story submitted for Admin Verification',
+      status: initialStatus,
       storyId: result.insertId,
       story: {
         id: result.insertId,

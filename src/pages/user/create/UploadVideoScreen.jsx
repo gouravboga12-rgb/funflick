@@ -59,7 +59,7 @@ const POPULAR_SOUNDS = [
 
 export const UploadVideoScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, creators, posts, setSubscriptionGateModalOpen, mediaLimits, showToast, fetchLiveVideos } = useApp();
+  const { currentUser, creators, posts, setSubscriptionGateModalOpen, mediaLimits, showToast, fetchLiveVideos, fetchMyMedia } = useApp();
 
   const maxReelLimit = mediaLimits?.maxReelDuration || 30;
   const [videoDuration, setVideoDuration] = useState(0);
@@ -312,8 +312,9 @@ export const UploadVideoScreen = () => {
       const resData = await res.json();
       setProgress(100);
 
-      // 4. Immediately refresh live feed from MySQL
+      // 4. Immediately refresh live feed and personal library from MySQL
       await fetchLiveVideos();
+      if (fetchMyMedia) await fetchMyMedia();
 
       setSubmittedItem({
         id: resData.videoId,

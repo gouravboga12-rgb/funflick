@@ -173,11 +173,41 @@ export async function initDatabase() {
         caption TEXT DEFAULT NULL,
         music VARCHAR(150) DEFAULT NULL,
         sticker VARCHAR(50) DEFAULT NULL,
+        status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         expires_at TIMESTAMP NULL,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       ) ENGINE=InnoDB;
     `);
+
+    // Migration helper: stories status column
+    try {
+      const [sCols] = await connection.query("SHOW COLUMNS FROM stories LIKE 'status'");
+      if (sCols.length === 0) {
+        await connection.query("ALTER TABLE stories ADD COLUMN status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending'");
+      }
+    } catch (e) {}
+
+    // Migration helper: ensure LONGTEXT for video and thumbnail urls
+    try {
+      await connection.query("ALTER TABLE videos MODIFY COLUMN thumbnail_url LONGTEXT");
+      await connection.query("ALTER TABLE videos MODIFY COLUMN video_url LONGTEXT");
+    } catch (e) {}
+
+    // Seed master administrator account in database if not present
+    try {
+      const bcrypt = (await import('bcryptjs')).default;
+      const [aRows] = await connection.query("SELECT id, role FROM users WHERE email = 'funflick0308@gmail.com'");
+      if (aRows.length === 0) {
+        const hash = await bcrypt.hash('FunFlicks@12', 10);
+        await connection.query(
+          "INSERT INTO users (name, username, email, password_hash, role, status) VALUES (?, ?, ?, ?, 'admin', 'Active')",
+          ['FunFlick Super Administrator', 'super_admin', 'funflick0308@gmail.com', hash]
+        );
+      } else if (aRows[0].role !== 'admin') {
+        await connection.query("UPDATE users SET role = 'admin' WHERE id = ?", [aRows[0].id]);
+      }
+    } catch (e) {}
 
     // Notifications table (real database events only)
     await connection.query(`

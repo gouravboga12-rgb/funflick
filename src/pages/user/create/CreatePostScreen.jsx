@@ -34,7 +34,7 @@ const SUGGESTED_LOCATIONS = [
 
 export const CreatePostScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, posts, setSubscriptionGateModalOpen, showToast, fetchLiveVideos } = useApp();
+  const { currentUser, posts, setSubscriptionGateModalOpen, showToast, fetchLiveVideos, fetchMyMedia } = useApp();
 
   const fileInputRef = useRef(null);
 
@@ -203,8 +203,9 @@ export const CreatePostScreen = () => {
       const resData = await res.json();
       setProgress(100);
 
-      // Refresh live feed
+      // Refresh live feed and user media library
       await fetchLiveVideos();
+      if (fetchMyMedia) await fetchMyMedia();
 
       setSubmittedItem({
         id: resData.videoId,

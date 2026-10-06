@@ -32,12 +32,18 @@ export const MyContentScreen = () => {
 
   const { 
     posts, 
+    myMedia,
+    fetchMyMedia,
     creatorVideos, 
     deleteUserPost, 
     updateUserPost, 
     currentUser, 
     showToast 
   } = useApp();
+
+  React.useEffect(() => {
+    if (fetchMyMedia) fetchMyMedia();
+  }, []);
 
   const [activeTab, setActiveTab] = useState(
     initialTab === 'liked' ? 'Liked' : initialTab === 'saved' ? 'Saved' : 'Posts'
@@ -139,8 +145,10 @@ export const MyContentScreen = () => {
       <div className="px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar border-b border-white/5">
         {tabs.map(t => {
           let count = 0;
-          if (t === 'Posts') count = posts.length;
-          else if (t === 'Videos') count = creatorVideos.length;
+          const userMediaList = myMedia || [];
+          const userVideos = userMediaList.filter(m => m.mediaType === 'video' || !m.mediaType);
+          if (t === 'Posts') count = userMediaList.length;
+          else if (t === 'Videos') count = userVideos.length;
           else if (t === 'Liked') count = likedPosts.length;
           else if (t === 'Saved') count = savedPosts.length;
 
@@ -169,32 +177,33 @@ export const MyContentScreen = () => {
 
       {/* Content List / Grid */}
       <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-3 pb-24">
-        {/* POSTS TAB */}
-        {activeTab === 'Posts' && (
-          posts.length === 0 ? (
+        {/* POSTS TAB - Displays all user's uploaded items strictly from their database records */}
+        {activeTab === 'Posts' && (() => {
+          const userMediaList = myMedia || [];
+          return userMediaList.length === 0 ? (
             <div className="p-12 text-center text-xs text-gray-400 space-y-3">
               <ImageIcon className="w-10 h-10 text-pink-400/60 mx-auto" />
-              <p className="font-bold text-white text-sm">No posts in your library</p>
-              <p className="text-gray-400 text-xs">Create your first comedy post to manage it here.</p>
+              <p className="font-bold text-white text-sm">No uploads in your library</p>
+              <p className="text-gray-400 text-xs">Upload your first reel or post to manage it here.</p>
               <button
-                onClick={() => navigate('/create/post')}
+                onClick={() => navigate('/create/video')}
                 className="mt-2 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md inline-flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Create New Post</span>
+                <span>Upload a Reel</span>
               </button>
             </div>
           ) : (
-            posts.map(post => (
+            userMediaList.map(item => (
               <div
-                key={post.id}
+                key={item.id}
                 className="p-3 rounded-2xl bg-[#140e2b] border border-white/5 flex items-center justify-between gap-3 hover:border-pink-500/30 transition shadow-sm"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="w-14 h-14 rounded-xl overflow-hidden bg-black/40 border border-white/10 shrink-0 relative flex items-center justify-center">
                     <img
-                      src={post.posterUrl || post.mediaUrl}
-                      alt={post.title}
+                      src={item.thumbnail || item.posterUrl || item.mediaUrl}
+                      alt={item.title}
                       onError={(e) => {
                         e.currentTarget.onerror = null;
                         e.currentTarget.src = 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80';
@@ -204,21 +213,19 @@ export const MyContentScreen = () => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <h4 className="text-xs font-bold text-white font-heading truncate">
-                      {post.title || post.caption?.slice(0, 30) || 'FunFlick Post'}
+                      {item.title || item.caption?.slice(0, 30) || 'FunFlick Post'}
                     </h4>
-                    <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                      {post.caption || 'No caption'}
-                    </p>
-                    <div className="flex items-center gap-3 text-[10px] text-gray-400 mt-1">
-                      <span className="flex items-center gap-1">
-                        <Eye className="w-3 h-3 text-pink-400" /> {post.viewsCount || '0'}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                        item.status === 'Approved'
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          : item.status === 'Rejected'
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                      }`}>
+                        {item.status === 'Approved' ? '✅ Live & Approved' : item.status === 'Rejected' ? '❌ Rejected' : '⏳ Pending Approval'}
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Heart className="w-3 h-3 text-rose-400" /> {post.likesCount || '0'}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MessageCircle className="w-3 h-3 text-blue-400" /> {post.commentsCount || '0'}
-                      </span>
+                      <span className="text-[10px] text-gray-400">{item.views || '0'} views</span>
                     </div>
                   </div>
                 </div>
@@ -226,15 +233,15 @@ export const MyContentScreen = () => {
                 {/* Edit & Delete Action Buttons */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
-                    onClick={() => handleOpenEdit(post)}
-                    title="Edit Post"
+                    onClick={() => handleOpenEdit(item)}
+                    title="Edit Item"
                     className="p-2.5 rounded-xl bg-white/5 text-gray-300 hover:text-white hover:bg-pink-500/20 hover:border-pink-500/30 border border-transparent transition active:scale-95"
                   >
                     <Edit3 className="w-4 h-4 text-pink-400" />
                   </button>
                   <button
-                    onClick={() => setDeletingItem(post)}
-                    title="Delete Post"
+                    onClick={() => setDeletingItem(item)}
+                    title="Delete Item"
                     className="p-2.5 rounded-xl bg-white/5 text-gray-300 hover:text-rose-400 hover:bg-rose-500/20 hover:border-rose-500/30 border border-transparent transition active:scale-95"
                   >
                     <Trash2 className="w-4 h-4 text-rose-400" />
@@ -242,12 +249,14 @@ export const MyContentScreen = () => {
                 </div>
               </div>
             ))
-          )
-        )}
+          );
+        })()}
 
         {/* VIDEOS TAB */}
-        {activeTab === 'Videos' && (
-          creatorVideos.length === 0 ? (
+        {activeTab === 'Videos' && (() => {
+          const userMediaList = myMedia || [];
+          const userVideos = userMediaList.filter(m => m.mediaType === 'video' || !m.mediaType);
+          return userVideos.length === 0 ? (
             <div className="p-12 text-center text-xs text-gray-400 space-y-3">
               <Film className="w-10 h-10 text-pink-400/60 mx-auto" />
               <p className="font-bold text-white text-sm">No videos uploaded yet</p>
@@ -260,7 +269,7 @@ export const MyContentScreen = () => {
               </button>
             </div>
           ) : (
-            creatorVideos.map(video => (
+            userVideos.map(video => (
               <div
                 key={video.id}
                 className="p-3 rounded-2xl bg-[#140e2b] border border-white/5 flex items-center justify-between gap-3 hover:border-pink-500/30 transition shadow-sm"
@@ -285,14 +294,14 @@ export const MyContentScreen = () => {
                       {video.title}
                     </h4>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                        video.status === 'Published' 
-                          ? 'bg-emerald-500/20 text-emerald-300' 
-                          : video.status === 'Pending Approval'
-                          ? 'bg-amber-500/20 text-amber-300'
-                          : 'bg-purple-500/20 text-purple-300'
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                        video.status === 'Approved' 
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                          : video.status === 'Rejected'
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                       }`}>
-                        {video.status}
+                        {video.status === 'Approved' ? '✅ Live & Approved' : video.status === 'Rejected' ? '❌ Rejected' : '⏳ Pending Approval'}
                       </span>
                       <span className="text-[10px] text-gray-400">{video.views || '0'} views</span>
                     </div>
@@ -317,8 +326,8 @@ export const MyContentScreen = () => {
                 </div>
               </div>
             ))
-          )
-        )}
+          );
+        })()}
 
         {/* LIKED TAB */}
         {activeTab === 'Liked' && (

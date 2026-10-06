@@ -85,12 +85,23 @@ export const AppProvider = ({ children }) => {
     fetchLiveStories();
     fetchLiveCreators();
 
+    // Check admin portal sync
+    const adminTok = localStorage.getItem('funflick_admin_token');
+    if (adminTok) {
+      fetchAdminPendingContent();
+      fetchAdminStats();
+    }
+
     const token = localStorage.getItem('funflick_token');
     if (!token) return;
 
+    fetchMyMedia();
     fetchLiveNotifications();
     fetchLiveConversations();
-    fetchAdminPendingContent();
+    if (!adminTok) {
+      fetchAdminPendingContent();
+      fetchAdminStats();
+    }
 
     fetch('/api/auth/me', {
       headers: {
@@ -143,11 +154,21 @@ export const AppProvider = ({ children }) => {
         return next;
       });
     }
+    // Refresh user-specific media and data
+    setTimeout(() => {
+      if (typeof fetchMyMedia === 'function') fetchMyMedia();
+      if (typeof fetchLiveNotifications === 'function') fetchLiveNotifications();
+      if (typeof fetchLiveConversations === 'function') fetchLiveConversations();
+    }, 50);
   };
 
   const logoutUser = () => {
     setIsAuthenticated(false);
     sessionStorage.removeItem('funflick_authenticated');
+    localStorage.removeItem('funflick_token');
+    sessionStorage.removeItem('funflick_token');
+    localStorage.removeItem('funflick_user');
+    setMyMedia([]);
   };
 
   // User video submissions (in-memory session state)
@@ -194,6 +215,15 @@ export const AppProvider = ({ children }) => {
 
   // Admin pending video approvals
   const [pendingApprovals, setPendingApprovals] = useState([]);
+
+  // Authenticated user's private media library (database-enforced isolation)
+  const [myMedia, setMyMedia] = useState([]);
+
+  // Live Admin overview metrics from database
+  const [adminStats, setAdminStats] = useState(null);
+
+  // Centralized single-video playback state (ensures only 1 reel plays at a time)
+  const [activePlayingVideoId, setActivePlayingVideoId] = useState(null);
 
   // Copyright & Plagiarism Dispute Reports
   const [copyrightReports, setCopyrightReports] = useState([]);
@@ -299,7 +329,7 @@ export const AppProvider = ({ children }) => {
   // Live Admin Pending Content synchronization with AWS MySQL backend
   const fetchAdminPendingContent = async () => {
     try {
-      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
       if (!token) return;
       const res = await fetch('/api/admin/content/pending', {
         headers: { Authorization: `Bearer ${token}` }
@@ -312,6 +342,47 @@ export const AppProvider = ({ children }) => {
       }
     } catch (err) {
       console.warn('Could not fetch live pending approvals:', err);
+    }
+  };
+
+  // Live Admin Overview Statistics synchronization with AWS MySQL backend
+  const fetchAdminStats = async () => {
+    try {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (!token) return;
+      const res = await fetch('/api/admin/stats', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.stats) {
+          setAdminStats(data.stats);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch admin platform stats:', err);
+    }
+  };
+
+  // Authenticated user's private media library synchronization
+  const fetchMyMedia = async () => {
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (!token) {
+        setMyMedia([]);
+        return;
+      }
+      const res = await fetch('/api/videos/my-media', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.media && Array.isArray(data.media)) {
+          setMyMedia(data.media);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch user private media library:', err);
     }
   };
 
@@ -1349,6 +1420,7 @@ export const AppProvider = ({ children }) => {
     setPendingApprovals(prev => prev.filter(a => String(a.id) !== String(postId)));
     setCreatorVideos(prev => prev.filter(cv => String(cv.id) !== String(postId)));
     setInfluencerMedia(prev => prev.filter(m => String(m.id) !== String(postId) && String(m.postId) !== String(postId)));
+    setMyMedia(prev => prev.filter(m => String(m.id) !== String(postId)));
     setCurrentUser(prev => ({
       ...prev,
       stats: {
@@ -1358,7 +1430,7 @@ export const AppProvider = ({ children }) => {
     }));
 
     // If backend video token exists, also call backend DELETE /api/videos/:id
-    const token = localStorage.getItem('funflick_token');
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
     if (token) {
       fetch(`/api/videos/${postId}`, {
         method: 'DELETE',
@@ -1371,9 +1443,17 @@ export const AppProvider = ({ children }) => {
 
   // Delete / withdraw submission from Influencer Hub
   const deleteUserSubmission = (submissionId) => {
-    setUserSubmissions(prev => prev.filter(s => s.id !== submissionId));
-    setPendingApprovals(prev => prev.filter(a => a.id !== submissionId));
-    setPosts(prev => prev.filter(p => p.id !== submissionId));
+    setUserSubmissions(prev => prev.filter(s => String(s.id) !== String(submissionId)));
+    setPendingApprovals(prev => prev.filter(a => String(a.id) !== String(submissionId)));
+    setPosts(prev => prev.filter(p => String(p.id) !== String(submissionId)));
+    setMyMedia(prev => prev.filter(m => String(m.id) !== String(submissionId)));
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (token) {
+      fetch(`/api/videos/${submissionId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {});
+    }
     showToast('🗑️ Submission removed from your library', 'info');
   };
 
@@ -1986,7 +2066,7 @@ export const AppProvider = ({ children }) => {
     setPendingApprovals(prev => prev.filter(a => a.id !== approvalId));
 
     try {
-      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
       if (token) {
         await fetch(`/api/admin/content/${approvalId}/moderate`, {
           method: 'PUT',
@@ -1994,7 +2074,10 @@ export const AppProvider = ({ children }) => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({ action }) // 'approve' | 'reject'
+          body: JSON.stringify({ 
+            action, 
+            itemType: target?.itemType || target?.contentType || 'video' 
+          })
         });
       }
     } catch (err) {
@@ -2027,9 +2110,6 @@ export const AppProvider = ({ children }) => {
       setNotifications(prev => [approvedNotif, ...prev]);
 
       showToast(`✅ Content approved and published live across FunFlick!`, 'success');
-
-      // Refresh live feed so approved post appears for everyone immediately
-      await fetchLiveVideos();
     } else {
       setUserSubmissions(prev => prev.map(s => {
         if (s.id === approvalId) {
@@ -2043,6 +2123,17 @@ export const AppProvider = ({ children }) => {
       }));
       showToast('Video submission rejected.', 'info');
     }
+
+    // Refresh all live collections after moderation
+    try {
+      await Promise.all([
+        fetchLiveVideos(),
+        fetchLiveStories(),
+        fetchAdminPendingContent(),
+        fetchAdminStats(),
+        fetchMyMedia()
+      ]);
+    } catch (e) {}
   };
 
   // Reset demo data
@@ -2163,7 +2254,15 @@ export const AppProvider = ({ children }) => {
         updateMediaLimits,
         isAuthenticated,
         loginUser,
-        logoutUser
+        logoutUser,
+        myMedia,
+        setMyMedia,
+        fetchMyMedia,
+        adminStats,
+        setAdminStats,
+        fetchAdminStats,
+        activePlayingVideoId,
+        setActivePlayingVideoId
       }}
     >
       {children}
