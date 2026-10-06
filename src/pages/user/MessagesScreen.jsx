@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
 import { 
@@ -10,14 +10,18 @@ import {
   CheckCheck,
   X,
   FileVideo,
-  Paperclip
+  Paperclip,
+  UserPlus,
+  MessageCircle,
+  Loader2
 } from 'lucide-react';
 
 const MAX_MEDIA_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB max limit
 
 export const MessagesScreen = () => {
   const navigate = useNavigate();
-  const { conversations, sendMessage, showToast } = useApp();
+  const location = useLocation();
+  const { conversations, sendMessage, openOrCreateConversation, currentUser, showToast } = useApp();
 
   const [activeConvId, setActiveConvId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,12 +29,73 @@ export const MessagesScreen = () => {
   const [attachedMedia, setAttachedMedia] = useState(null); // { type, url, name, size }
   const fileInputRef = useRef(null);
 
+  // Database searched users
+  const [dbUsers, setDbUsers] = useState([]);
+  const [isSearchingDb, setIsSearchingDb] = useState(false);
+
+  // Auto-open chat if navigated with ?user=username
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const targetUsername = params.get('user');
+    if (targetUsername) {
+      // Find or create conversation with this user
+      const convId = openOrCreateConversation(targetUsername);
+      if (convId) {
+        setActiveConvId(convId);
+      }
+    }
+  }, [location.search]);
+
+  // Live search users in MySQL database when user types in search box
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setDbUsers([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingDb(true);
+      try {
+        const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(trimmed)}&limit=10`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.users && Array.isArray(data.users)) {
+            // Filter out current logged in user
+            setDbUsers(data.users.filter(u => u.username !== currentUser?.username));
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to search database users:', err);
+      } finally {
+        setIsSearchingDb(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, currentUser]);
+
   const activeConv = conversations.find(c => c.id === activeConvId);
 
   const filteredConvs = conversations.filter(c => 
     c.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.user.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleStartChatWithDbUser = (user) => {
+    const convId = openOrCreateConversation({
+      username: user.username,
+      name: user.name || user.username,
+      avatar: user.avatar || '/brand/default-avatar.svg'
+    });
+    if (convId) {
+      setActiveConvId(convId);
+      setSearchQuery('');
+    }
+  };
 
   const handleMediaSelect = (e) => {
     const file = e.target.files?.[0];
@@ -258,8 +323,65 @@ export const MessagesScreen = () => {
             </div>
           </div>
 
+          {/* Search Results from Real Database */}
+          {searchQuery.trim() && (
+            <div className="px-4 py-2 space-y-2">
+              <div className="flex items-center justify-between text-[11px] text-gray-400 font-semibold px-1">
+                <span>All Users on FunFlick</span>
+                {isSearchingDb && <Loader2 className="w-3 h-3 text-pink-400 animate-spin" />}
+              </div>
+
+              {dbUsers.length > 0 ? (
+                <div className="bg-[#120a24] rounded-2xl p-1.5 border border-white/5 divide-y divide-white/5 space-y-0.5">
+                  {dbUsers.map(u => (
+                    <div
+                      key={u.id}
+                      onClick={() => handleStartChatWithDbUser(u)}
+                      className="p-2 rounded-xl hover:bg-white/5 cursor-pointer transition flex items-center justify-between group"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={u.avatar || '/brand/default-avatar.svg'}
+                          alt={u.name}
+                          className="w-9 h-9 rounded-full object-cover border border-white/10 group-hover:border-pink-500/50"
+                        />
+                        <div>
+                          <h4 className="text-xs font-bold text-white group-hover:text-pink-300 transition">
+                            {u.name || u.username}
+                          </h4>
+                          <span className="text-[10px] text-gray-400 block">
+                            @{u.username} {u.followersCount ? `· ${u.followersCount} followers` : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="px-2.5 py-1 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/20 text-[11px] font-semibold group-hover:bg-pink-500 group-hover:text-white transition flex items-center gap-1"
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        <span>Chat</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                !isSearchingDb && (
+                  <div className="p-3 rounded-2xl bg-[#140c26] text-center text-xs text-gray-400">
+                    No matching users found for "{searchQuery}"
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
           {/* Conversations */}
           <div className="flex-1 overflow-y-auto no-scrollbar p-2 space-y-1">
+            {!searchQuery.trim() && (
+              <div className="px-2 py-1 text-[11px] font-semibold text-gray-400">
+                Recent Chats
+              </div>
+            )}
             {filteredConvs.map(conv => (
               <div
                 key={conv.id}

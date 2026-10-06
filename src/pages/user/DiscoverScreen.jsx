@@ -15,20 +15,22 @@ import {
   Zap, 
   Sparkles, 
   Languages, 
-  Globe,
-  Film,
-  Smile,
+  Globe, 
+  Film, 
+  Smile, 
   Play, 
-  ChevronRight,
-  TrendingUp,
-  X,
-  Eye,
-  Heart
+  ChevronRight, 
+  TrendingUp, 
+  X, 
+  Eye, 
+  Heart,
+  MessageCircle,
+  UserPlus
 } from 'lucide-react';
 
 export const DiscoverScreen = () => {
   const navigate = useNavigate();
-  const { creators, posts, toggleFollowCreator } = useApp();
+  const { creators, posts, toggleFollowCreator, currentUser } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Trending');
@@ -355,13 +357,16 @@ export const DiscoverScreen = () => {
           )}
         </div>
 
-        {/* Popular Creators Section (Screen 4) */}
+        {/* Available Creators & People to Follow Section */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-white font-heading">
-              Popular Creators
-            </h3>
-            <span className="text-xs font-bold text-pink-400">See All &gt;</span>
+            <div>
+              <h3 className="text-sm font-bold text-white font-heading flex items-center gap-1.5">
+                <UserPlus className="w-4 h-4 text-pink-400" />
+                <span>People & Creators to Follow</span>
+              </h3>
+              <span className="text-[10px] text-gray-400">Discover real users, follow them and connect directly</span>
+            </div>
           </div>
 
           {filteredCreators.length === 0 ? (
@@ -370,46 +375,73 @@ export const DiscoverScreen = () => {
             </div>
           ) : (
             <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
-              {filteredCreators.map(creator => (
-                <div
-                  key={creator.id}
-                  className="w-32 bg-[#18122c] border border-white/10 rounded-2xl p-3 flex flex-col items-center text-center shrink-0 space-y-2 hover:border-pink-500/30 transition group"
-                >
-                  <div 
-                    onClick={() => navigate(`/creator/${creator.username}`)}
-                    className="w-14 h-14 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 cursor-pointer group-hover:scale-105 transition-transform"
+              {filteredCreators.map(creator => {
+                const isSelf = creator.username === currentUser?.username || creator.isSelf;
+                return (
+                  <div
+                    key={creator.id || creator.username}
+                    className="w-36 bg-[#18122c] border border-white/10 rounded-2xl p-3 flex flex-col items-center text-center shrink-0 space-y-2 hover:border-pink-500/30 transition group shadow-md"
                   >
-                    <img
-                      src={creator.avatar}
-                      alt={creator.name}
-                      className="w-full h-full rounded-full object-cover border border-[#18122c]"
-                    />
-                  </div>
+                    <div 
+                      onClick={() => navigate(isSelf ? '/profile' : `/creator/${creator.username}`)}
+                      className="w-14 h-14 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 cursor-pointer group-hover:scale-105 transition-transform"
+                    >
+                      <img
+                        src={creator.avatar || '/brand/default-avatar.svg'}
+                        alt={creator.name}
+                        className="w-full h-full rounded-full object-cover border border-[#18122c]"
+                      />
+                    </div>
 
-                  <div 
-                    onClick={() => navigate(`/creator/${creator.username}`)}
-                    className="cursor-pointer"
-                  >
-                    <h4 className="text-xs font-bold text-white truncate max-w-[100px] font-heading">
-                      {creator.username}
-                    </h4>
-                    <span className="text-[10px] text-gray-400 block">
-                      {creator.stats?.followers || '1.5M'}
-                    </span>
-                  </div>
+                    <div 
+                      onClick={() => navigate(isSelf ? '/profile' : `/creator/${creator.username}`)}
+                      className="cursor-pointer w-full px-1"
+                    >
+                      <h4 className="text-xs font-bold text-white truncate font-heading">
+                        {creator.name || creator.username}
+                      </h4>
+                      <span className="text-[10px] text-pink-300 block truncate">
+                        @{creator.username}
+                      </span>
+                      <span className="text-[9px] text-gray-400 block mt-0.5">
+                        {creator.stats?.followers || '0'} followers
+                      </span>
+                    </div>
 
-                  <button
-                    onClick={() => toggleFollowCreator(creator.username)}
-                    className={`w-full py-1.5 rounded-xl text-xs font-bold transition ${
-                      creator.isFollowing
-                        ? 'bg-white/15 text-white'
-                        : 'bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white hover:opacity-90'
-                    }`}
-                  >
-                    {creator.isFollowing ? 'Following' : 'Follow'}
-                  </button>
-                </div>
-              ))}
+                    <div className="w-full space-y-1.5 pt-1">
+                      {isSelf ? (
+                        <button
+                          onClick={() => navigate('/profile')}
+                          className="w-full py-1.5 rounded-xl text-xs font-bold bg-white/10 text-gray-300 hover:text-white"
+                        >
+                          My Account
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => toggleFollowCreator(creator.username)}
+                            className={`w-full py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 ${
+                              creator.isFollowing
+                                ? 'bg-white/15 text-white'
+                                : 'bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white hover:opacity-90 shadow-sm'
+                            }`}
+                          >
+                            <span>{creator.isFollowing ? 'Following' : 'Follow'}</span>
+                          </button>
+
+                          <button
+                            onClick={() => navigate(`/messages?user=${creator.username}`)}
+                            className="w-full py-1 rounded-xl text-[11px] font-semibold bg-pink-500/10 text-pink-300 border border-pink-500/20 hover:bg-pink-500/20 transition flex items-center justify-center gap-1"
+                          >
+                            <MessageCircle className="w-3 h-3 text-pink-400" />
+                            <span>Message</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

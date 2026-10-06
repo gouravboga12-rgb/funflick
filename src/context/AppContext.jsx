@@ -476,6 +476,7 @@ export const AppProvider = ({ children }) => {
     fetchLiveVideos();
     fetchLiveStories();
     fetchLiveNotifications();
+    fetchLiveCreators();
     fetchSubscriptionPlans();
     fetchPlatformSettings();
   }, []);
@@ -588,26 +589,63 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
-  // Toggle follow creator (sync with followingList & dynamic count)
-  const toggleFollowCreator = (username) => {
-    let nowFollowing = false;
+  // Fetch live active creators/users from MySQL backend for Discover, Tagging, and Messaging
+  const fetchLiveCreators = async () => {
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const res = await fetch('/api/users?limit=30', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.users && Array.isArray(data.users)) {
+          const mapped = data.users.map(u => ({
+            id: u.id,
+            name: u.name,
+            username: u.username,
+            avatar: u.avatar || '/brand/default-avatar.svg',
+            isFollowing: Boolean(u.isFollowing),
+            isSelf: Boolean(u.isSelf),
+            stats: {
+              followers: u.followersCount > 999 ? `${(u.followersCount / 1000).toFixed(1)}K` : String(u.followersCount)
+            }
+          }));
+          setCreators(mapped);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch live creators from MySQL:', err);
+    }
+  };
+
+  // Toggle follow creator (sync with followingList, backend MySQL & dynamic count)
+  const toggleFollowCreator = async (username) => {
+    if (!username) return;
+    if (currentUser?.username === username) {
+      showToast('You cannot follow yourself', 'info');
+      return;
+    }
+
+    let targetCreator = creators.find(c => c.username === username);
+    const willFollow = targetCreator ? !targetCreator.isFollowing : true;
+
+    // Optimistic UI updates
     setCreators(prev => prev.map(c => {
       if (c.username === username) {
-        nowFollowing = !c.isFollowing;
-        return { ...c, isFollowing: nowFollowing };
+        return { ...c, isFollowing: willFollow };
       }
       return c;
     }));
 
     setPosts(prev => prev.map(p => {
       if (p.creator?.username === username) {
-        return { ...p, isFollowing: nowFollowing };
+        return { ...p, isFollowing: willFollow };
       }
       return p;
     }));
 
     setFollowingList(prev => {
-      if (nowFollowing) {
+      if (willFollow) {
         if (!prev.some(u => u.username === username)) {
           const creatorObj = creators.find(c => c.username === username) || {
             username,
@@ -626,11 +664,25 @@ export const AppProvider = ({ children }) => {
       ...prev,
       stats: {
         ...prev.stats,
-        following: nowFollowing ? (Number(prev.stats?.following) || 0) + 1 : Math.max(0, (Number(prev.stats?.following) || 1) - 1)
+        following: willFollow ? (Number(prev.stats?.following) || 0) + 1 : Math.max(0, (Number(prev.stats?.following) || 1) - 1)
       }
     }));
 
-    showToast(nowFollowing ? `Following @${username}` : `Unfollowed @${username}`, 'info');
+    showToast(willFollow ? `Following @${username}` : `Unfollowed @${username}`, 'info');
+
+    // Sync with backend /api/follows
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (token) {
+      try {
+        const endpoint = willFollow ? `/api/follows/${username}/follow` : `/api/follows/${username}/unfollow`;
+        await fetch(endpoint, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (err) {
+        console.error('Failed to sync follow state to backend:', err);
+      }
+    }
   };
 
   // Accept Follow Request (Instagram style)
@@ -1329,6 +1381,40 @@ export const AppProvider = ({ children }) => {
     }, 1500);
   };
 
+  // Open or create conversation with a user (by username or user object)
+  const openOrCreateConversation = (targetUser) => {
+    if (!targetUser) return null;
+    const username = typeof targetUser === 'string' ? targetUser : targetUser.username;
+    const name = typeof targetUser === 'string' ? targetUser : (targetUser.name || targetUser.username);
+    const avatar = (typeof targetUser === 'object' && targetUser.avatar) ? targetUser.avatar : '/brand/default-avatar.svg';
+
+    // Check if conversation already exists
+    const existing = conversations.find(c => c.user?.username?.toLowerCase() === username.toLowerCase());
+    if (existing) {
+      return existing.id;
+    }
+
+    // Create new conversation
+    const newConvId = 'conv_' + username + '_' + Date.now();
+    const newConv = {
+      id: newConvId,
+      user: {
+        name,
+        username,
+        avatar,
+        isVerified: false,
+        isOnline: true
+      },
+      lastMessage: 'Tap here to start chatting',
+      time: 'Just now',
+      unreadCount: 0,
+      messages: []
+    };
+
+    setConversations(prev => [newConv, ...prev]);
+    return newConvId;
+  };
+
   // Submit Video for Central Admin Verification (Unified Influencer Workflow) - FREE FOR ALL USERS!
   const submitVideoForVerification = (videoData) => {
 
@@ -1978,6 +2064,7 @@ export const AppProvider = ({ children }) => {
         fetchLiveVideos,
         fetchLiveStories,
         fetchLiveNotifications,
+        fetchLiveCreators,
         blockedUsers,
         blockUser,
         unblockUser,
@@ -1997,6 +2084,7 @@ export const AppProvider = ({ children }) => {
         submitStoryForVerification,
         sendPerformanceReward,
         sendMessage,
+        openOrCreateConversation,
         processAdminPayout,
         processCustomAdminPayout,
         requestCreatorPayout,

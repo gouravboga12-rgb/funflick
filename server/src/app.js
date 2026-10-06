@@ -13,6 +13,7 @@ import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import payoutRoutes from './routes/payoutRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/stories', storyRoutes);

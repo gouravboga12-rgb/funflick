@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../../context/AppContext';
 import { 
@@ -24,14 +24,6 @@ import confetti from 'canvas-confetti';
 import { UploadSuccessMonetizationModal } from '../../../components/common/UploadSuccessMonetizationModal';
 import { uploadFileToS3 } from '../../../services/s3UploadService';
 
-const SUGGESTED_CREATORS = [
-  'pavani_official',
-  'srilatha_16',
-  'fun_bros',
-  'chill_mammu',
-  'rohan_comedy'
-];
-
 const SUGGESTED_LOCATIONS = [
   'Hyderabad Film City',
   'Jubilee Hills, Hyderabad',
@@ -44,6 +36,30 @@ export const CreatePostScreen = () => {
   const { currentUser, setSubscriptionGateModalOpen, showToast, fetchLiveVideos } = useApp();
 
   const fileInputRef = useRef(null);
+
+  // Real users for tagging from database
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
+
+  useEffect(() => {
+    const fetchUsersForTagging = async () => {
+      try {
+        const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+        const res = await fetch('/api/users?limit=25', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.users && Array.isArray(data.users)) {
+            setAvailableUsers(data.users.filter(u => u.username !== currentUser?.username));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch users for tagging:', e);
+      }
+    };
+    fetchUsersForTagging();
+  }, [currentUser]);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [mediaUrl, setMediaUrl] = useState('');
@@ -336,8 +352,8 @@ export const CreatePostScreen = () => {
           />
         </div>
 
-        {/* Tag People (Instagram Feature) */}
-        <div className="space-y-1.5">
+        {/* Tag People (Instagram Feature) - Real Database Users */}
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5 text-pink-400" />
@@ -345,25 +361,49 @@ export const CreatePostScreen = () => {
             </label>
             <span className="text-[10px] text-pink-300 font-semibold">{taggedUsers.length} tagged</span>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {SUGGESTED_CREATORS.map(username => {
-              const isTagged = taggedUsers.includes(username);
-              return (
-                <button
-                  key={username}
-                  type="button"
-                  onClick={() => handleToggleTag(username)}
-                  className={`px-3 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
-                    isTagged
-                      ? 'bg-pink-500 text-white shadow-sm'
-                      : 'bg-white/5 border border-white/10 text-gray-300 hover:text-white'
-                  }`}
-                >
-                  <span>@{username}</span>
-                  {isTagged && <Check className="w-3 h-3 stroke-[3]" />}
-                </button>
-              );
-            })}
+
+          {availableUsers.length > 5 && (
+            <input
+              type="text"
+              value={tagSearchQuery}
+              onChange={e => setTagSearchQuery(e.target.value)}
+              placeholder="Search user to tag..."
+              className="w-full bg-[#100a22] text-white text-[11px] px-3 py-1.5 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500 placeholder-gray-500"
+            />
+          )}
+
+          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto no-scrollbar">
+            {availableUsers
+              .filter(u => !tagSearchQuery || u.username?.toLowerCase().includes(tagSearchQuery.toLowerCase()) || u.name?.toLowerCase().includes(tagSearchQuery.toLowerCase()))
+              .map(user => {
+                const isTagged = taggedUsers.includes(user.username);
+                return (
+                  <button
+                    key={user.id || user.username}
+                    type="button"
+                    onClick={() => handleToggleTag(user.username)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+                      isTagged
+                        ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-sm'
+                        : 'bg-white/5 border border-white/10 text-gray-300 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <img 
+                      src={user.avatar || '/brand/default-avatar.svg'} 
+                      alt="" 
+                      className="w-4 h-4 rounded-full object-cover" 
+                    />
+                    <span>@{user.username}</span>
+                    {user.name && user.name !== user.username && (
+                      <span className="text-[10px] opacity-75 font-normal">({user.name})</span>
+                    )}
+                    {isTagged && <Check className="w-3 h-3 stroke-[3]" />}
+                  </button>
+                );
+              })}
+            {availableUsers.length === 0 && (
+              <span className="text-[11px] text-gray-500 italic">No other registered users found to tag</span>
+            )}
           </div>
         </div>
 
