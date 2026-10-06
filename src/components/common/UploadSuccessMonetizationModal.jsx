@@ -128,16 +128,6 @@ export const UploadSuccessMonetizationModal = ({
             </div>
           )}
 
-          <button
-            onClick={() => {
-              if (onClose) onClose();
-              navigate('/admin/content');
-            }}
-            className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-gray-200 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
-          >
-            <span>Go to Admin Approval Desk (/admin/content)</span>
-            <ExternalLink className="w-3.5 h-3.5 text-pink-400" />
-          </button>
 
           <button
             onClick={() => {
