@@ -12,26 +12,37 @@ import {
   Heart, 
   TrendingUp, 
   Sparkles,
-  MessageSquare
+  MessageSquare,
+  Building2,
+  Smartphone,
+  Copy,
+  ShieldCheck,
+  Check,
+  Loader2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export const PayoutModal = ({ payout, isOpen, onClose }) => {
-  const { processCustomAdminPayout, showToast } = useApp();
-  const [payAmount, setPayAmount] = useState(payout?.remainingAmount || 2500);
-  const [settleScope, setSettleScope] = useState('live'); // 'live' | 'snapshot'
-  const [adminNote, setAdminNote] = useState(payout?.customRateNote || '');
+export const PayoutModal = ({ creator, isOpen, onClose, onPaidSuccess }) => {
+  const { showToast } = useApp();
+  const [payAmount, setPayAmount] = useState(2500);
+  const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
+  const [adminReference, setAdminReference] = useState('');
+  const [adminNote, setAdminNote] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [copiedField, setCopiedField] = useState(null);
 
-  if (!isOpen || !payout) return null;
+  if (!isOpen || !creator) return null;
 
-  const requestedViews = payout.requestedViews || 80000;
-  const requestedLikes = payout.requestedLikes || 9500;
-  const currentLiveViews = payout.currentLiveViews || Math.round(requestedViews * 1.15);
-  const currentLiveLikes = payout.currentLiveLikes || Math.round(requestedLikes * 1.12);
-  const viewGrowth = Math.max(0, currentLiveViews - requestedViews);
+  const payoutDetails = creator.payoutDetails;
 
-  const handleConfirm = (e) => {
+  const copyToClipboard = (text, fieldName) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    showToast(`Copied ${fieldName}: ${text}`, 'info');
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleMarkAsPaid = async (e) => {
     e.preventDefault();
     const num = parseInt(payAmount, 10);
     if (!num || num <= 0) {
@@ -40,22 +51,45 @@ export const PayoutModal = ({ payout, isOpen, onClose }) => {
     }
 
     setProcessing(true);
-    setTimeout(() => {
-      processCustomAdminPayout(payout.id, {
-        amount: num,
-        settleScope,
-        note: adminNote
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+
+    try {
+      const res = await fetch('/api/payouts/admin/mark-paid', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          creator_id: creator.id,
+          amount: num,
+          payment_method: paymentMethod,
+          admin_reference: adminReference.trim() || `UTR_${Date.now()}`,
+          notes: adminNote.trim()
+        })
       });
-      setProcessing(false);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to mark payout as paid');
+      }
+
+      showToast(`✅ ₹${num.toLocaleString()} marked as paid to @${creator.username}! Notification sent.`, 'success');
       try {
         confetti({
-          particleCount: 90,
+          particleCount: 100,
           spread: 80,
           origin: { y: 0.6 }
         });
       } catch (e) {}
+
+      if (onPaidSuccess) onPaidSuccess();
       onClose();
-    }, 600);
+    } catch (err) {
+      showToast(err.message || 'Payment mark failed', 'error');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (
@@ -74,9 +108,9 @@ export const PayoutModal = ({ payout, isOpen, onClose }) => {
             </div>
             <div>
               <h3 className="font-bold text-white text-base font-heading">
-                Evaluate & Disburse Payout
+                Creator Payout Disbursal
               </h3>
-              <p className="text-[11px] text-pink-300">Admin Custom Evaluation & Settled Views Engine</p>
+              <p className="text-[11px] text-pink-300">Manual Outside Transfer & Mark as Paid</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-full bg-white/10 hover:bg-white/15 text-gray-300 transition">
@@ -84,139 +118,117 @@ export const PayoutModal = ({ payout, isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Creator Info & VIP Badge */}
-        <div className="p-3 rounded-2xl bg-[#181033] border border-white/10 flex items-center justify-between">
+        {/* Creator Info */}
+        <div className="p-3.5 rounded-2xl bg-[#181033] border border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
-              src={payout.creatorAvatar} 
-              alt={payout.creator} 
-              className="w-10 h-10 rounded-full object-cover border-2 border-pink-500/50" 
+              src={creator.avatar || '/brand/default-avatar.svg'} 
+              alt={creator.name} 
+              className="w-11 h-11 rounded-2xl object-cover border-2 border-pink-500/50" 
             />
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-white text-xs">{payout.creator}</span>
+                <span className="font-bold text-white text-xs">{creator.name}</span>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-extrabold flex items-center gap-1">
                   <Crown className="w-3 h-3 text-amber-400" />
-                  <span>VIP Influencer</span>
+                  <span>{creator.planName || 'VIP Creator'}</span>
                 </span>
               </div>
-              <span className="text-[11px] text-pink-300 block font-medium">
-                {payout.postTitle}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Requested Snapshot vs Live Performance Comparison */}
-        <div className="p-3.5 rounded-2xl bg-[#160f2e] border border-white/10 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              Performance Metrics Comparison
-            </span>
-            <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>+{viewGrowth.toLocaleString()} Views Growth!</span>
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            {/* Snapshot */}
-            <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 space-y-1">
-              <span className="text-[10px] text-gray-400 block font-medium">📌 Requested Snapshot</span>
-              <div className="flex items-center justify-between text-white font-bold">
-                <span className="flex items-center gap-1 text-[11px]">
-                  <Eye className="w-3 h-3 text-purple-400" />
-                  {requestedViews.toLocaleString()}
-                </span>
-                <span className="flex items-center gap-1 text-[11px] text-pink-300">
-                  <Heart className="w-3 h-3 text-pink-400" />
-                  {requestedLikes.toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            {/* Live Count */}
-            <div className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-950/40 to-teal-950/40 border border-emerald-500/30 space-y-1">
-              <span className="text-[10px] text-emerald-300 block font-medium">🚀 Current Live Count</span>
-              <div className="flex items-center justify-between text-white font-extrabold">
-                <span className="flex items-center gap-1 text-[11px] text-emerald-200">
-                  <Eye className="w-3 h-3 text-emerald-400" />
-                  {currentLiveViews.toLocaleString()}
-                </span>
-                <span className="flex items-center gap-1 text-[11px] text-pink-300">
-                  <Heart className="w-3 h-3 text-pink-400" />
-                  {currentLiveLikes.toLocaleString()}
-                </span>
+              <span className="text-[11px] text-pink-300">@{creator.username}</span>
+              <div className="flex items-center gap-3 text-[10px] text-gray-400 mt-1">
+                <span>Views: <strong className="text-white">{creator.metrics?.totalViews || 0}</strong></span>
+                <span>Likes: <strong className="text-white">{creator.metrics?.totalLikes || 0}</strong></span>
+                <span>Videos: <strong className="text-white">{creator.metrics?.videosCount || 0}</strong></span>
               </div>
             </div>
           </div>
 
-          {/* Settlement Scope Radios */}
-          <div className="space-y-1.5 pt-1">
-            <span className="text-[11px] font-bold text-gray-300 block">Settlement Scope:</span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <label 
-                className={`p-2 rounded-xl border text-[11px] cursor-pointer transition flex items-center gap-2 ${
-                  settleScope === 'live' 
-                    ? 'bg-pink-500/20 border-pink-500 text-white font-bold' 
-                    : 'bg-white/5 border-white/10 text-gray-400'
-                }`}
-              >
-                <input 
-                  type="radio" 
-                  name="settleScope" 
-                  checked={settleScope === 'live'} 
-                  onChange={() => setSettleScope('live')}
-                  className="accent-pink-500"
-                />
-                <span>Settle All Live ({currentLiveViews.toLocaleString()})</span>
-              </label>
-
-              <label 
-                className={`p-2 rounded-xl border text-[11px] cursor-pointer transition flex items-center gap-2 ${
-                  settleScope === 'snapshot' 
-                    ? 'bg-pink-500/20 border-pink-500 text-white font-bold' 
-                    : 'bg-white/5 border-white/10 text-gray-400'
-                }`}
-              >
-                <input 
-                  type="radio" 
-                  name="settleScope" 
-                  checked={settleScope === 'snapshot'} 
-                  onChange={() => setSettleScope('snapshot')}
-                  className="accent-pink-500"
-                />
-                <span>Settle Requested ({requestedViews.toLocaleString()})</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Bank & Payout Summary */}
-        <div className="p-3 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2.5">
-            <Building className="w-4 h-4 text-emerald-400 shrink-0" />
-            <div>
-              <span className="font-bold text-white block">Direct Creator Wallet / Bank</span>
-              <span className="text-[10px] text-gray-400">Account verified · Instant Settlement</span>
-            </div>
-          </div>
           <div className="text-right">
-            <span className="text-[10px] text-gray-400 block">Total Paid So Far</span>
-            <span className="text-xs font-bold text-emerald-400">₹{(payout.paidAmount || 0).toLocaleString()}</span>
+            <span className="text-[10px] text-gray-400 block">Wallet Balance</span>
+            <span className="text-sm font-extrabold text-emerald-400 font-heading">
+              ₹{(creator.walletBalance || 0).toLocaleString()}
+            </span>
           </div>
         </div>
 
-        {/* Form Inputs */}
-        <form onSubmit={handleConfirm} className="space-y-3.5">
-          {/* Custom Editable Amount Field */}
+        {/* Submitted Payout Destination Details (For Admin to Transfer) */}
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/40 to-pink-950/30 border border-pink-500/30 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Destination Account Details for Manual Transfer:</span>
+            </span>
+            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-white/10 text-pink-300">
+              {payoutDetails ? (payoutDetails.payout_method || 'Bank') : 'Fallback: Registered Contact'}
+            </span>
+          </div>
+
+          {payoutDetails ? (
+            <div className="space-y-1.5 text-xs text-gray-300 bg-black/40 p-3 rounded-xl border border-white/5">
+              {payoutDetails.payout_method === 'bank' ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span>Bank Name: <strong className="text-white">{payoutDetails.bank_name}</strong></span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Account No: <strong className="text-white font-mono">{payoutDetails.account_number}</strong></span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(payoutDetails.account_number, 'Account Number')}
+                      className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-pink-300 flex items-center gap-1"
+                    >
+                      {copiedField === 'Account Number' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>Copy</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>IFSC Code: <strong className="text-white font-mono">{payoutDetails.ifsc_code}</strong></span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(payoutDetails.ifsc_code, 'IFSC Code')}
+                      className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-pink-300 flex items-center gap-1"
+                    >
+                      {copiedField === 'IFSC Code' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>Copy</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span>UPI ID: <strong className="text-white font-mono">{payoutDetails.upi_id}</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(payoutDetails.upi_id, 'UPI ID')}
+                    className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-pink-300 flex items-center gap-1"
+                  >
+                    {copiedField === 'UPI ID' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>Copy</span>
+                  </button>
+                </div>
+              )}
+              <div className="text-[10px] text-gray-400 pt-1 border-t border-white/5">
+                Phone: {payoutDetails.phone || creator.phone} • Email: {payoutDetails.email || creator.email}
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-amber-200 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 space-y-1">
+              <p>Creator closed without submitting bank/UPI. Use their registered registration details:</p>
+              <p>Phone: <strong className="text-white font-mono">{creator.phone || 'Not provided'}</strong></p>
+              <p>Email: <strong className="text-white">{creator.email}</strong></p>
+            </div>
+          )}
+        </div>
+
+        {/* Form Inputs for Mark as Paid */}
+        <form onSubmit={handleMarkAsPaid} className="space-y-3.5">
+          {/* Payout Amount Field */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-bold text-gray-200">
-                Custom Payout Amount (₹)
+                Payout Amount to Disburse (₹)
               </label>
               <div className="flex items-center gap-1">
-                {[1000, 2000, 3000, 5000].map(val => (
+                {[500, 1000, 2000, 5000].map(val => (
                   <button
                     key={val}
                     type="button"
@@ -232,29 +244,57 @@ export const PayoutModal = ({ payout, isOpen, onClose }) => {
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-base">₹</span>
               <input
                 type="number"
+                required
                 value={payAmount}
                 onChange={e => setPayAmount(e.target.value)}
-                placeholder="Enter custom rate..."
                 className="w-full bg-[#181033] text-white text-base font-extrabold pl-8 pr-4 py-2.5 rounded-2xl border border-white/15 focus:outline-none focus:border-pink-500 shadow-inner"
               />
             </div>
           </div>
 
-          {/* Admin Note / Rate Justification */}
-          <div>
-            <label className="text-xs font-bold text-gray-300 block mb-1">
-              Admin Evaluation Note (Visible to Creator)
-            </label>
-            <div className="relative">
-              <MessageSquare className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-3" />
+          {/* Payment Method Used */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs font-bold text-gray-300 block mb-1">
+                Payment Method Used
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={e => setPaymentMethod(e.target.value)}
+                className="w-full bg-[#181033] text-white text-xs px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500"
+              >
+                <option value="Bank Transfer">Bank Transfer (IMPS/NEFT)</option>
+                <option value="UPI Transfer">UPI Transfer (GPay/PhonePe)</option>
+                <option value="Direct Cash">Direct Cash</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-gray-300 block mb-1">
+                UTR / Reference No.
+              </label>
               <input
                 type="text"
-                value={adminNote}
-                onChange={e => setAdminNote(e.target.value)}
-                placeholder="e.g. ₹500 base rate + ₹150 viral engagement bonus applied!"
-                className="w-full bg-[#181033] text-white text-xs pl-9 pr-3 py-2 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500"
+                value={adminReference}
+                onChange={e => setAdminReference(e.target.value)}
+                placeholder="e.g. UTR12345678 or Txn ID"
+                className="w-full bg-[#181033] text-white text-xs px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500 font-mono"
               />
             </div>
+          </div>
+
+          {/* Admin Note */}
+          <div>
+            <label className="text-xs font-bold text-gray-300 block mb-1">
+              Admin Note / Milestone Details
+            </label>
+            <input
+              type="text"
+              value={adminNote}
+              onChange={e => setAdminNote(e.target.value)}
+              placeholder="e.g. Payout for reaching 10,000 views & 10,000 likes milestone"
+              className="w-full bg-[#181033] text-white text-xs px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500"
+            />
           </div>
 
           {/* Action Buttons */}
@@ -272,11 +312,11 @@ export const PayoutModal = ({ payout, isOpen, onClose }) => {
               className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-indigo-600 text-white font-bold text-xs hover:opacity-95 disabled:opacity-50 shadow-xl shadow-emerald-500/20 transition flex items-center justify-center gap-2"
             >
               {processing ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
               ) : (
                 <>
-                  <span>Disburse ₹{parseInt(payAmount || 0, 10).toLocaleString()}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Mark as Paid (₹{parseInt(payAmount || 0, 10).toLocaleString()})</span>
                 </>
               )}
             </button>

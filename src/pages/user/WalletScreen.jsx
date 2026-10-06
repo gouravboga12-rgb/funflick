@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
+import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDetailsModal';
 import { 
   ChevronLeft, 
   Wallet, 
@@ -13,47 +14,59 @@ import {
   Building, 
   X,
   CreditCard,
-  Plus
+  Plus,
+  Building2,
+  Smartphone,
+  ShieldCheck,
+  Loader2,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const WalletScreen = () => {
   const navigate = useNavigate();
-  const { transactions, currentUser, setCurrentUser, showToast } = useApp();
+  const { currentUser, showToast } = useApp();
 
   const [activeFilter, setActiveFilter] = useState('All');
-  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState('10000');
-  const [bankAccount, setBankAccount] = useState('HDFC Bank - 501004928174');
-  const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+  const [payoutHistory, setPayoutHistory] = useState([]);
+  const [registeredDetails, setRegisteredDetails] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredTransactions = transactions.filter(t => {
-    if (activeFilter === 'Credits') return t.type === 'credit';
-    if (activeFilter === 'Debits') return t.type === 'debit';
-    return true;
-  });
-
-  const handleWithdraw = (e) => {
-    e.preventDefault();
-    const amountNum = parseInt(withdrawAmount, 10);
-    if (!amountNum || amountNum <= 0) return;
-    if (amountNum > currentUser.availableBalance) {
-      showToast('Amount exceeds available balance', 'error');
+  const loadData = async () => {
+    setIsLoading(true);
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (!token) {
+      setIsLoading(false);
       return;
     }
 
-    setSubmittingWithdraw(true);
-    setTimeout(() => {
-      setSubmittingWithdraw(false);
-      setWithdrawModalOpen(false);
-      setCurrentUser(prev => ({
-        ...prev,
-        walletBalance: prev.walletBalance - amountNum,
-        availableBalance: prev.availableBalance - amountNum
-      }));
-      showToast(`Withdrawal of ₹${amountNum.toLocaleString()} initiated to ${bankAccount.split('-')[0]}!`, 'success');
-    }, 800);
+    try {
+      const [histRes, detRes] = await Promise.all([
+        fetch('/api/payouts/my-history', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/payouts/details', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
+      if (histRes.ok) {
+        const d = await histRes.json();
+        setPayoutHistory(d.payouts || []);
+      }
+      if (detRes.ok) {
+        const d = await detRes.json();
+        setRegisteredDetails(d.payoutDetails);
+      }
+    } catch (err) {
+      console.warn('Failed to load wallet data:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const latestPaid = payoutHistory.find(p => p.status === 'Paid');
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#090514] min-h-full select-none">
@@ -63,26 +76,48 @@ export const WalletScreen = () => {
           <ChevronLeft className="w-6 h-6" />
         </button>
         <span className="text-sm font-bold text-white font-heading">
-          FunFlick Wallet
+          FunFlick Wallet & Payouts
         </span>
         <button 
-          onClick={() => showToast('Simulated ₹5,000 creator bonus credited to wallet!', 'success')}
+          onClick={() => setPayoutModalOpen(true)}
           className="p-1.5 text-xs text-pink-400 font-bold hover:text-pink-300 flex items-center gap-1"
         >
-          <Plus className="w-4 h-4" />
-          <span>Top Up</span>
+          <Building2 className="w-4 h-4" />
+          <span>Bank/UPI</span>
         </button>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto no-scrollbar p-5 space-y-5">
+      <div className="flex-1 overflow-y-auto no-scrollbar p-5 space-y-4">
         
-        {/* Top Gradient Card (Inspired by Screen 11) */}
+        {/* Latest Paid Alert Notification Banner */}
+        {latestPaid && (
+          <div className="p-4 rounded-3xl bg-gradient-to-r from-emerald-950/80 via-purple-950/70 to-pink-950/60 border border-emerald-500/40 text-emerald-200 text-xs shadow-xl flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-extrabold text-white text-xs block">
+                Payout Disbursed by Admin
+              </span>
+              <p className="text-[11px] leading-relaxed text-gray-200">
+                <strong>₹{Number(latestPaid.amount).toLocaleString()}</strong> has been marked as paid to your registered payout account. Please check your bank account or UPI account using the payment details you submitted.
+              </p>
+              <div className="text-[10px] text-emerald-300 flex items-center gap-2 pt-0.5">
+                <span>Method: <strong>{latestPaid.payment_method}</strong></span>
+                <span>•</span>
+                <span>Ref: <strong>{latestPaid.admin_reference || 'ADMIN_DISBURSED'}</strong></span>
+                <span>•</span>
+                <span>Date: {new Date(latestPaid.payment_date || latestPaid.created_at).toLocaleDateString('en-IN')}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Top Balance Card */}
         <div className="relative rounded-3xl p-5 bg-gradient-to-tr from-[#ff007a] via-[#ff4b2b] to-[#7928ca] text-white shadow-2xl shadow-pink-500/25 overflow-hidden">
           <div className="absolute top-0 right-0 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-white/80">Total Wallet Balance</span>
+            <span className="text-xs font-semibold text-white/80">Creator Earnings & Wallet</span>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-black/30 backdrop-blur-md border border-white/15">
               INR (₹)
             </span>
@@ -94,93 +129,122 @@ export const WalletScreen = () => {
             </h2>
           </div>
 
-          {/* Sub-balances: Pending & Available */}
+          {/* Sub-balances: Available */}
           <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/20">
             <div>
-              <span className="text-[10px] text-white/70 block">Available to Withdraw</span>
+              <span className="text-[10px] text-white/70 block">Total Payouts Received</span>
               <span className="text-sm font-bold font-heading">
-                ₹{(currentUser.availableBalance || currentUser.walletBalance || 0).toLocaleString()}
+                ₹{payoutHistory.filter(p => p.status === 'Paid').reduce((acc, curr) => acc + Number(curr.amount || 0), 0).toLocaleString()}
               </span>
             </div>
             <div>
-              <span className="text-[10px] text-white/70 block">Pending Clearance</span>
-              <span className="text-sm font-bold font-heading text-amber-200">
-                ₹{(currentUser.pendingBalance || 0).toLocaleString()}
+              <span className="text-[10px] text-white/70 block">Registered Mode</span>
+              <span className="text-sm font-bold font-heading text-amber-200 uppercase">
+                {registeredDetails?.payout_method || 'Bank / UPI'}
               </span>
             </div>
           </div>
 
-          {/* Withdraw CTA Button */}
+          {/* Bank / UPI Update CTA */}
           <button
-            onClick={() => setWithdrawModalOpen(true)}
+            onClick={() => setPayoutModalOpen(true)}
             className="w-full mt-4 py-2.5 rounded-2xl bg-white text-gray-900 font-extrabold text-xs shadow-lg hover:bg-gray-100 active:scale-[0.99] transition flex items-center justify-center gap-1.5"
           >
-            <ArrowUpRight className="w-4 h-4" />
-            <span>Withdraw to Bank Account</span>
+            <Building2 className="w-4 h-4 text-pink-600" />
+            <span>{registeredDetails ? 'Update Bank / UPI Payout Details' : 'Add Bank / UPI Payout Details'}</span>
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center justify-between pt-1">
-          <h3 className="text-sm font-bold text-white font-heading">
-            Transaction History
-          </h3>
-
-          <div className="flex items-center gap-1 bg-[#18122f] p-1 rounded-xl border border-white/10 text-[11px]">
-            {['All', 'Credits', 'Debits'].map(f => (
-              <button
-                key={f}
-                onClick={() => setActiveFilter(f)}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition ${
-                  activeFilter === f
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-sm'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                {f}
-              </button>
-            ))}
+        {/* Registered Payout Info Card */}
+        <div className="p-4 rounded-2xl bg-[#140e2b] border border-white/10 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Registered Payout Destination</span>
+            </span>
+            <button
+              onClick={() => setPayoutModalOpen(true)}
+              className="text-[11px] text-pink-400 font-bold hover:underline"
+            >
+              Edit
+            </button>
           </div>
+
+          {registeredDetails ? (
+            <div className="text-xs text-gray-300 space-y-1">
+              {registeredDetails.payout_method === 'bank' ? (
+                <>
+                  <p>Bank: <strong className="text-white">{registeredDetails.bank_name}</strong></p>
+                  <p>Account: <strong className="text-white font-mono">{registeredDetails.account_number}</strong></p>
+                  <p>IFSC: <strong className="text-white font-mono">{registeredDetails.ifsc_code}</strong></p>
+                </>
+              ) : (
+                <p>UPI ID: <strong className="text-white font-mono">{registeredDetails.upi_id}</strong></p>
+              )}
+              <p className="text-[10px] text-gray-400">Alert Phone: {registeredDetails.phone} • Email: {registeredDetails.email}</p>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400">
+              No custom bank/UPI registered yet. In case of payouts, admins will reach out to your registered phone ({currentUser?.phone || 'on file'}) & email ({currentUser?.email || 'on file'}).
+            </p>
+          )}
         </div>
 
-        {/* Transactions List */}
-        <div className="space-y-2.5">
-          {filteredTransactions.map(tx => {
-            const isCredit = tx.type === 'credit';
-            return (
-              <div
-                key={tx.id}
-                className="p-3.5 rounded-2xl bg-[#140e2b] border border-white/5 hover:border-white/10 transition flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                    isCredit ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-                  }`}>
-                    {isCredit ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+        {/* Payout & Settlement History */}
+        <div className="space-y-2 pt-1">
+          <h3 className="text-sm font-bold text-white font-heading">
+            Payout History & Disbursals
+          </h3>
+
+          {isLoading ? (
+            <div className="p-8 text-center text-gray-400">
+              <Loader2 className="w-6 h-6 animate-spin text-pink-500 mx-auto mb-2" />
+              <span className="text-xs">Loading payout history...</span>
+            </div>
+          ) : payoutHistory.length === 0 ? (
+            <div className="p-8 text-center text-xs text-gray-400 bg-[#140e2b] rounded-2xl border border-white/5">
+              <Building2 className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+              <p className="font-semibold text-gray-300 mb-1">No payout records yet</p>
+              <p className="text-[11px] text-gray-500">
+                When admins review your views & likes performance and process a payout, it will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {payoutHistory.map(p => (
+                <div
+                  key={p.id}
+                  className="p-3.5 rounded-2xl bg-[#140e2b] border border-white/5 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                      <ArrowDownLeft className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white">
+                        Creator Payout Disbursed
+                      </h4>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        Via {p.payment_method} • Ref: {p.admin_reference || 'ADMIN_TRANSFER'}
+                      </p>
+                      <span className="text-[10px] text-gray-500 block">
+                        {new Date(p.payment_date || p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
                   </div>
 
-                  <div>
-                    <h4 className="text-xs font-bold text-white font-heading line-clamp-1">
-                      {tx.title}
-                    </h4>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{tx.desc}</p>
-                    <span className="text-[10px] text-gray-500 mt-0.5 block">{tx.date}</span>
+                  <div className="text-right">
+                    <span className="text-sm font-extrabold text-emerald-400 font-heading block">
+                      +₹{Number(p.amount).toLocaleString()}
+                    </span>
+                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 inline-block mt-1">
+                      {p.status}
+                    </span>
                   </div>
                 </div>
-
-                <div className="text-right">
-                  <span className={`text-sm font-extrabold font-heading ${
-                    isCredit ? 'text-emerald-400' : 'text-white'
-                  }`}>
-                    {tx.formattedAmount}
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300 block mt-1">
-                    {tx.status}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          )}
         </div>
 
       </div>
@@ -188,62 +252,12 @@ export const WalletScreen = () => {
       {/* Bottom Navigation */}
       <BottomNavigation />
 
-      {/* Withdrawal Modal */}
-      {withdrawModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, y: 100 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-md bg-[#130d29] border border-white/10 rounded-t-[32px] sm:rounded-3xl p-5 shadow-2xl space-y-4"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="font-bold text-white text-base font-heading">Withdraw Funds</h3>
-              <button onClick={() => setWithdrawModalOpen(false)} className="p-1 rounded-full bg-white/10 text-gray-300">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleWithdraw} className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1.5">
-                  Withdrawal Amount (₹)
-                </label>
-                <input
-                  type="number"
-                  value={withdrawAmount}
-                  onChange={e => setWithdrawAmount(e.target.value)}
-                  max={currentUser.availableBalance}
-                  className="w-full bg-[#18122f] text-white text-lg font-bold px-4 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500"
-                />
-                <span className="text-[11px] text-gray-400 mt-1 block">
-                  Available: ₹{currentUser.availableBalance.toLocaleString()}
-                </span>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1.5">
-                  Select Payout Destination
-                </label>
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3">
-                  <Building className="w-5 h-5 text-pink-400" />
-                  <div className="text-xs">
-                    <span className="font-bold text-white block">HDFC Bank Limited</span>
-                    <span className="text-gray-400">A/C: **** **** 4921 · IFSC: HDFC000189</span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={submittingWithdraw}
-                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xs tracking-wide shadow-xl hover:opacity-95"
-              >
-                {submittingWithdraw ? 'Processing Transfer...' : 'Confirm Withdrawal'}
-              </button>
-            </form>
-          </motion.div>
-        </div>
-      )}
+      {/* Creator Bank / UPI Details Modal */}
+      <CreatorPayoutDetailsModal
+        isOpen={payoutModalOpen}
+        onClose={() => setPayoutModalOpen(false)}
+        onSaved={loadData}
+      />
     </div>
   );
 };

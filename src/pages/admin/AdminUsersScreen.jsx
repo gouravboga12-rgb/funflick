@@ -1,33 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useApp } from '../../context/AppContext';
-import { Search, ShieldAlert, ShieldCheck, MoreVertical, Ban, CheckCircle2 } from 'lucide-react';
+import { Search, ShieldAlert, ShieldCheck, MoreVertical, Ban, CheckCircle2, Loader2 } from 'lucide-react';
 
 export const AdminUsersScreen = () => {
   const { showToast } = useApp();
   const [search, setSearch] = useState('');
-  
-  const [users, setUsers] = useState([
-    { id: 'u1', name: 'Srilatha Reddy', username: 'srilatha_16', email: 'srilatha@funflick.com', subscription: 'Monthly (₹199)', wallet: '₹1,25,430', joined: '12 Jan 2026', status: 'Active', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80' },
-    { id: 'u2', name: 'Rahul Sharma', username: 'rahul_vibe', email: 'rahul@gmail.com', subscription: 'None', wallet: '₹450', joined: '04 Feb 2026', status: 'Active', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80' },
-    { id: 'u3', name: 'Sneha Patel', username: 'sneha_laughs', email: 'sneha@yahoo.com', subscription: 'Yearly (₹699)', wallet: '₹3,800', joined: '18 Dec 2025', status: 'Active', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80' },
-    { id: 'u4', name: 'Kiran Kumar', username: 'kiran_k', email: 'kiran.k@rediff.com', subscription: 'None', wallet: '₹0', joined: '22 Mar 2026', status: 'Suspended', avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=100&q=80' }
-  ]);
+  const [users, setUsers] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const toggleUserStatus = (userId) => {
-    setUsers(prev => prev.map(u => {
-      if (u.id === userId) {
-        const nextStatus = u.status === 'Active' ? 'Suspended' : 'Active';
-        showToast(`User @${u.username} marked as ${nextStatus}`, 'info');
-        return { ...u, status: nextStatus };
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      const res = await fetch('/api/admin/users', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data.users || []);
+        setTotalCount(data.totalCount || 0);
       }
-      return u;
-    }));
+    } catch (err) {
+      console.error('Failed to fetch admin users:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const toggleUserStatus = async (userId) => {
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/status`, {
+        method: 'PATCH',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: data.status } : u));
+        showToast(data.message || 'Status updated', 'success');
+      }
+    } catch (err) {
+      showToast('Failed to update status', 'error');
+    }
   };
 
   const filtered = users.filter(u => 
-    u.name.toLowerCase().includes(search.toLowerCase()) || 
-    u.username.toLowerCase().includes(search.toLowerCase())
+    (u.name && u.name.toLowerCase().includes(search.toLowerCase())) || 
+    (u.username && u.username.toLowerCase().includes(search.toLowerCase())) ||
+    (u.email && u.email.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -44,7 +70,7 @@ export const AdminUsersScreen = () => {
           />
         </div>
         <span className="text-xs text-gray-400 font-semibold">
-          Total Registered Users: 12,540
+          Total Registered Users: {totalCount}
         </span>
       </div>
 
@@ -63,48 +89,63 @@ export const AdminUsersScreen = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-gray-200">
-              {filtered.map(u => (
-                <tr key={u.id} className="hover:bg-white/5 transition">
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-2.5">
-                      <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover" />
-                      <div>
-                        <span className="font-bold text-white block">{u.name}</span>
-                        <span className="text-[10px] text-pink-300">@{u.username}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 text-gray-400">{u.email}</td>
-                  <td className="py-3.5 px-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      u.subscription.includes('None') ? 'bg-white/5 text-gray-400' : 'bg-pink-500/20 text-pink-300 border border-pink-500/30'
-                    }`}>
-                      {u.subscription}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 font-bold text-white font-heading">{u.wallet}</td>
-                  <td className="py-3.5 px-4 text-gray-400">{u.joined}</td>
-                  <td className="py-3.5 px-4">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      u.status === 'Active' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
-                    }`}>
-                      {u.status}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => toggleUserStatus(u.id)}
-                      className={`px-3 py-1 rounded-xl text-xs font-bold transition ${
-                        u.status === 'Active'
-                          ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'
-                          : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
-                      }`}
-                    >
-                      {u.status === 'Active' ? 'Suspend' : 'Activate'}
-                    </button>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-gray-400">
+                    <Loader2 className="w-6 h-6 animate-spin text-pink-500 mx-auto mb-2" />
+                    <span>Loading registered users from database...</span>
                   </td>
                 </tr>
-              ))}
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-gray-400">
+                    <span>No registered users found</span>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map(u => (
+                  <tr key={u.id} className="hover:bg-white/5 transition">
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-2.5">
+                        <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover" />
+                        <div>
+                          <span className="font-bold text-white block">{u.name}</span>
+                          <span className="text-[10px] text-pink-300">@{u.username}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-gray-400">{u.email}</td>
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        u.subscription.includes('None') ? 'bg-white/5 text-gray-400' : 'bg-pink-500/20 text-pink-300 border border-pink-500/30'
+                      }`}>
+                        {u.subscription}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-white font-heading">{u.wallet}</td>
+                    <td className="py-3.5 px-4 text-gray-400">{u.joined}</td>
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        u.status === 'Active' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                      }`}>
+                        {u.status}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        onClick={() => toggleUserStatus(u.id)}
+                        className={`px-3 py-1 rounded-xl text-xs font-bold transition ${
+                          u.status === 'Active'
+                            ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'
+                            : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                        }`}
+                      >
+                        {u.status === 'Active' ? 'Suspend' : 'Activate'}
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

@@ -8,6 +8,7 @@ export async function listVideos(req, res) {
     let query = `
       SELECT 
         v.id, v.title, v.description, v.category, v.video_url, v.thumbnail_url,
+        v.media_type, v.hashtags, v.location, v.audio_title,
         v.duration, v.views_count, v.likes_count, v.created_at,
         (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id) AS comments_count,
         (SELECT COUNT(*) FROM likes l WHERE l.video_id = v.id AND l.user_id = ?) AS user_liked,
@@ -35,33 +36,62 @@ export async function listVideos(req, res) {
 
 export async function createVideo(req, res) {
   try {
-    const { title, description, category, video_url, thumbnail_url, duration } = req.body;
+    const { 
+      title, 
+      description, 
+      category, 
+      video_url, 
+      thumbnail_url, 
+      duration,
+      media_type = 'video',
+      hashtags = '',
+      location = '',
+      audio_title = ''
+    } = req.body;
 
     if (!title || !video_url) {
-      return res.status(400).json({ error: 'Title and video_url are required' });
+      return res.status(400).json({ error: 'Title and media URL are required' });
     }
 
     const [result] = await pool.query(
-      `INSERT INTO videos (user_id, title, description, category, video_url, thumbnail_url, duration)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO videos (user_id, title, description, category, video_url, thumbnail_url, duration, media_type, hashtags, location, audio_title)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user.id,
         title,
         description || '',
         category || 'Comedy',
         video_url,
-        thumbnail_url || null,
+        thumbnail_url || video_url,
         duration || 0,
+        media_type || 'video',
+        hashtags || '',
+        location || '',
+        audio_title || ''
       ]
     );
 
     return res.status(201).json({
-      message: 'Video published successfully',
+      message: 'Published successfully to FunFlick live feed',
       videoId: result.insertId,
+      video: {
+        id: result.insertId,
+        user_id: req.user.id,
+        title,
+        description,
+        category,
+        video_url,
+        thumbnail_url: thumbnail_url || video_url,
+        media_type,
+        duration,
+        likes_count: 0,
+        views_count: 0,
+        created_at: new Date().toISOString()
+      }
     });
   } catch (err) {
     console.error('Create video error:', err);
-    return res.status(500).json({ error: 'Failed to publish video' });
+    return res.status(500).json({ error: 'Failed to publish content' });
   }
 }
 
@@ -83,6 +113,19 @@ export async function toggleLike(req, res) {
     } else {
       await pool.query('INSERT INTO likes (user_id, video_id) VALUES (?, ?)', [userId, id]);
       await pool.query('UPDATE videos SET likes_count = likes_count + 1 WHERE id = ?', [id]);
+
+      // Notify video author if not self
+      try {
+        const [vRows] = await pool.query('SELECT user_id, title FROM videos WHERE id = ?', [id]);
+        if (vRows.length > 0 && vRows[0].user_id !== userId) {
+          await pool.query(
+            `INSERT INTO notifications (user_id, actor_id, type, title, message, target_id)
+             VALUES (?, ?, 'like', 'New Like', ?, ?)`,
+            [vRows[0].user_id, userId, `liked your post "${vRows[0].title || 'FunFlick post'}"`, id]
+          );
+        }
+      } catch (err) {}
+
       return res.json({ liked: true });
     }
   } catch (err) {
@@ -133,6 +176,18 @@ export async function addComment(req, res) {
       `INSERT INTO comments (user_id, video_id, content) VALUES (?, ?, ?)`,
       [req.user.id, id, commentText]
     );
+
+    // Notify video author if not self
+    try {
+      const [vRows] = await pool.query('SELECT user_id, title FROM videos WHERE id = ?', [id]);
+      if (vRows.length > 0 && vRows[0].user_id !== req.user.id) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, actor_id, type, title, message, target_id)
+           VALUES (?, ?, 'comment', 'New Comment', ?, ?)`,
+          [vRows[0].user_id, req.user.id, `commented: "${commentText.slice(0, 40)}"`, id]
+        );
+      }
+    } catch (err) {}
 
     const [userRows] = await pool.query(
       `SELECT id, name, username, avatar_url FROM users WHERE id = ?`,

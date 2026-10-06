@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { PUBLISHING_PLANS } from '../../data/mockData';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
+import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDetailsModal';
 import { 
   ChevronLeft, 
   Crown, 
@@ -25,11 +26,18 @@ export const SubscriptionScreen = () => {
     currentUser, 
     recordSubscriptionPayment,
     showToast,
-    publishingPlans = PUBLISHING_PLANS 
+    publishingPlans = PUBLISHING_PLANS,
+    fetchSubscriptionPlans
   } = useApp();
+
+  useEffect(() => {
+    if (fetchSubscriptionPlans) fetchSubscriptionPlans();
+  }, []);
+
   const activePlans = (publishingPlans && publishingPlans.length > 0) ? publishingPlans : PUBLISHING_PLANS;
   const [selectedPlanId, setSelectedPlanId] = useState(() => activePlans[0]?.id || 'monthly');
   const [processing, setProcessing] = useState(false);
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
 
   const handlePurchase = (planToPurchase) => {
     const selectedPlan = planToPurchase || activePlans.find(p => p.id === selectedPlanId) || activePlans[0];
@@ -69,6 +77,7 @@ export const SubscriptionScreen = () => {
               paymentId,
               paymentMethod: 'Razorpay Test (Captured)'
             });
+            setShowPayoutModal(true);
             try {
               confetti({
                 particleCount: 120,
@@ -111,6 +120,7 @@ export const SubscriptionScreen = () => {
         paymentMethod: 'Razorpay Test (Simulated)'
       });
       setProcessing(false);
+      setShowPayoutModal(true);
       try {
         confetti({
           particleCount: 120,
@@ -310,6 +320,12 @@ export const SubscriptionScreen = () => {
 
       {/* Bottom Navigation */}
       <BottomNavigation />
+
+      {/* Creator Payout & Bank Details Registration Modal */}
+      <CreatorPayoutDetailsModal
+        isOpen={showPayoutModal}
+        onClose={() => setShowPayoutModal(false)}
+      />
     </div>
   );
 };

@@ -19,26 +19,23 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UploadSuccessMonetizationModal } from '../../../components/common/UploadSuccessMonetizationModal';
-
-const SAMPLE_STORY_PHOTOS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=600&q=80'
-];
+import { uploadFileToS3 } from '../../../services/s3UploadService';
 
 export const CreateStoryScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, submitStoryForVerification, setSubscriptionGateModalOpen, mediaLimits, showToast } = useApp();
+  const { currentUser, setSubscriptionGateModalOpen, mediaLimits, showToast, fetchLiveStories } = useApp();
 
   const maxStoryDuration = mediaLimits?.maxStoryDuration || 15;
   const fileInputRef = useRef(null);
 
-  const [mediaUrl, setMediaUrl] = useState(SAMPLE_STORY_PHOTOS[0]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [mediaUrl, setMediaUrl] = useState('');
   const [caption, setCaption] = useState('');
   const [selectedMusic, setSelectedMusic] = useState('🎵 Telugu Comedy Beats - Trending');
   const [selectedSticker, setSelectedSticker] = useState('😂');
 
   const [isUploading, setIsUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [submittedItem, setSubmittedItem] = useState(null);
 
   const stickers = ['😂', '🔥', '❤️', '🎉', '🍿', '💯', '✨', '☕'];
@@ -51,13 +48,19 @@ export const CreateStoryScreen = () => {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       setMediaUrl(URL.createObjectURL(file));
-      showToast('Story photo updated! 📸');
+      showToast('Story media selected from device! 📸');
     }
   };
 
-  const handlePublish = (e) => {
-    e.preventDefault();
+  const handlePublish = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!selectedFile && !mediaUrl) {
+      showToast('Please select a photo or video from your device first!', 'error');
+      return;
+    }
+
     if (!currentUser.hasPublishingSubscription) {
       setSubscriptionGateModalOpen(true);
       showToast('⚠️ Creator Publishing Plan required to post stories!', 'error');
@@ -65,25 +68,66 @@ export const CreateStoryScreen = () => {
     }
 
     setIsUploading(true);
-    setTimeout(() => {
-      setIsUploading(false);
-      const res = submitStoryForVerification({
-        mediaUrl,
-        caption
+    setProgress(5);
+
+    try {
+      let finalMediaUrl = mediaUrl;
+      if (selectedFile) {
+        finalMediaUrl = await uploadFileToS3(selectedFile, 'stories', (pct) => {
+          setProgress(Math.min(90, Math.max(5, pct)));
+        });
+      }
+
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const isVideo = selectedFile?.type?.startsWith('video');
+
+      const res = await fetch('/api/stories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          media_url: finalMediaUrl,
+          media_type: isVideo ? 'video' : 'image',
+          caption,
+          music: selectedMusic,
+          sticker: selectedSticker
+        })
       });
 
-      if (res.success) {
-        setSubmittedItem(res.submission);
-        try {
-          confetti({
-            particleCount: 70,
-            spread: 60,
-            origin: { y: 0.6 }
-          });
-        } catch (e) {}
-        showToast('📤 Story submitted for Admin Review!', 'success');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to save story');
       }
-    }, 700);
+
+      const resData = await res.json();
+      setProgress(100);
+
+      // Refresh live stories from MySQL
+      if (fetchLiveStories) await fetchLiveStories();
+
+      setSubmittedItem({
+        id: resData.storyId,
+        mediaUrl: finalMediaUrl,
+        contentType: isVideo ? 'video' : 'image',
+        title: caption || 'New Story'
+      });
+
+      try {
+        confetti({
+          particleCount: 70,
+          spread: 60,
+          origin: { y: 0.6 }
+        });
+      } catch (e) {}
+      showToast('📤 Story uploaded to AWS S3 & published live!', 'success');
+    } catch (err) {
+      console.error('Story upload error:', err);
+      showToast(err.message || 'Story upload failed', 'error');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -117,49 +161,85 @@ export const CreateStoryScreen = () => {
 
       {/* Center Story Visual Canvas */}
       <div className="relative flex-1 m-3 rounded-3xl overflow-hidden bg-gray-900 border border-white/10 flex items-center justify-center shadow-2xl">
-        <img
-          src={mediaUrl}
-          alt="Story Canvas"
-          className="w-full h-full object-cover"
-        />
+        {mediaUrl ? (
+          <>
+            <img
+              src={mediaUrl}
+              alt="Story Canvas"
+              className="w-full h-full object-cover"
+            />
 
-        {/* Floating Sticker */}
-        {selectedSticker && (
-          <div className="absolute top-1/4 right-8 text-5xl drop-shadow-2xl animate-bounce">
-            {selectedSticker}
+            {/* Floating Sticker */}
+            {selectedSticker && (
+              <div className="absolute top-1/4 right-8 text-5xl drop-shadow-2xl animate-bounce">
+                {selectedSticker}
+              </div>
+            )}
+
+            {/* Music Track Sticker */}
+            {selectedMusic && (
+              <div className="absolute top-6 left-6 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white text-xs font-semibold flex items-center gap-1.5 border border-white/20">
+                <Music className="w-3.5 h-3.5 text-pink-400" />
+                <span className="truncate max-w-[180px]">{selectedMusic}</span>
+              </div>
+            )}
+
+            {/* Caption Overlay */}
+            {caption && (
+              <div className="absolute bottom-6 left-4 right-4 text-center">
+                <span className="inline-block px-3 py-1.5 rounded-2xl bg-black/60 backdrop-blur-md text-white text-xs font-medium border border-white/20">
+                  {caption}
+                </span>
+              </div>
+            )}
+
+            {/* Change Photo Floating Button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-16 right-4 p-2.5 rounded-full bg-black/70 backdrop-blur-md text-white border border-white/20 shadow-lg hover:scale-105 transition"
+              title="Pick media from device"
+            >
+              <Camera className="w-5 h-5 text-pink-400" />
+            </button>
+          </>
+        ) : (
+          <div 
+            onClick={() => fileInputRef.current?.click()}
+            className="flex flex-col items-center justify-center p-6 text-center cursor-pointer select-none group"
+          >
+            <div className="w-16 h-16 rounded-3xl bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-pink-400 mb-3 group-hover:scale-110 transition">
+              <Camera className="w-8 h-8" />
+            </div>
+            <span className="text-sm font-bold text-white mb-1">Select Story Photo or Video</span>
+            <span className="text-xs text-gray-400">Tap to upload from device gallery</span>
           </div>
         )}
 
-        {/* Music Track Sticker */}
-        {selectedMusic && (
-          <div className="absolute top-6 left-6 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white text-xs font-semibold flex items-center gap-1.5 border border-white/20">
-            <Music className="w-3.5 h-3.5 text-pink-400" />
-            <span className="truncate max-w-[180px]">{selectedMusic}</span>
-          </div>
-        )}
-
-        {/* Caption Overlay */}
-        <div className="absolute bottom-6 left-4 right-4 text-center">
-          <span className="inline-block px-3 py-1.5 rounded-2xl bg-black/60 backdrop-blur-md text-white text-xs font-medium border border-white/20">
-            {caption}
-          </span>
-        </div>
-
-        {/* Change Photo Floating Button */}
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="absolute bottom-16 right-4 p-2.5 rounded-full bg-black/70 backdrop-blur-md text-white border border-white/20 shadow-lg hover:scale-105 transition"
-          title="Pick image from device"
-        >
-          <Camera className="w-5 h-5 text-pink-400" />
-        </button>
         <input
           type="file"
           ref={fileInputRef}
-          accept="image/*"
+          accept="image/*,video/*"
           className="hidden"
           onChange={handleFileChange}
         />
+
+        {/* Upload Progress Overlay */}
+        {isUploading && (
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 z-30">
+            <div className="w-full max-w-xs p-4 rounded-2xl bg-[#150f2c] border border-pink-500/40 space-y-3 shadow-2xl">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-pink-300">Uploading Story to AWS S3...</span>
+                <span className="text-white">{progress}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-pink-500 to-purple-600 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Bottom Story Controls (Instagram Stories Toolbox) */}

@@ -1,0 +1,69 @@
+/**
+ * Uploads a file directly to AWS S3 using FunFlick presigned PUT URLs
+ * Reports real percentage progress (0-100) via XMLHttpRequest
+ *
+ * @param {File} file File from HTML input (<input type="file" />)
+ * @param {string} folder Destination folder ('videos' | 'images' | 'thumbnails' | 'avatars')
+ * @param {Function} onProgress Callback receiving percentage number
+ * @returns {Promise<string>} S3 public permanent URL
+ */
+export async function uploadFileToS3(file, folder = 'videos', onProgress = () => {}) {
+  const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+  if (!token) {
+    throw new Error('Please log in before uploading media.');
+  }
+
+  // 1. Get presigned upload URL from AWS EC2 backend
+  const res = await fetch('/api/media/upload-url', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      fileName: file.name,
+      fileType: file.type || (folder === 'images' ? 'image/jpeg' : 'video/mp4'),
+      folder
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to initialize AWS S3 upload');
+  }
+
+  const { uploadUrl, publicUrl } = await res.json();
+  if (!uploadUrl || !publicUrl) {
+    throw new Error('Invalid upload authorization from server');
+  }
+
+  // 2. Perform direct PUT to S3 with live progress monitoring
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl, true);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
+        onProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(100);
+        resolve(publicUrl);
+      } else {
+        reject(new Error(`AWS S3 rejected upload (HTTP ${xhr.status})`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Network error uploading file to AWS S3'));
+    xhr.ontimeout = () => reject(new Error('Upload to AWS S3 timed out'));
+
+    xhr.send(file);
+  });
+
+  return publicUrl;
+}

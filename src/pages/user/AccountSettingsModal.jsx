@@ -17,8 +17,10 @@ import {
   ChevronRight,
   Sparkles,
   Moon,
-  Sun
+  Sun,
+  Building2
 } from 'lucide-react';
+import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDetailsModal';
 
 export const AccountSettingsModal = ({ isOpen, onClose }) => {
   const { currentUser, setCurrentUser, showToast, theme, setTheme } = useApp();
@@ -33,6 +35,7 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
   const [notifEarnings, setNotifEarnings] = useState(true);
   const [language, setLanguage] = useState('Telugu & Hindi');
   const [saving, setSaving] = useState(false);
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
 
   // Re-sync fields with the logged-in account every time the modal opens
   useEffect(() => {
@@ -186,6 +189,39 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
                 <p className={`text-[10px] pt-1 ${theme === 'light' ? 'text-slate-500' : 'text-gray-500'}`}>
                   Tap a field to edit, then press <span className="text-pink-400 font-semibold">Save Settings</span>.
                 </p>
+              </div>
+            </div>
+
+            {/* Creator Payout & Bank / UPI Settings */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
+                Creator Payout & Bank Account
+              </span>
+              <div className={`p-4 rounded-2xl ${theme === 'light' ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/5'} border space-y-2.5`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-pink-500 flex items-center justify-center text-white">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className={`text-xs font-bold block ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>
+                        Bank & UPI Payout Details
+                      </span>
+                      <span className="text-[10px] text-gray-400">
+                        Where admins disburse your creator earnings
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPayoutModalOpen(true)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-amber-500/20 hover:from-pink-500/30 hover:to-purple-500/30 border border-pink-500/30 text-xs font-bold text-white flex items-center justify-center gap-2 transition active:scale-95 shadow-sm"
+                >
+                  <Building2 className="w-3.5 h-3.5 text-pink-400" />
+                  <span>Update Bank / UPI Details</span>
+                </button>
               </div>
             </div>
 
@@ -461,6 +497,12 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
           </button>
         </div>
       </motion.div>
+
+      {/* Creator Bank & UPI Details Modal */}
+      <CreatorPayoutDetailsModal
+        isOpen={payoutModalOpen}
+        onClose={() => setPayoutModalOpen(false)}
+      />
     </div>
   );
 };

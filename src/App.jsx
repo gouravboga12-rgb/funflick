@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
-import { FloatingNavButton } from './components/common/FloatingNavButton';
 import { PhoneFrame } from './components/common/PhoneFrame';
 import { ToastContainer } from './components/common/Toast';
 
@@ -51,6 +50,9 @@ import { AdminInfluencerMediaScreen } from './pages/admin/AdminInfluencerMediaSc
 import { AdminAdsScreen } from './pages/admin/AdminAdsScreen';
 import { AdminCopyrightScreen } from './pages/admin/AdminCopyrightScreen';
 
+import { AdminLoginScreen } from './pages/admin/AdminLoginScreen';
+import { AdminRouteGuard } from './components/admin/AdminRouteGuard';
+
 // Wrapper for mobile-first user routes
 const MobileAppWrapper = ({ children }) => {
   return <PhoneFrame>{children}</PhoneFrame>;
@@ -66,9 +68,6 @@ function AppRoutes() {
 
   return (
     <div className={`min-h-screen ${isLight ? 'bg-slate-100 text-slate-900 light' : 'bg-[#07040d] text-white dark'} flex flex-col font-sans transition-colors duration-200`}>
-      {/* Discreet Floating Prototype Navigation Button */}
-      <FloatingNavButton />
-
       {/* Global Toast Container */}
       <ToastContainer />
 
@@ -114,21 +113,24 @@ function AppRoutes() {
           <Route path="/creator/analytics" element={<MobileAppWrapper><CreatorAnalyticsScreen /></MobileAppWrapper>} />
           <Route path="/creator/earnings" element={<MobileAppWrapper><CreatorEarningsScreen /></MobileAppWrapper>} />
 
-          {/* Admin Panel Routes */}
-          <Route path="/admin" element={<AdminDashboardScreen />} />
-          <Route path="/admin/influencer-media" element={<AdminInfluencerMediaScreen />} />
-          <Route path="/admin/ads" element={<AdminAdsScreen />} />
-          <Route path="/admin/users" element={<AdminUsersScreen />} />
-          <Route path="/admin/creators" element={<AdminCreatorsScreen />} />
-          <Route path="/admin/content" element={<AdminContentScreen />} />
-          <Route path="/admin/subscriptions" element={<AdminSubscriptionsScreen />} />
-          <Route path="/admin/manage-subscriptions" element={<AdminSubscriptionsScreen />} />
-          <Route path="/admin/payouts" element={<AdminPayoutsScreen />} />
-          <Route path="/admin/copyright-claims" element={<AdminCopyrightScreen />} />
-          <Route path="/admin/revenue" element={<AdminRevenueScreen />} />
-          <Route path="/admin/reports" element={<AdminReportsScreen />} />
-          <Route path="/admin/categories" element={<AdminCategoriesScreen />} />
-          <Route path="/admin/settings" element={<AdminSettingsScreen />} />
+          {/* Dedicated Admin Login */}
+          <Route path="/admin/login" element={<AdminLoginScreen />} />
+
+          {/* Protected Admin Panel Routes (Strictly Isolated Auth) */}
+          <Route path="/admin" element={<AdminRouteGuard><AdminDashboardScreen /></AdminRouteGuard>} />
+          <Route path="/admin/influencer-media" element={<AdminRouteGuard><AdminInfluencerMediaScreen /></AdminRouteGuard>} />
+          <Route path="/admin/ads" element={<AdminRouteGuard><AdminAdsScreen /></AdminRouteGuard>} />
+          <Route path="/admin/users" element={<AdminRouteGuard><AdminUsersScreen /></AdminRouteGuard>} />
+          <Route path="/admin/creators" element={<AdminRouteGuard><AdminCreatorsScreen /></AdminRouteGuard>} />
+          <Route path="/admin/content" element={<AdminRouteGuard><AdminContentScreen /></AdminRouteGuard>} />
+          <Route path="/admin/subscriptions" element={<AdminRouteGuard><AdminSubscriptionsScreen /></AdminRouteGuard>} />
+          <Route path="/admin/manage-subscriptions" element={<AdminRouteGuard><AdminSubscriptionsScreen /></AdminRouteGuard>} />
+          <Route path="/admin/payouts" element={<AdminRouteGuard><AdminPayoutsScreen /></AdminRouteGuard>} />
+          <Route path="/admin/copyright-claims" element={<AdminRouteGuard><AdminCopyrightScreen /></AdminRouteGuard>} />
+          <Route path="/admin/revenue" element={<AdminRouteGuard><AdminRevenueScreen /></AdminRouteGuard>} />
+          <Route path="/admin/reports" element={<AdminRouteGuard><AdminReportsScreen /></AdminRouteGuard>} />
+          <Route path="/admin/categories" element={<AdminRouteGuard><AdminCategoriesScreen /></AdminRouteGuard>} />
+          <Route path="/admin/settings" element={<AdminRouteGuard><AdminSettingsScreen /></AdminRouteGuard>} />
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />

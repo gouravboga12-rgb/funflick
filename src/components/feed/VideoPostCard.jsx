@@ -255,16 +255,22 @@ export const VideoPostCard = ({ post }) => {
             )}
           </button>
 
-          <button
-            onClick={() => toggleFollowCreator(post.creator.username)}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition shadow-sm ${
-              post.isFollowing
-                ? 'bg-white/20 backdrop-blur-md text-white border border-white/20'
-                : 'bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white hover:opacity-90 active:scale-95'
-            }`}
-          >
-            {post.isFollowing ? 'Following' : 'Follow'}
-          </button>
+          {isOwner ? (
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/15 backdrop-blur-md text-pink-300 border border-white/10 shadow-sm">
+              My Account
+            </span>
+          ) : (
+            <button
+              onClick={() => toggleFollowCreator(post.creator.username)}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition shadow-sm ${
+                post.isFollowing
+                  ? 'bg-white/20 backdrop-blur-md text-white border border-white/20'
+                  : 'bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white hover:opacity-90 active:scale-95'
+              }`}
+            >
+              {post.isFollowing ? 'Following' : 'Follow'}
+            </button>
+          )}
         </div>
 
         {/* Caption */}
@@ -307,7 +313,7 @@ export const VideoPostCard = ({ post }) => {
               className="w-full h-full rounded-full object-cover border border-black"
             />
           </div>
-          {!post.isFollowing && (
+          {!post.isFollowing && !isOwner && (
             <button
               onClick={() => toggleFollowCreator(post.creator.username)}
               className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] flex items-center justify-center text-white shadow-md hover:scale-110 transition-transform"

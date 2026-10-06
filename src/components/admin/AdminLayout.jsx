@@ -45,10 +45,17 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
     { label: 'Manage Subscriptions', icon: Crown, path: '/admin/manage-subscriptions' },
     { label: 'Creator Payouts', icon: DollarSign, path: '/admin/payouts', badge: pendingPayoutCount },
     { label: 'Revenue Analytics', icon: BarChart3, path: '/admin/revenue' },
-    { label: 'Reports', icon: Flag, path: '/admin/reports', badge: '2' },
+    { label: 'Reports', icon: Flag, path: '/admin/reports' },
     { label: 'Categories', icon: Tag, path: '/admin/categories' },
     { label: 'Platform Settings', icon: Settings, path: '/admin/settings' },
   ];
+
+  const handleAdminSignOut = () => {
+    localStorage.removeItem('funflick_admin_token');
+    localStorage.removeItem('funflick_admin_user');
+    showToast('Signed out of Administrator Portal', 'info');
+    navigate('/admin/login');
+  };
 
   return (
     <div className={`min-h-screen ${isLight ? 'bg-[#f8fafc] text-slate-900 light' : 'bg-[#080512] text-white dark'} flex flex-col md:flex-row select-none transition-colors`}>
@@ -57,7 +64,7 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
         <div className="space-y-6">
           {/* Brand */}
           <div 
-            onClick={() => navigate('/')} 
+            onClick={() => navigate('/admin')} 
             className="flex items-center gap-2.5 px-3 py-2 cursor-pointer group"
           >
             <img src="/brand/funflick-logo.png" alt="FunFlick" className="w-8 h-8 rounded-xl object-contain shadow" />
@@ -129,14 +136,21 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
           </div>
 
           <button
+            onClick={handleAdminSignOut}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold border border-rose-500/20 transition cursor-pointer"
+          >
+            <span>Sign Out Administrator</span>
+          </button>
+
+          <button
             onClick={() => navigate('/')}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl ${
+            className={`w-full flex items-center justify-center gap-2 py-2 rounded-2xl ${
               isLight 
                 ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200' 
-                : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border-white/5'
-            } text-xs font-bold border transition`}
+                : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border-white/5'
+            } text-xs font-semibold border transition`}
           >
-            <Smartphone className="w-4 h-4 text-pink-400" />
+            <Smartphone className="w-3.5 h-3.5 text-pink-400" />
             <span>Open User App</span>
           </button>
         </div>

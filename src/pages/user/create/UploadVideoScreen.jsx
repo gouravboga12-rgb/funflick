@@ -30,33 +30,8 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UploadSuccessMonetizationModal } from '../../../components/common/UploadSuccessMonetizationModal';
+import { uploadFileToS3 } from '../../../services/s3UploadService';
 
-const SAMPLE_COMEDY_VIDEOS = [
-  {
-    id: 'sample_1',
-    name: 'Office Appraisal Comedy',
-    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-talking-on-video-call-with-phone-41445-large.mp4',
-    thumbnail: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=600&q=80',
-    duration: '0:32',
-    category: 'Comedy'
-  },
-  {
-    id: 'sample_2',
-    name: 'Stand-up Open Mic Punchline',
-    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-girl-in-neon-sign-1232-large.mp4',
-    thumbnail: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
-    duration: '0:45',
-    category: 'Stand-up'
-  },
-  {
-    id: 'sample_3',
-    name: 'Hostel Cooking Chaos',
-    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-friends-walking-on-the-street-at-night-42805-large.mp4',
-    thumbnail: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
-    duration: '0:28',
-    category: 'Memes'
-  }
-];
 
 const SUGGESTED_CREATORS_TO_TAG = [
   'pavani_official',
@@ -83,7 +58,7 @@ const POPULAR_SOUNDS = [
 
 export const UploadVideoScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, submitVideoForVerification, setSubscriptionGateModalOpen, mediaLimits, showToast } = useApp();
+  const { currentUser, setSubscriptionGateModalOpen, mediaLimits, showToast, fetchLiveVideos } = useApp();
 
   const maxReelLimit = mediaLimits?.maxReelDuration || 30;
   const [videoDuration, setVideoDuration] = useState(0);
@@ -92,9 +67,9 @@ export const UploadVideoScreen = () => {
   const fileInputRef = useRef(null);
 
   // Form State
-  const [selectedVideo, setSelectedVideo] = useState(SAMPLE_COMEDY_VIDEOS[0]);
-  const [videoSrc, setVideoSrc] = useState(SAMPLE_COMEDY_VIDEOS[0].videoUrl);
-  const [thumbnailUrl, setThumbnailUrl] = useState(SAMPLE_COMEDY_VIDEOS[0].thumbnail);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [videoSrc, setVideoSrc] = useState('');
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -108,7 +83,7 @@ export const UploadVideoScreen = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
 
-  // Upload progress simulation
+  // Upload progress state
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [submittedItem, setSubmittedItem] = useState(null);
@@ -117,9 +92,13 @@ export const UploadVideoScreen = () => {
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       const blobUrl = URL.createObjectURL(file);
       setVideoSrc(blobUrl);
-      setSelectedVideo(null);
+      if (!title) {
+        const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+        setTitle(cleanName);
+      }
       showToast(`Selected "${file.name}" for upload! 🎥`, 'info');
     }
   };
@@ -165,14 +144,13 @@ export const UploadVideoScreen = () => {
     }
   };
 
-  // Submit flow
-  const handleUpload = (e) => {
+  // Submit flow: Upload to S3, Save in MySQL, Publish live
+  const handleUpload = async (e) => {
     e.preventDefault();
 
-    // 1. Subscription Check
-    if (!currentUser.hasPublishingSubscription) {
-      setSubscriptionGateModalOpen(true);
-      showToast('⚠️ Creator Publishing Plan required to post videos!', 'error');
+    if (!selectedFile && !videoSrc) {
+      showToast('Please select a video file from your device first!', 'error');
+      fileInputRef.current?.click();
       return;
     }
 
@@ -182,39 +160,73 @@ export const UploadVideoScreen = () => {
     }
 
     setIsUploading(true);
-    setProgress(25);
+    setProgress(5);
 
-    setTimeout(() => setProgress(60), 350);
-    setTimeout(() => setProgress(88), 700);
+    try {
+      let finalMediaUrl = videoSrc;
 
-    setTimeout(() => {
-      setProgress(100);
-      const res = submitVideoForVerification({
-        title,
-        description,
-        category,
-        hashtags,
-        mediaUrl: videoSrc,
-        thumbnailUrl: thumbnailUrl || selectedVideo?.thumbnail,
-        audioTitle: selectedSound,
-        location: selectedLocation,
-        tags: taggedUsers
+      // 1. Direct AWS S3 upload if selected from device
+      if (selectedFile) {
+        finalMediaUrl = await uploadFileToS3(selectedFile, 'videos', (pct) => {
+          setProgress(pct);
+        });
+      }
+
+      // 2. Persist to MySQL database on AWS
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const res = await fetch('/api/videos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          category,
+          video_url: finalMediaUrl,
+          thumbnail_url: finalMediaUrl,
+          duration: Math.round(videoDuration) || 30,
+          media_type: 'video',
+          hashtags,
+          location: selectedLocation,
+          audio_title: selectedSound
+        })
       });
 
-      setIsUploading(false);
-
-      if (res.success) {
-        setSubmittedItem(res.submission);
-        try {
-          confetti({
-            particleCount: 90,
-            spread: 70,
-            origin: { y: 0.6 }
-          });
-        } catch (e) {}
-        showToast('📤 Reel submitted for Central Admin Verification!', 'success');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to save video to database');
       }
-    }, 1100);
+
+      const resData = await res.json();
+      setProgress(100);
+
+      // 3. Immediately refresh live feed from MySQL
+      await fetchLiveVideos();
+
+      setSubmittedItem({
+        id: resData.videoId,
+        title,
+        mediaUrl: finalMediaUrl,
+        contentType: 'video'
+      });
+
+      try {
+        confetti({
+          particleCount: 90,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      } catch (e) {}
+
+      showToast('🎥 Video uploaded to AWS S3 & published live!', 'success');
+    } catch (err) {
+      console.error('Upload video error:', err);
+      showToast(err.message || 'Upload failed', 'error');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -354,8 +366,8 @@ export const UploadVideoScreen = () => {
             </div>
           )}
 
-          {/* Video Selector Options: Choose from Device or Pick FunFlick Sample */}
-          <div className="flex items-center gap-2 pt-1">
+          {/* Video Selector: Choose from Device */}
+          <div className="pt-1">
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -367,43 +379,11 @@ export const UploadVideoScreen = () => {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex-1 py-2 px-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white flex items-center justify-center gap-2 transition"
+              className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-transparent hover:bg-white/10 border border-pink-500/30 text-xs font-bold text-white flex items-center justify-center gap-2 transition active:scale-[0.99] shadow-sm"
             >
               <UploadCloud className="w-4 h-4 text-pink-400" />
-              <span>Choose from Device / Gallery</span>
+              <span>{selectedFile ? 'Choose Different Video from Device' : 'Choose Video from Device / Gallery'}</span>
             </button>
-          </div>
-
-          {/* Quick Comedy Video Samples */}
-          <div className="space-y-1 pt-1">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-              Or pick sample comedy clip:
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              {SAMPLE_COMEDY_VIDEOS.map(v => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedVideo(v);
-                    setVideoSrc(v.videoUrl);
-                    setThumbnailUrl(v.thumbnail);
-                    setTitle(v.name);
-                    setCategory(v.category);
-                    setIsPlaying(false);
-                  }}
-                  className={`p-1.5 rounded-2xl border text-left transition ${
-                    videoSrc === v.videoUrl
-                      ? 'bg-pink-500/20 border-pink-500 text-white shadow-md'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <img src={v.thumbnail} alt={v.name} className="w-full h-12 rounded-xl object-cover mb-1" />
-                  <span className="text-[10px] font-bold block truncate">{v.name}</span>
-                  <span className="text-[9px] text-pink-300">{v.duration}</span>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 

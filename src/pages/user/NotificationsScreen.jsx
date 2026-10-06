@@ -25,9 +25,28 @@ export const NotificationsScreen = () => {
     followRequests,
     acceptFollowRequest,
     declineFollowRequest,
-    markAllNotificationsAsRead
+    markAllNotificationsAsRead,
+    fetchLiveNotifications
   } = useApp();
   const [filter, setFilter] = useState('All');
+
+  React.useEffect(() => {
+    if (fetchLiveNotifications) fetchLiveNotifications();
+  }, []);
+
+  const handleMarkAllRead = async () => {
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (token) {
+      try {
+        await fetch('/api/notifications/read-all', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (e) {}
+    }
+    markAllNotificationsAsRead();
+    showToast('All notifications marked as read', 'info');
+  };
 
   const categories = ['All', 'Requests', 'Likes', 'Comments', 'Follows', 'System'];
 
@@ -64,7 +83,7 @@ export const NotificationsScreen = () => {
           Activity
         </span>
         <button
-          onClick={markAllNotificationsAsRead}
+          onClick={handleMarkAllRead}
           className="text-xs font-semibold text-pink-400 hover:text-pink-300 flex items-center gap-1"
         >
           <CheckCheck className="w-3.5 h-3.5" />

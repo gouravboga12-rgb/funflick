@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { CREATORS } from '../../data/mockData';
 import { CreatorSubscriptionModal } from '../../components/creator/CreatorSubscriptionModal';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
+import { FollowListModal } from '../../components/user/FollowListModal';
 import { 
   ChevronLeft, 
   Share2, 
@@ -14,9 +15,10 @@ import {
   Heart, 
   Info, 
   Play, 
-  Crown,
-  CheckCircle2,
-  Lock
+  Crown, 
+  CheckCircle2, 
+  Lock,
+  User
 } from 'lucide-react';
 
 export const CreatorProfileScreen = () => {
@@ -25,7 +27,38 @@ export const CreatorProfileScreen = () => {
   const navigate = useNavigate();
   const { creators, currentUser, toggleFollowCreator, showToast } = useApp();
 
-  const isOwner = username === currentUser.username;
+  const isOwner = username === currentUser?.username;
+
+  const [liveFollowCounts, setLiveFollowCounts] = useState({ followers: 0, following: 0 });
+  const [isFollowModalOpen, setIsFollowModalOpen] = useState(false);
+  const [followModalTab, setFollowModalTab] = useState('followers');
+
+  const fetchLiveCounts = async () => {
+    if (!username) return;
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    try {
+      const [f1, f2] = await Promise.all([
+        fetch(`/api/follows/${username}/followers`, { headers }),
+        fetch(`/api/follows/${username}/following`, { headers })
+      ]);
+      if (f1.ok && f2.ok) {
+        const d1 = await f1.json();
+        const d2 = await f2.json();
+        setLiveFollowCounts({
+          followers: d1.count !== undefined ? d1.count : (d1.followers?.length || 0),
+          following: d2.count !== undefined ? d2.count : (d2.following?.length || 0)
+        });
+      }
+    } catch (e) {
+      console.warn('Could not fetch creator live follow counts:', e);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchLiveCounts();
+  }, [username]);
+
   const creator = isOwner 
     ? {
         name: currentUser.name,
@@ -33,9 +66,9 @@ export const CreatorProfileScreen = () => {
         avatar: currentUser.avatar,
         bio: currentUser.bio,
         isPrivate: currentUser.isPrivate,
-        isFollowing: true,
+        isFollowing: false,
         isSubscribed: true,
-        stats: currentUser.stats,
+        stats: { followers: liveFollowCounts.followers, following: liveFollowCounts.following, posts: currentUser.stats?.posts || 0 },
         socials: { instagram: currentUser.username, youtube: currentUser.username }
       }
     : (creators.find(c => c.username === username) || {
@@ -44,7 +77,7 @@ export const CreatorProfileScreen = () => {
         avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
         bio: 'FunFlick Creator | Entertaining India 🎬✨',
         isPrivate: false,
-        stats: { followers: '0', following: 0, posts: 0 }
+        stats: { followers: liveFollowCounts.followers, following: liveFollowCounts.following, posts: 0 }
       });
 
   const isAccountPrivate = isOwner ? !!currentUser.isPrivate : !!creator.isPrivate;
@@ -119,15 +152,21 @@ export const CreatorProfileScreen = () => {
                 </span>
                 <span className="text-[10px] text-gray-400">Videos</span>
               </div>
-              <div>
+              <div 
+                className="cursor-pointer hover:opacity-80 transition"
+                onClick={() => { setFollowModalTab('followers'); setIsFollowModalOpen(true); }}
+              >
                 <span className="font-extrabold text-sm text-white block font-heading">
-                  {creator.stats?.followers || '2.1M'}
+                  {creator.stats?.followers !== undefined ? creator.stats.followers : '0'}
                 </span>
                 <span className="text-[10px] text-gray-400">Followers</span>
               </div>
-              <div>
+              <div 
+                className="cursor-pointer hover:opacity-80 transition"
+                onClick={() => { setFollowModalTab('following'); setIsFollowModalOpen(true); }}
+              >
                 <span className="font-extrabold text-sm text-white block font-heading">
-                  {creator.stats?.following || 150}
+                  {creator.stats?.following !== undefined ? creator.stats.following : '0'}
                 </span>
                 <span className="text-[10px] text-gray-400">Following</span>
               </div>
@@ -179,28 +218,40 @@ export const CreatorProfileScreen = () => {
 
           {/* Action Buttons: Follow & Subscribe (Screen 5) */}
           <div className="flex items-center gap-3 pt-2">
-            <button
-              onClick={() => toggleFollowCreator(creator.username)}
-              className={`flex-1 py-2.5 rounded-2xl text-xs font-bold transition shadow-md ${
-                creator.isFollowing
-                  ? 'bg-white/15 text-white border border-white/20'
-                  : 'bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white hover:opacity-95'
-              }`}
-            >
-              {creator.isFollowing ? 'Following' : 'Follow'}
-            </button>
+            {isOwner ? (
+              <button
+                onClick={() => navigate('/profile')}
+                className="w-full py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition flex items-center justify-center gap-2 border border-white/15 shadow-md active:scale-95"
+              >
+                <User className="w-4 h-4 text-pink-400" />
+                <span>My Account</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => toggleFollowCreator(creator.username)}
+                  className={`flex-1 py-2.5 rounded-2xl text-xs font-bold transition shadow-md ${
+                    creator.isFollowing
+                      ? 'bg-white/15 text-white border border-white/20'
+                      : 'bg-gradient-to-r from-[#ff007a] to-[#ff4b2b] text-white hover:opacity-95'
+                  }`}
+                >
+                  {creator.isFollowing ? 'Following' : 'Follow'}
+                </button>
 
-            <button
-              onClick={() => setIsSubscribeModalOpen(true)}
-              className={`flex-1 py-2.5 rounded-2xl text-xs font-bold transition shadow-md flex items-center justify-center gap-1.5 ${
-                creator.isSubscribed
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                  : 'bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white hover:opacity-95'
-              }`}
-            >
-              <Crown className="w-3.5 h-3.5" />
-              <span>{creator.isSubscribed ? 'Subscribed 👑' : 'Subscribe'}</span>
-            </button>
+                <button
+                  onClick={() => setIsSubscribeModalOpen(true)}
+                  className={`flex-1 py-2.5 rounded-2xl text-xs font-bold transition shadow-md flex items-center justify-center gap-1.5 ${
+                    creator.isSubscribed
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white hover:opacity-95'
+                  }`}
+                >
+                  <Crown className="w-3.5 h-3.5" />
+                  <span>{creator.isSubscribed ? 'Subscribed 👑' : 'Subscribe'}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -291,6 +342,16 @@ export const CreatorProfileScreen = () => {
         creator={creator}
         isOpen={isSubscribeModalOpen}
         onClose={() => setIsSubscribeModalOpen(false)}
+      />
+
+      {/* Real Followers & Following Modal */}
+      <FollowListModal
+        isOpen={isFollowModalOpen}
+        onClose={() => setIsFollowModalOpen(false)}
+        targetUsername={username}
+        initialTab={followModalTab}
+        currentUsername={currentUser?.username}
+        onRelationshipChanged={fetchLiveCounts}
       />
     </div>
   );

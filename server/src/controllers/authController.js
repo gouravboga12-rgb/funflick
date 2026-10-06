@@ -802,3 +802,97 @@ export async function googleSignupComplete(req, res) {
   }
 }
 
+/**
+ * Dedicated Admin Authentication
+ * Enforces admin-only credentials and separate admin JWT
+ */
+export async function adminLogin(req, res) {
+  try {
+    const { identifier, password } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Admin identifier and password are required' });
+    }
+
+    const clean = identifier.trim().toLowerCase();
+
+    // Check master admin credentials first
+    if ((clean === 'funflick0308@gmail.com' || clean === 'admin') && password === 'FunFlicks@12') {
+      const adminUser = {
+        id: 999999,
+        name: 'FunFlick Super Administrator',
+        username: 'super_admin',
+        email: 'funflick0308@gmail.com',
+        role: 'admin',
+        avatar_url: '/brand/funflick-logo.png'
+      };
+
+      const token = jwt.sign(
+        { id: adminUser.id, username: adminUser.username, email: adminUser.email, role: 'admin', isAdminSession: true },
+        process.env.JWT_SECRET || 'funflick_secret',
+        { expiresIn: '1d' }
+      );
+
+      return res.json({
+        success: true,
+        message: 'Admin authentication successful',
+        token,
+        adminUser
+      });
+    }
+
+    // Check database users with role = 'admin'
+    const [rows] = await pool.query(
+      'SELECT id, name, username, email, password_hash, role, avatar_url FROM users WHERE (email = ? OR username = ?) AND role = ?',
+      [clean, clean, 'admin']
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid admin credentials or not authorized as administrator' });
+    }
+
+    const admin = rows[0];
+    const match = await bcrypt.compare(password, admin.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid admin password' });
+    }
+
+    const token = jwt.sign(
+      { id: admin.id, username: admin.username, email: admin.email, role: 'admin', isAdminSession: true },
+      process.env.JWT_SECRET || 'funflick_secret',
+      { expiresIn: '1d' }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Admin authentication successful',
+      token,
+      adminUser: {
+        id: admin.id,
+        name: admin.name,
+        username: admin.username,
+        email: admin.email,
+        role: 'admin',
+        avatar_url: admin.avatar_url || '/brand/funflick-logo.png'
+      }
+    });
+  } catch (err) {
+    console.error('Admin login error:', err);
+    return res.status(500).json({ error: 'Server error during admin authentication' });
+  }
+}
+
+export async function getAdminMe(req, res) {
+  try {
+    if (!req.user || req.user.role !== 'admin' || !req.user.isAdminSession) {
+      return res.status(403).json({ error: 'Unauthorized administrator session' });
+    }
+    return res.json({
+      authenticated: true,
+      user: req.user
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to verify admin session' });
+  }
+}
+
+

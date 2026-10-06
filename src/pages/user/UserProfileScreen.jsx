@@ -7,6 +7,7 @@ import { SubscriptionGateModal } from '../../components/common/SubscriptionGateM
 import { CreateChooserModal } from '../../components/user/create/CreateChooserModal';
 import { AccountSettingsModal } from './AccountSettingsModal';
 import { HelpSupportModal } from './HelpSupportModal';
+import { FollowListModal } from '../../components/user/FollowListModal';
 import { 
   ChevronLeft, 
   Settings, 
@@ -56,13 +57,50 @@ export const UserProfileScreen = () => {
     transactions
   } = useApp();
 
-  // Compute real dynamic stats
-  const realPostCount = currentUser.stats?.posts || posts.filter(p => p.creator?.username === currentUser.username).length || 0;
-  const realFollowing = currentUser.stats?.following || followingList.length || 0;
-  const realFollowers = currentUser.stats?.followers || followersList.length || 0;
+  // Dynamic live follower counts from backend
+  const [liveFollowCounts, setLiveFollowCounts] = useState({
+    followers: followersList?.length || 0,
+    following: followingList?.length || 0
+  });
+
+  const [isFollowModalOpen, setIsFollowModalOpen] = useState(false);
+  const [followModalTab, setFollowModalTab] = useState('followers');
+
+  const fetchLiveFollowCounts = async () => {
+    if (!currentUser?.username) return;
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    try {
+      const [f1, f2] = await Promise.all([
+        fetch(`/api/follows/${currentUser.username}/followers`, { headers }),
+        fetch(`/api/follows/${currentUser.username}/following`, { headers })
+      ]);
+      if (f1.ok && f2.ok) {
+        const d1 = await f1.json();
+        const d2 = await f2.json();
+        setLiveFollowCounts({
+          followers: d1.count !== undefined ? d1.count : (d1.followers?.length || 0),
+          following: d2.count !== undefined ? d2.count : (d2.following?.length || 0)
+        });
+      }
+    } catch (e) {
+      console.warn('Could not fetch live follow counts:', e);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchLiveFollowCounts();
+  }, [currentUser?.username]);
+
+  // Compute real dynamic stats from database
+  const realPostCount = posts.filter(p => p.creator?.username === currentUser.username).length;
+  const realFollowing = liveFollowCounts.following;
+  const realFollowers = liveFollowCounts.followers;
   const realWallet = currentUser.walletBalance || 0;
   const realViews = currentUser.creatorMetrics?.totalViews || '0';
   const realEarnings = currentUser.creatorMetrics?.performanceEarnings || '₹0';
+  const realLikedCount = posts.filter(p => p.isLiked).length;
+  const realSavedCount = posts.filter(p => p.isSaved).length;
 
   const [activeProfileMode, setActiveProfileMode] = useState(initialTab); // 'viewer' | 'influencer'
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -74,14 +112,14 @@ export const UserProfileScreen = () => {
       icon: Heart,
       color: 'text-pink-400',
       label: 'Liked Videos',
-      badge: '48',
+      badge: realLikedCount > 0 ? String(realLikedCount) : null,
       path: '/my-content?tab=liked'
     },
     {
       icon: Bookmark,
       color: 'text-amber-400',
       label: 'Saved Videos',
-      badge: '19',
+      badge: realSavedCount > 0 ? String(realSavedCount) : null,
       path: '/my-content?tab=saved'
     },
     {
@@ -241,18 +279,21 @@ export const UserProfileScreen = () => {
               </span>
               <span className="text-[11px] text-gray-400">Posts</span>
             </div>
-            <div className="text-center cursor-pointer" onClick={() => navigate('/notifications')}>
+            <div 
+              className="text-center cursor-pointer hover:opacity-80 transition active:scale-95" 
+              onClick={() => { setFollowModalTab('following'); setIsFollowModalOpen(true); }}
+            >
               <span className="font-extrabold text-base text-white block font-heading">
                 {realFollowing}
               </span>
               <span className="text-[11px] text-gray-400">Following</span>
             </div>
-            <div className="text-center cursor-pointer" onClick={() => navigate('/notifications?tab=followers')}>
+            <div 
+              className="text-center cursor-pointer hover:opacity-80 transition active:scale-95" 
+              onClick={() => { setFollowModalTab('followers'); setIsFollowModalOpen(true); }}
+            >
               <span className="font-extrabold text-base text-white block font-heading">
                 {realFollowers}
-                {followRequests.length > 0 && (
-                  <span className="text-[10px] text-pink-400 ml-1">+{followRequests.length}</span>
-                )}
               </span>
               <span className="text-[11px] text-gray-400">Followers</span>
             </div>
@@ -730,6 +771,16 @@ export const UserProfileScreen = () => {
 
       <SubscriptionGateModal />
       <CreateChooserModal />
+
+      {/* Real Database Followers & Following Modal */}
+      <FollowListModal
+        isOpen={isFollowModalOpen}
+        onClose={() => setIsFollowModalOpen(false)}
+        targetUsername={currentUser.username}
+        initialTab={followModalTab}
+        currentUsername={currentUser.username}
+        onRelationshipChanged={fetchLiveFollowCounts}
+      />
     </div>
   );
 };

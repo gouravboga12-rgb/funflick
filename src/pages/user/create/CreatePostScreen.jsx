@@ -22,27 +22,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UploadSuccessMonetizationModal } from '../../../components/common/UploadSuccessMonetizationModal';
-
-const SAMPLE_POST_PHOTOS = [
-  {
-    id: 'photo_1',
-    name: 'Behind the Scenes Comedy Set',
-    url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80',
-    category: 'Comedy'
-  },
-  {
-    id: 'photo_2',
-    name: 'Stand-up Open Mic Stage',
-    url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
-    category: 'Stand-up'
-  },
-  {
-    id: 'photo_3',
-    name: 'Cast Celebration Shoot',
-    url: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=800&q=80',
-    category: 'Entertainment'
-  }
-];
+import { uploadFileToS3 } from '../../../services/s3UploadService';
 
 const SUGGESTED_CREATORS = [
   'pavani_official',
@@ -61,11 +41,12 @@ const SUGGESTED_LOCATIONS = [
 
 export const CreatePostScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, submitPostForVerification, setSubscriptionGateModalOpen, showToast } = useApp();
+  const { currentUser, setSubscriptionGateModalOpen, showToast, fetchLiveVideos } = useApp();
 
   const fileInputRef = useRef(null);
 
-  const [mediaUrl, setMediaUrl] = useState(SAMPLE_POST_PHOTOS[0].url);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [mediaUrl, setMediaUrl] = useState('');
   const [caption, setCaption] = useState('');
   const [hashtags, setHashtags] = useState('#funflick #post');
   const [location, setLocation] = useState('Hyderabad, India');
@@ -73,7 +54,7 @@ export const CreatePostScreen = () => {
   const [taggedUsers, setTaggedUsers] = useState([]);
   const [enableComments, setEnableComments] = useState(true);
 
-  // Upload simulation states: 'idle' | 'uploading' | 'submitted'
+  // Upload states
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [submittedItem, setSubmittedItem] = useState(null);
@@ -81,12 +62,9 @@ export const CreatePostScreen = () => {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setMediaUrl(event.target.result);
-        showToast('Photo selected from device! 📸', 'info');
-      };
-      reader.readAsDataURL(file);
+      setSelectedFile(file);
+      setMediaUrl(URL.createObjectURL(file));
+      showToast('Photo selected from device! 📸', 'info');
     }
   };
 
@@ -104,9 +82,12 @@ export const CreatePostScreen = () => {
     }
   };
 
-  const handlePublish = (e) => {
-    e.preventDefault();
-    if (!mediaUrl) return;
+  const handlePublish = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!selectedFile && !mediaUrl) {
+      showToast('Please select a photo from your device first!', 'error');
+      return;
+    }
 
     // 1. Subscription Check
     if (!currentUser.hasPublishingSubscription) {
@@ -115,39 +96,72 @@ export const CreatePostScreen = () => {
       return;
     }
 
-    // Caption is optional (social media post style)
-    const finalCaption = caption.trim();
-
     setIsUploading(true);
-    setProgress(30);
+    setProgress(5);
 
-    setTimeout(() => setProgress(70), 300);
-    setTimeout(() => {
-      setProgress(100);
-      const finalCaption = caption.trim();
-      const res = submitPostForVerification({
-        caption: finalCaption,
-        hashtags,
-        mediaType: 'image',
-        mediaUrl,
-        category,
-        location,
-        tags: taggedUsers
-      });
-      setIsUploading(false);
+    try {
+      let finalMediaUrl = mediaUrl;
 
-      if (res.success) {
-        setSubmittedItem(res.submission);
-        try {
-          confetti({
-            particleCount: 80,
-            spread: 70,
-            origin: { y: 0.6 }
-          });
-        } catch (err) {}
-        showToast('📤 Post submitted for Central Admin Verification!', 'success');
+      // Upload real device file to AWS S3
+      if (selectedFile) {
+        finalMediaUrl = await uploadFileToS3(selectedFile, 'images', (pct) => {
+          setProgress(Math.min(90, Math.max(5, pct)));
+        });
       }
-    }, 850);
+
+      // Save into MySQL database
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const res = await fetch('/api/videos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: caption.trim().slice(0, 45) || 'New Photo Post',
+          description: caption.trim(),
+          category,
+          video_url: finalMediaUrl,
+          thumbnail_url: finalMediaUrl,
+          duration: 0,
+          media_type: 'image',
+          hashtags,
+          location
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to save post to database');
+      }
+
+      const resData = await res.json();
+      setProgress(100);
+
+      // Refresh live feed
+      await fetchLiveVideos();
+
+      setSubmittedItem({
+        id: resData.videoId,
+        title: caption.trim() || 'New Photo Post',
+        mediaUrl: finalMediaUrl,
+        contentType: 'image'
+      });
+
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      } catch (err) {}
+      showToast('📸 Photo uploaded to AWS S3 & published live!', 'success');
+    } catch (err) {
+      console.error('Post upload error:', err);
+      showToast(err.message || 'Upload failed', 'error');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -215,23 +229,36 @@ export const CreatePostScreen = () => {
         )}
 
         {/* Media Preview & Device File Picker */}
-        <div className="space-y-2">
-          <div className="relative w-full aspect-[4/3] rounded-3xl overflow-hidden bg-[#150f2c] border border-white/10 shadow-xl group">
-            <img
-              src={mediaUrl}
-              alt="Post preview"
-              className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
-            />
-            
-            <button
-              type="button"
+        <div className="space-y-3">
+          {mediaUrl ? (
+            <div className="relative w-full aspect-[4/3] rounded-3xl overflow-hidden bg-[#150f2c] border border-white/10 shadow-xl group">
+              <img
+                src={mediaUrl}
+                alt="Post preview"
+                className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
+              />
+              
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-3 right-3 px-3.5 py-1.5 rounded-full bg-black/75 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 border border-white/20 hover:bg-black/90 transition shadow-lg"
+              >
+                <UploadCloud className="w-3.5 h-3.5 text-pink-400" />
+                <span>Change Photo</span>
+              </button>
+            </div>
+          ) : (
+            <div 
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 border border-white/20 hover:bg-black/90 transition"
+              className="w-full aspect-[4/3] rounded-3xl border-2 border-dashed border-white/20 hover:border-pink-500/50 bg-[#150f2c]/50 flex flex-col items-center justify-center p-6 text-center cursor-pointer transition hover:bg-[#150f2c] group"
             >
-              <UploadCloud className="w-3.5 h-3.5 text-pink-400" />
-              <span>Change Photo</span>
-            </button>
-          </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-500/20 to-purple-500/20 flex items-center justify-center text-pink-400 mb-3 group-hover:scale-110 transition border border-pink-500/30">
+                <UploadCloud className="w-7 h-7" />
+              </div>
+              <span className="text-sm font-bold text-white mb-1">Choose Photo from Device</span>
+              <span className="text-xs text-gray-400">JPG, PNG, WEBP or GIF supported</span>
+            </div>
+          )}
 
           <input
             type="file"
@@ -241,32 +268,30 @@ export const CreatePostScreen = () => {
             onChange={handleFileChange}
           />
 
-          {/* Sample comedy shoot photos */}
-          <div className="space-y-1 pt-1">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-              Or pick sample photo:
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              {SAMPLE_POST_PHOTOS.map(p => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    setMediaUrl(p.url);
-                    setCategory(p.category);
-                  }}
-                  className={`p-1 rounded-2xl border text-left transition ${
-                    mediaUrl === p.url
-                      ? 'bg-pink-500/20 border-pink-500 text-white'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <img src={p.url} alt={p.name} className="w-full h-12 rounded-xl object-cover mb-1" />
-                  <span className="text-[10px] font-bold block truncate">{p.name}</span>
-                </button>
-              ))}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-transparent hover:bg-white/10 border border-pink-500/30 text-xs font-bold text-white flex items-center justify-center gap-2 transition active:scale-[0.99] shadow-sm"
+          >
+            <UploadCloud className="w-4 h-4 text-pink-400" />
+            <span>{selectedFile ? 'Select Different Photo from Device' : 'Select Photo from Gallery / Device'}</span>
+          </button>
+
+          {/* Upload Progress Bar */}
+          {isUploading && (
+            <div className="p-3 rounded-2xl bg-pink-500/10 border border-pink-500/30 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-pink-300">Uploading to AWS S3...</span>
+                <span className="text-white">{progress}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-pink-500 to-purple-600 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Caption & Description */}

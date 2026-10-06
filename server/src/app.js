@@ -6,6 +6,12 @@ import morgan from 'morgan';
 import authRoutes from './routes/authRoutes.js';
 import mediaRoutes from './routes/mediaRoutes.js';
 import videoRoutes from './routes/videoRoutes.js';
+import storyRoutes from './routes/storyRoutes.js';
+import followRoutes from './routes/followRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import subscriptionRoutes from './routes/subscriptionRoutes.js';
+import payoutRoutes from './routes/payoutRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 
 const app = express();
@@ -28,6 +34,12 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/videos', videoRoutes);
+app.use('/api/stories', storyRoutes);
+app.use('/api/follows', followRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/payouts', payoutRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
 
 // 404 handler

@@ -179,7 +179,7 @@ export const StandardPostCard = ({ post }) => {
 
         {/* Right side: Follow button (if not owner) & Options Menu */}
         <div className="flex items-center gap-2">
-          {!isOwner && (
+          {!isOwner ? (
             <button
               onClick={() => toggleFollowCreator(post.creator?.username)}
               className={`px-3 py-1 rounded-full text-[11px] font-bold transition shadow-sm ${
@@ -190,6 +190,10 @@ export const StandardPostCard = ({ post }) => {
             >
               {post.isFollowing ? 'Following' : 'Follow'}
             </button>
+          ) : (
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-pink-300 border border-white/10">
+              My Account
+            </span>
           )}
 
           <button

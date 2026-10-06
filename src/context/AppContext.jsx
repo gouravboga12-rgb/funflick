@@ -193,24 +193,7 @@ export const AppProvider = ({ children }) => {
   // Followers, Following, and Follow Requests (Instagram Style)
   const [followingList, setFollowingList] = useState([]);
   const [followersList, setFollowersList] = useState([]);
-  const [followRequests, setFollowRequests] = useState([
-    {
-      id: 'fr_1',
-      username: 'rohan_comedy',
-      name: 'Rohan Sharma',
-      avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=100&q=80',
-      time: '2h ago',
-      category: 'Comedy'
-    },
-    {
-      id: 'fr_2',
-      username: 'priya_vines',
-      name: 'Priya Verma',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80',
-      time: '5h ago',
-      category: 'Entertainment'
-    }
-  ]);
+  const [followRequests, setFollowRequests] = useState([]);
 
   // View frame & demo switcher state
   const [phoneFrame, setPhoneFrame] = useState(true);
@@ -294,7 +277,53 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Fetch comments for a specific post from AWS MySQL
+  // Live Stories synchronization with AWS MySQL backend
+  const fetchLiveStories = async () => {
+    try {
+      const res = await fetch('/api/stories');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.stories && Array.isArray(data.stories)) {
+          const myStory = {
+            id: 'st_my',
+            isUser: true,
+            username: 'Your Story',
+            avatar: currentUser?.avatar || '/brand/default-avatar.svg',
+            hasUnseen: false,
+            stories: []
+          };
+          const userStoriesGroup = data.stories.find(s => s.userId === currentUser?.id || s.username === currentUser?.username);
+          if (userStoriesGroup) {
+            myStory.stories = userStoriesGroup.stories;
+          }
+          const otherStories = data.stories.filter(s => s.userId !== currentUser?.id && s.username !== currentUser?.username);
+          setStories([myStory, ...otherStories]);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch live stories:', err);
+    }
+  };
+
+  // Live Notifications synchronization with AWS MySQL backend
+  const fetchLiveNotifications = async () => {
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (!token) return;
+      const res = await fetch('/api/notifications', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.notifications && Array.isArray(data.notifications)) {
+          setNotifications(data.notifications);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch live notifications:', err);
+    }
+  };
+
   const fetchComments = async (postId) => {
     try {
       const res = await fetch(`/api/videos/${postId}/comments`);
@@ -445,6 +474,9 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     fetchLiveVideos();
+    fetchLiveStories();
+    fetchLiveNotifications();
+    fetchSubscriptionPlans();
     fetchPlatformSettings();
   }, []);
 
@@ -787,8 +819,27 @@ export const AppProvider = ({ children }) => {
     return newTransaction;
   };
 
-  // Admin: Update an existing plan globally
-  const updatePublishingPlan = (updatedPlan) => {
+  // Fetch active plans from database
+  const fetchSubscriptionPlans = async () => {
+    try {
+      const res = await fetch('/api/subscriptions/plans');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
+          const mapped = data.plans.map(p => ({
+            ...p,
+            formattedPrice: p.formatted_price || `₹${Number(p.price).toLocaleString()}`
+          }));
+          setPublishingPlans(mapped);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch subscription plans from DB:', err);
+    }
+  };
+
+  // Admin: Update an existing plan globally & sync with MySQL
+  const updatePublishingPlan = async (updatedPlan) => {
     setPublishingPlans(prev => prev.map(p => {
       if (p.id === updatedPlan.id) {
         return {
@@ -800,23 +851,56 @@ export const AppProvider = ({ children }) => {
       }
       return p;
     }));
-    showToast(`✅ Plan "${updatedPlan.name}" updated globally!`, 'success');
+
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      await fetch(`/api/subscriptions/admin/plans/${updatedPlan.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(updatedPlan)
+      });
+      await fetchSubscriptionPlans();
+    } catch (err) {
+      console.error('Failed to sync plan update with database:', err);
+    }
+
+    showToast(`✅ Plan "${updatedPlan.name}" updated in database and reflected user-wide!`, 'success');
   };
 
   // Admin: Toggle plan active/inactive status
-  const togglePlanActiveStatus = (planId) => {
+  const togglePlanActiveStatus = async (planId) => {
+    let nextActive = true;
     setPublishingPlans(prev => prev.map(p => {
       if (p.id === planId) {
-        const nextActive = p.active === false ? true : false;
-        showToast(`Plan "${p.name}" is now ${nextActive ? 'ACTIVE' : 'INACTIVE'}`, 'info');
+        nextActive = p.active === false ? true : false;
         return { ...p, active: nextActive };
       }
       return p;
     }));
+
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      await fetch(`/api/subscriptions/admin/plans/${planId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ active: nextActive })
+      });
+      await fetchSubscriptionPlans();
+    } catch (err) {
+      console.error('Failed to toggle plan status:', err);
+    }
+
+    showToast(`Plan is now ${nextActive ? 'ACTIVE' : 'INACTIVE'} in database`, 'info');
   };
 
   // Admin: Add a new custom plan
-  const addPublishingPlan = (newPlan) => {
+  const addPublishingPlan = async (newPlan) => {
     const planId = newPlan.id || 'plan_' + Date.now();
     const formatted = {
       ...newPlan,
@@ -829,13 +913,39 @@ export const AppProvider = ({ children }) => {
       features: Array.isArray(newPlan.features) ? newPlan.features : ['Influencer badge', 'Advanced analytics & rewards']
     };
     setPublishingPlans(prev => [...prev, formatted]);
-    showToast(`🎉 New plan "${newPlan.name}" added to influencer plans!`, 'success');
+
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      await fetch('/api/subscriptions/admin/plans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(formatted)
+      });
+      await fetchSubscriptionPlans();
+    } catch (err) {
+      console.error('Failed to save new plan to database:', err);
+    }
+
+    showToast(`🎉 New plan "${newPlan.name}" saved to database!`, 'success');
   };
 
   // Admin: Delete a plan
-  const deletePublishingPlan = (planId) => {
+  const deletePublishingPlan = async (planId) => {
     setPublishingPlans(prev => prev.filter(p => p.id !== planId));
-    showToast('Plan removed from user-side pricing.', 'info');
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      await fetch(`/api/subscriptions/admin/plans/${planId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      await fetchSubscriptionPlans();
+    } catch (err) {
+      console.error('Failed to delete plan from database:', err);
+    }
+    showToast('Plan removed from database.', 'info');
   };
 
   // Admin: Reset plans to default
@@ -1866,6 +1976,8 @@ export const AppProvider = ({ children }) => {
         deleteComment,
         fetchComments,
         fetchLiveVideos,
+        fetchLiveStories,
+        fetchLiveNotifications,
         blockedUsers,
         blockUser,
         unblockUser,
@@ -1893,6 +2005,7 @@ export const AppProvider = ({ children }) => {
         submitCopyrightReport,
         handlePendingApproval,
         publishingPlans,
+        fetchSubscriptionPlans,
         updatePublishingPlan,
         addPublishingPlan,
         deletePublishingPlan,
