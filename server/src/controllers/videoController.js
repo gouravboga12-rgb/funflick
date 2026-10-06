@@ -59,6 +59,12 @@ export async function createVideo(req, res) {
     // Normal users go to 'Pending' verification queue; admin goes straight to 'Approved'
     const initialStatus = req.user.role === 'admin' ? 'Approved' : 'Pending';
 
+    // Safe thumbnail fallback
+    let safeThumbnail = thumbnail_url || video_url;
+    if (typeof safeThumbnail === 'string' && safeThumbnail.length > 5000000) {
+      safeThumbnail = video_url;
+    }
+
     const [result] = await pool.query(
       `INSERT INTO videos (user_id, title, description, category, video_url, thumbnail_url, duration, media_type, hashtags, location, audio_title, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -68,7 +74,7 @@ export async function createVideo(req, res) {
         description || '',
         category || 'Comedy',
         video_url,
-        thumbnail_url || video_url,
+        safeThumbnail,
         duration || 0,
         media_type || 'video',
         hashtags || '',
@@ -98,7 +104,7 @@ export async function createVideo(req, res) {
         description,
         category,
         video_url,
-        thumbnail_url: thumbnail_url || video_url,
+        thumbnail_url: safeThumbnail,
         media_type,
         duration,
         status: initialStatus,
@@ -109,7 +115,7 @@ export async function createVideo(req, res) {
     });
   } catch (err) {
     console.error('Create video error:', err);
-    return res.status(500).json({ error: 'Failed to publish content' });
+    return res.status(500).json({ error: err.message || 'Failed to publish content' });
   }
 }
 

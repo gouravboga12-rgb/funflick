@@ -267,7 +267,22 @@ export const UploadVideoScreen = () => {
       const finalTitle = title.trim() || description.trim().slice(0, 40) || 'Untitled Reel';
       const finalHashtags = selectedTags.map(t => `#${t}`).join(' ');
 
-      // 2. Persist to MySQL database on AWS
+      // 2. Upload thumbnail frame to S3 if captured as base64 data URL
+      let finalThumbnailUrl = finalMediaUrl;
+      if (thumbnailUrl && thumbnailUrl.startsWith('data:image/')) {
+        try {
+          const thumbBlob = await (await fetch(thumbnailUrl)).blob();
+          const thumbFile = new File([thumbBlob], `thumb_${Date.now()}.jpg`, { type: 'image/jpeg' });
+          finalThumbnailUrl = await uploadFileToS3(thumbFile, 'thumbnails');
+        } catch (e) {
+          console.warn('Fallback thumbnail upload:', e);
+          finalThumbnailUrl = thumbnailUrl;
+        }
+      } else if (thumbnailUrl && !thumbnailUrl.startsWith('blob:')) {
+        finalThumbnailUrl = thumbnailUrl;
+      }
+
+      // 3. Persist to MySQL database on AWS
       const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
       const res = await fetch('/api/videos', {
         method: 'POST',
@@ -280,7 +295,7 @@ export const UploadVideoScreen = () => {
           description: description.trim(),
           category,
           video_url: finalMediaUrl,
-          thumbnail_url: thumbnailUrl || finalMediaUrl,
+          thumbnail_url: finalThumbnailUrl,
           duration: Math.round(videoDuration) || 30,
           media_type: 'video',
           hashtags: finalHashtags,
@@ -297,7 +312,7 @@ export const UploadVideoScreen = () => {
       const resData = await res.json();
       setProgress(100);
 
-      // 3. Immediately refresh live feed from MySQL
+      // 4. Immediately refresh live feed from MySQL
       await fetchLiveVideos();
 
       setSubmittedItem({
@@ -315,7 +330,11 @@ export const UploadVideoScreen = () => {
         });
       } catch (e) {}
 
-      showToast('🎥 Reel uploaded & submitted to Admin Approval Desk!', 'success');
+      if (resData.status === 'Approved') {
+        showToast('🎉 Reel approved & published live to FunFlick!', 'success');
+      } else {
+        showToast('⏳ Reel submitted for Admin Verification! Once verified, it will be published live.', 'info');
+      }
     } catch (err) {
       console.error('Upload video error:', err);
       showToast(err.message || 'Upload failed', 'error');
