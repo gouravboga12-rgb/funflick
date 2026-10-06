@@ -1,30 +1,39 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, Send, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Heart, Send, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 export const StoryViewerModal = () => {
+  const navigate = useNavigate();
   const { activeStoryGroup, setActiveStoryGroup, showToast } = useApp();
   const [currentIdx, setCurrentIdx] = useState(0);
   const [replyText, setReplyText] = useState('');
   const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
   useEffect(() => {
     setCurrentIdx(0);
-    setIsLiked(false);
   }, [activeStoryGroup]);
+
+  const stories = activeStoryGroup?.stories || [];
+  const currentStory = stories[currentIdx] || stories[0];
+
+  useEffect(() => {
+    if (currentStory) {
+      setIsLiked(Boolean(currentStory.isLiked));
+      setLikesCount(Number(currentStory.likesCount) || 0);
+    }
+  }, [currentStory, currentIdx]);
 
   if (!activeStoryGroup || !activeStoryGroup.stories || activeStoryGroup.stories.length === 0) {
     return null;
   }
 
-  const stories = activeStoryGroup.stories;
-  const currentStory = stories[currentIdx] || stories[0];
-
   const handleNext = () => {
     if (currentIdx < stories.length - 1) {
       setCurrentIdx(prev => prev + 1);
-      setIsLiked(false);
     } else {
       setActiveStoryGroup(null);
     }
@@ -33,15 +42,82 @@ export const StoryViewerModal = () => {
   const handlePrev = () => {
     if (currentIdx > 0) {
       setCurrentIdx(prev => prev - 1);
-      setIsLiked(false);
     }
   };
 
-  const handleSendReply = (e) => {
+  // Real Story Like / Unlike linked with AWS MySQL database
+  const handleToggleLike = async () => {
+    if (!currentStory?.id) return;
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (!token) {
+      showToast('Please login to like stories', 'info');
+      return;
+    }
+
+    const nextLiked = !isLiked;
+    setIsLiked(nextLiked);
+    setLikesCount(prev => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+
+    try {
+      const res = await fetch(`/api/stories/${currentStory.id}/like`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsLiked(Boolean(data.liked));
+        setLikesCount(Number(data.likesCount) || 0);
+      }
+    } catch (err) {
+      console.warn('Story like error:', err);
+    }
+  };
+
+  // Real Story Reply sending direct message to creator and redirecting to 1-to-1 conversation
+  const handleSendReply = async (e) => {
     e.preventDefault();
-    if (!replyText.trim()) return;
-    showToast(`Replied to @${activeStoryGroup.username}'s story! ✨`, 'success');
-    setReplyText('');
+    if (!replyText.trim() || !activeStoryGroup?.userId) return;
+
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (!token) {
+      showToast('Please login to send message', 'info');
+      return;
+    }
+
+    setIsSendingReply(true);
+    const targetUserId = activeStoryGroup.userId;
+    const targetUsername = activeStoryGroup.username;
+    const textToSend = `Replied to story: "${replyText.trim()}"`;
+
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          recipientId: targetUserId,
+          messageText: textToSend,
+          mediaUrl: currentStory.mediaUrl
+        })
+      });
+
+      if (res.ok) {
+        showToast(`💬 Replied to @${targetUsername}'s story!`, 'success');
+        setReplyText('');
+        setActiveStoryGroup(null);
+        navigate(`/messages?user=${targetUserId}`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || 'Failed to send story reply', 'error');
+      }
+    } catch (err) {
+      console.error('Story reply error:', err);
+      showToast('Could not send story reply', 'error');
+    } finally {
+      setIsSendingReply(false);
+    }
   };
 
   return (
@@ -65,7 +141,7 @@ export const StoryViewerModal = () => {
               alt="Story" 
               onError={(e) => {
                 e.currentTarget.onerror = null;
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80';
+                e.currentTarget.src = '/brand/funflick-logo.png';
               }}
               className="w-full h-full object-cover" 
             />
@@ -92,23 +168,23 @@ export const StoryViewerModal = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <img 
-                src={activeStoryGroup.avatar} 
+                src={activeStoryGroup.avatar || '/brand/default-avatar.svg'} 
                 alt={activeStoryGroup.username} 
                 className="w-9 h-9 rounded-full object-cover border border-white/50" 
               />
               <div>
                 <span className="text-xs font-bold text-white block">
-                  {activeStoryGroup.username}
+                  @{activeStoryGroup.username}
                 </span>
                 <span className="text-[10px] text-gray-300">
-                  {currentStory.time || '1h ago'}
+                  {currentStory.time || 'Active Story'}
                 </span>
               </div>
             </div>
 
             <button 
               onClick={() => setActiveStoryGroup(null)}
-              className="p-1.5 rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-md"
+              className="p-1.5 rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-md transition"
             >
               <X className="w-5 h-5" />
             </button>
@@ -139,21 +215,34 @@ export const StoryViewerModal = () => {
               placeholder={`Reply to ${activeStoryGroup.username}...`}
               className="flex-1 bg-white/15 backdrop-blur-md text-white placeholder-gray-300 text-xs px-4 py-2.5 rounded-full border border-white/20 focus:outline-none focus:border-pink-500"
             />
+            
+            {/* Story Like Button */}
             <button
               type="button"
-              onClick={() => setIsLiked(!isLiked)}
-              className={`p-2.5 rounded-full backdrop-blur-md transition ${
-                isLiked ? 'bg-pink-600 text-white' : 'bg-white/15 text-white hover:bg-white/25'
+              onClick={handleToggleLike}
+              className={`p-2.5 rounded-full backdrop-blur-md transition flex items-center gap-1 active:scale-95 ${
+                isLiked ? 'bg-[#ff007a] text-white shadow-lg shadow-pink-500/30' : 'bg-white/15 text-white hover:bg-white/25'
               }`}
+              title={isLiked ? 'Liked' : 'Like Story'}
             >
-              <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
+              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current text-white' : 'text-white'}`} />
+              {likesCount > 0 && (
+                <span className="text-[10px] font-bold pr-0.5">{likesCount}</span>
+              )}
             </button>
+
+            {/* Send Reply Button */}
             <button
               type="submit"
-              disabled={!replyText.trim()}
-              className="p-2.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white disabled:opacity-40"
+              disabled={!replyText.trim() || isSendingReply}
+              className="p-2.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white disabled:opacity-40 transition active:scale-95 shadow-md shadow-pink-500/25"
+              title="Send reply message"
             >
-              <Send className="w-4 h-4" />
+              {isSendingReply ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </button>
           </form>
         </div>

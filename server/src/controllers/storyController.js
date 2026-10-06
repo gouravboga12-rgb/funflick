@@ -2,15 +2,18 @@ import pool from '../config/db.js';
 
 export async function listStories(req, res) {
   try {
+    const currentUserId = req.user?.id || 0;
     const [rows] = await pool.query(`
       SELECT 
         s.id, s.user_id, s.media_url, s.media_type, s.caption, s.music, s.sticker, s.created_at, s.status,
+        s.likes_count,
+        (SELECT COUNT(*) FROM story_likes sl WHERE sl.story_id = s.id AND sl.user_id = ?) AS user_liked,
         u.name, u.username, u.avatar_url
       FROM stories s
       JOIN users u ON s.user_id = u.id
       WHERE (s.expires_at IS NULL OR s.expires_at > NOW()) AND (s.status = 'Approved' OR s.status IS NULL) AND (u.status IS NULL OR u.status != 'Suspended')
       ORDER BY s.created_at DESC
-    `);
+    `, [currentUserId]);
 
     // Group stories by creator
     const grouped = {};
@@ -33,6 +36,8 @@ export async function listStories(req, res) {
         caption: row.caption || '',
         music: row.music,
         sticker: row.sticker,
+        likesCount: Number(row.likes_count) || 0,
+        isLiked: Boolean(row.user_liked),
         time: 'Recently',
         created_at: row.created_at
       });
@@ -42,6 +47,46 @@ export async function listStories(req, res) {
   } catch (err) {
     console.error('List stories error:', err);
     return res.status(500).json({ error: 'Failed to fetch stories' });
+  }
+}
+
+export async function toggleStoryLike(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const [existing] = await pool.query(
+      'SELECT id FROM story_likes WHERE user_id = ? AND story_id = ?',
+      [userId, id]
+    );
+
+    if (existing.length > 0) {
+      await pool.query('DELETE FROM story_likes WHERE user_id = ? AND story_id = ?', [userId, id]);
+      await pool.query('UPDATE stories SET likes_count = GREATEST(0, likes_count - 1) WHERE id = ?', [id]);
+      const [cnt] = await pool.query('SELECT likes_count FROM stories WHERE id = ?', [id]);
+      return res.json({ liked: false, likesCount: cnt[0]?.likes_count || 0 });
+    } else {
+      await pool.query('INSERT INTO story_likes (user_id, story_id) VALUES (?, ?)', [userId, id]);
+      await pool.query('UPDATE stories SET likes_count = likes_count + 1 WHERE id = ?', [id]);
+
+      // Notify story creator if not self
+      try {
+        const [sRows] = await pool.query('SELECT user_id FROM stories WHERE id = ?', [id]);
+        if (sRows.length > 0 && sRows[0].user_id !== userId) {
+          await pool.query(
+            `INSERT INTO notifications (user_id, actor_id, type, title, message, target_id)
+             VALUES (?, ?, 'like', 'Story Liked ❤️', 'liked your story', ?)`,
+            [sRows[0].user_id, userId, id]
+          );
+        }
+      } catch (e) {}
+
+      const [cnt] = await pool.query('SELECT likes_count FROM stories WHERE id = ?', [id]);
+      return res.json({ liked: true, likesCount: cnt[0]?.likes_count || 1 });
+    }
+  } catch (err) {
+    console.error('Toggle story like error:', err);
+    return res.status(500).json({ error: 'Failed to toggle story like' });
   }
 }
 

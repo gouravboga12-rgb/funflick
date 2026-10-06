@@ -19,6 +19,7 @@ import {
   UserX,
   UserCheck
 } from 'lucide-react';
+import { SuspendAccountModal } from '../../components/admin/SuspendAccountModal';
 
 export const AdminStoryScreen = () => {
   const { showToast, fetchAdminStats, fetchLiveStories } = useApp();
@@ -26,7 +27,7 @@ export const AdminStoryScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activePreview, setActivePreview] = useState(null);
   const [isDeletingId, setIsDeletingId] = useState(null);
-  const [isSuspendingUserId, setIsSuspendingUserId] = useState(null);
+  const [suspendingUser, setSuspendingUser] = useState(null);
 
   const fetchActiveStories = async () => {
     setIsLoading(true);
@@ -89,39 +90,26 @@ export const AdminStoryScreen = () => {
     }
   };
 
-  // Suspend or reactivate story owner
-  const handleToggleUserSuspension = async (userId, currentStatus) => {
-    const isSuspending = currentStatus === 'Active';
-    const msg = isSuspending 
-      ? 'Suspend this account? The user will be blocked from uploading or interacting.'
-      : 'Reactivate this user account?';
-
-    if (!window.confirm(msg)) return;
-
-    setIsSuspendingUserId(userId);
+  // Reactivate user directly
+  const handleReactivateUser = async (userId, username) => {
+    if (!window.confirm(`Reactivate account @${username}? The user will be restored immediately.`)) return;
     try {
-      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
-      const res = await fetch(`/api/admin/stories/users/${userId}/suspend`, {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+      const res = await fetch(`/api/admin/users/${userId}/reactivate`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` }
       });
-
       if (res.ok) {
-        const data = await res.json();
-        const nextStatus = data.userStatus;
-        showToast(`User account status updated: ${nextStatus}!`, 'info');
-        setStories(prev => prev.map(s => s.userId === userId ? { ...s, userStatus: nextStatus } : s));
+        showToast(`✅ Account @${username} reactivated!`, 'success');
+        setStories(prev => prev.map(s => s.userId === userId ? { ...s, userStatus: 'Active' } : s));
         if (activePreview?.userId === userId) {
-          setActivePreview(prev => ({ ...prev, userStatus: nextStatus }));
+          setActivePreview(prev => ({ ...prev, userStatus: 'Active' }));
         }
       } else {
-        showToast('Failed to toggle suspension', 'error');
+        showToast('Failed to reactivate user', 'error');
       }
-    } catch (err) {
-      console.error('Toggle suspension error:', err);
-      showToast('Error updating account status', 'error');
-    } finally {
-      setIsSuspendingUserId(null);
+    } catch (e) {
+      showToast('Error reactivating user', 'error');
     }
   };
 
@@ -305,16 +293,21 @@ export const AdminStoryScreen = () => {
                   </button>
 
                   <button
-                    onClick={() => handleToggleUserSuspension(story.userId, story.userStatus)}
-                    disabled={isSuspending}
+                    onClick={() => {
+                      if (isSuspended) {
+                        handleReactivateUser(story.userId, story.username);
+                      } else {
+                        setSuspendingUser({ id: story.userId, name: story.name || story.username, username: story.username });
+                      }
+                    }}
                     className={`p-2 rounded-xl border transition ${
                       isSuspended
                         ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border-emerald-500/30'
-                        : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10'
+                        : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/20'
                     }`}
-                    title={isSuspended ? 'Reactivate Account' : 'Suspend Account'}
+                    title={isSuspended ? 'Reactivate Account' : 'Suspend Account with Duration'}
                   >
-                    {isSuspended ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4 text-rose-400" />}
+                    {isSuspended ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
@@ -377,16 +370,54 @@ export const AdminStoryScreen = () => {
               )}
             </div>
 
-            {/* Delete CTA */}
-            <button
-              onClick={() => handleDeleteStory(activePreview.id)}
-              className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-lg shadow-rose-600/30"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Delete Violating Story Immediately</span>
-            </button>
+            {/* Actions CTA */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleDeleteStory(activePreview.id)}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-lg shadow-rose-600/30"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Story</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (activePreview.userStatus === 'Suspended') {
+                    handleReactivateUser(activePreview.userId, activePreview.username);
+                  } else {
+                    setSuspendingUser({ id: activePreview.userId, name: activePreview.name || activePreview.username, username: activePreview.username });
+                  }
+                }}
+                className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition ${
+                  activePreview.userStatus === 'Suspended'
+                    ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20'
+                }`}
+                title={activePreview.userStatus === 'Suspended' ? 'Reactivate User' : 'Suspend User'}
+              >
+                {activePreview.userStatus === 'Suspended' ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                <span>{activePreview.userStatus === 'Suspended' ? 'Reactivate' : 'Suspend'}</span>
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Suspend Account Modal */}
+      {suspendingUser && (
+        <SuspendAccountModal
+          isOpen={!!suspendingUser}
+          onClose={() => setSuspendingUser(null)}
+          user={suspendingUser}
+          onSuccess={() => {
+            showToast(`User @${suspendingUser.username} suspended`, 'success');
+            setStories(prev => prev.map(s => s.userId === suspendingUser.id ? { ...s, userStatus: 'Suspended' } : s));
+            if (activePreview?.userId === suspendingUser.id) {
+              setActivePreview(prev => ({ ...prev, userStatus: 'Suspended' }));
+            }
+            setSuspendingUser(null);
+          }}
+        />
       )}
     </AdminLayout>
   );

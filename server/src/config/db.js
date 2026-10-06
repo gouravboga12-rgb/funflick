@@ -117,8 +117,13 @@ export async function initDatabase() {
     const userCols = [
       { name: 'is_influencer', def: 'TINYINT DEFAULT 0' },
       { name: 'subscription_plan', def: 'VARCHAR(100) DEFAULT NULL' },
+      { name: 'subscription_start', def: 'TIMESTAMP NULL DEFAULT NULL' },
+      { name: 'subscription_expires_at', def: 'TIMESTAMP NULL DEFAULT NULL' },
       { name: 'wallet_balance', def: 'INT DEFAULT 0' },
-      { name: 'status', def: "ENUM('Active', 'Suspended') DEFAULT 'Active'" }
+      { name: 'status', def: "ENUM('Active', 'Suspended') DEFAULT 'Active'" },
+      { name: 'suspended_at', def: 'TIMESTAMP NULL DEFAULT NULL' },
+      { name: 'suspended_until', def: 'TIMESTAMP NULL DEFAULT NULL' },
+      { name: 'suspension_reason', def: 'VARCHAR(255) DEFAULT NULL' }
     ];
     for (const col of userCols) {
       try {
@@ -128,6 +133,46 @@ export async function initDatabase() {
         }
       } catch (e) {}
     }
+
+    // User Subscriptions History Table (Tracks all purchases, renewals & extensions)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS user_subscriptions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        plan_id VARCHAR(50) NOT NULL,
+        plan_name VARCHAR(100) NOT NULL,
+        price INT NOT NULL,
+        duration_days INT NOT NULL,
+        payment_id VARCHAR(100) DEFAULT NULL,
+        payment_status ENUM('success', 'pending', 'failed') DEFAULT 'success',
+        start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        end_date TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_user_sub (user_id)
+      ) ENGINE=InnoDB;
+    `);
+
+    // Story Likes Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS story_likes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        story_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_user_story_like (user_id, story_id),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+    `);
+
+    // Migration helper: add likes_count to stories if not present
+    try {
+      const [stLikeCol] = await connection.query("SHOW COLUMNS FROM stories LIKE 'likes_count'");
+      if (stLikeCol.length === 0) {
+        await connection.query("ALTER TABLE stories ADD COLUMN likes_count INT DEFAULT 0");
+      }
+    } catch (e) {}
 
     // Migration helper: add video columns if not present
     const videoCols = [

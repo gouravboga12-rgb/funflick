@@ -245,6 +245,17 @@ export const AppProvider = ({ children }) => {
   // Active Story Viewer Modal
   const [activeStoryGroup, setActiveStoryGroup] = useState(null);
 
+  // Real database-backed user subscription status & history
+  const [subscriptionStatus, setSubscriptionStatus] = useState({
+    isActive: false,
+    isExpired: false,
+    planName: null,
+    startDate: null,
+    expiresAt: null,
+    daysRemaining: 0,
+    history: []
+  });
+
   // App Theme state ('dark' | 'light')
   const [theme, setTheme] = useState('dark');
 
@@ -263,6 +274,15 @@ export const AppProvider = ({ children }) => {
       return next;
     });
   };
+
+  useEffect(() => {
+    fetchLiveVideos();
+    fetchLiveStories();
+    fetchLiveNotifications();
+    fetchLiveConversations();
+    fetchMyMedia();
+    fetchUserSubscriptionStatus();
+  }, []);
 
   // Live Feed & Videos synchronization with AWS MySQL backend
   const fetchLiveVideos = async () => {
@@ -1016,8 +1036,42 @@ export const AppProvider = ({ children }) => {
     showToast(`🎉 Influencer Status Activated! Welcome to FunFlick Influencer Suite (${plan.name})`, 'success');
   };
 
-  // Record Verified Razorpay Test Subscription Payment
-  const recordSubscriptionPayment = ({ plan, paymentId, paymentMethod = 'Razorpay Test (UPI / Card)' }) => {
+  // Fetch real subscription validity and history from backend
+  const fetchUserSubscriptionStatus = async () => {
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/subscriptions/my-status', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSubscriptionStatus({
+          isActive: Boolean(data.isActive),
+          isExpired: Boolean(data.isExpired),
+          planName: data.planName,
+          startDate: data.startDate,
+          expiresAt: data.expiresAt,
+          daysRemaining: data.daysRemaining || 0,
+          history: data.history || []
+        });
+
+        setCurrentUser(prev => ({
+          ...prev,
+          isInfluencer: Boolean(data.isActive),
+          subscriptionPlan: data.isActive ? data.planName : (prev.subscriptionPlan || null),
+          subscriptionStart: data.startDate,
+          subscriptionExpiresAt: data.expiresAt,
+          subscriptionDaysRemaining: data.daysRemaining || 0
+        }));
+      }
+    } catch (err) {
+      console.warn('Failed to fetch user subscription status:', err);
+    }
+  };
+
+  // Record Verified Razorpay Subscription Payment & Sync with MySQL Backend
+  const recordSubscriptionPayment = async ({ plan, paymentId, paymentMethod = 'Razorpay Test (UPI / Card)' }) => {
     const now = new Date();
     const formattedDate = now.toLocaleDateString('en-US', {
       month: 'short',
@@ -1032,10 +1086,10 @@ export const AppProvider = ({ children }) => {
     const newTransaction = {
       id: 'pay_' + (paymentId || ('test_' + Date.now())),
       razorpayPaymentId: paymentId || `pay_test_${Math.random().toString(36).substring(2, 9)}`,
-      user: currentUser.username || 'srilatha_16',
-      userName: currentUser.name || 'Srilatha Reddy',
-      userEmail: currentUser.email || 'srilatha@funflick.com',
-      userAvatar: currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+      user: currentUser.username || 'user',
+      userName: currentUser.name || 'User',
+      userEmail: currentUser.email || 'user@funflick.com',
+      userAvatar: currentUser.avatar || '/brand/default-avatar.svg',
       planId: plan.id,
       planName: plan.name,
       planDuration: plan.duration || '30 Days',
@@ -1051,7 +1105,39 @@ export const AppProvider = ({ children }) => {
 
     setSubscriptionTransactions(prev => [newTransaction, ...prev]);
 
-    // Activate Influencer Status for the user
+    // Send real subscription event to backend MySQL
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (token) {
+      try {
+        const subRes = await fetch('/api/subscriptions/subscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            planId: plan.id,
+            planName: plan.name,
+            price: plan.price,
+            paymentId: newTransaction.razorpayPaymentId
+          })
+        });
+
+        if (subRes.ok) {
+          const subData = await subRes.json();
+          if (subData.isExtension) {
+            showToast(`🎉 Subscription Extended! Validity now: ${subData.totalRemainingDays} days remaining`, 'success');
+          } else {
+            showToast(`🎉 Influencer Plan Activated! Valid until ${new Date(subData.expiresAt).toLocaleDateString()}`, 'success');
+          }
+          await fetchUserSubscriptionStatus();
+        }
+      } catch (e) {
+        console.warn('Subscription sync to backend error:', e);
+      }
+    }
+
+    // Activate Influencer Status locally
     setCurrentUser(prev => ({
       ...prev,
       isInfluencer: true,
@@ -1076,7 +1162,6 @@ export const AppProvider = ({ children }) => {
     setTransactions(prev => [walletTx, ...prev]);
 
     setSubscriptionGateModalOpen(false);
-    showToast(`🎉 Razorpay Test Payment Successful! Influencer Plan Activated (${plan.name})`, 'success');
     return newTransaction;
   };
 
@@ -2245,6 +2330,8 @@ export const AppProvider = ({ children }) => {
         unblockUser,
         purchasePublishingSubscription,
         recordSubscriptionPayment,
+        subscriptionStatus,
+        fetchUserSubscriptionStatus,
         subscriptionTransactions,
         setSubscriptionTransactions,
         toggleUserSubscriptionStatus,

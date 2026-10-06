@@ -57,7 +57,9 @@ export const UserProfileScreen = () => {
     followingList,
     followersList,
     followRequests,
-    transactions
+    transactions,
+    subscriptionStatus,
+    fetchUserSubscriptionStatus
   } = useApp();
 
   // Dynamic live follower counts from backend
@@ -94,6 +96,7 @@ export const UserProfileScreen = () => {
   React.useEffect(() => {
     fetchLiveFollowCounts();
     if (fetchMyMedia) fetchMyMedia();
+    if (fetchUserSubscriptionStatus) fetchUserSubscriptionStatus();
   }, [currentUser?.username]);
 
   // Compute real dynamic stats from database
@@ -447,7 +450,7 @@ export const UserProfileScreen = () => {
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-white font-heading">
                       {currentUser.isInfluencer
-                        ? `Influencer Plan: ${currentUser.subscriptionPlan || 'Monthly Pass'}`
+                        ? `Influencer Plan: ${subscriptionStatus?.planName || currentUser.subscriptionPlan || 'Monthly Pass'}`
                         : 'Upgrade to Influencer Status'}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold ${
@@ -455,12 +458,17 @@ export const UserProfileScreen = () => {
                         ? 'bg-emerald-500/20 text-emerald-300'
                         : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
                     }`}>
-                      {currentUser.isInfluencer ? 'SUBSCRIBED' : 'BOOST REACH'}
+                      {currentUser.isInfluencer ? 'ACTIVE' : 'BOOST REACH'}
                     </span>
                   </div>
                   <p className="text-[10px] text-gray-300 mt-0.5">
                     {currentUser.isInfluencer
-                      ? 'Deep analytics (Views, Likes, Comments, Shares, Saves, Performance) & Admin rewards eligible'
+                      ? (
+                        <span>
+                          Valid until <strong className="text-emerald-300">{subscriptionStatus?.expiresAt ? new Date(subscriptionStatus.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Active'}</strong>
+                          {subscriptionStatus?.daysRemaining > 0 && <span className="text-amber-300 ml-1">({subscriptionStatus.daysRemaining} days left)</span>}
+                        </span>
+                      )
                       : 'Free uploads active for everyone. Subscribe to become an Influencer and unlock deep analytics & rewards!'}
                   </p>
                 </div>

@@ -3,15 +3,13 @@ import pool from '../config/db.js';
 export async function savePayoutDetails(req, res) {
   try {
     const userId = req.user.id;
-    const { 
-      payout_type = 'bank', 
-      bank_name = '', 
-      account_number = '', 
-      ifsc_code = '', 
-      upi_id = '', 
-      phone_number = '', 
-      email_id = '' 
-    } = req.body;
+    const payout_type = req.body.payout_type || req.body.payout_method || 'bank';
+    const bank_name = req.body.bank_name || '';
+    const account_number = req.body.account_number || '';
+    const ifsc_code = req.body.ifsc_code || '';
+    const upi_id = req.body.upi_id || '';
+    const phone_number = req.body.phone_number || req.body.phone || '';
+    const email_id = req.body.email_id || req.body.email || '';
 
     // Validation
     if (payout_type === 'bank') {
@@ -85,28 +83,24 @@ export async function getPayoutDetails(req, res) {
     const userPhone = uRows[0]?.phone || '';
     const userEmail = uRows[0]?.email || '';
 
-    if (rows.length === 0) {
-      return res.json({
-        hasDetails: false,
-        details: {
-          payout_type: 'bank',
-          bank_name: '',
-          account_number: '',
-          ifsc_code: '',
-          upi_id: '',
-          phone_number: userPhone,
-          email_id: userEmail
-        }
-      });
-    }
+    const d = rows[0] || {};
+    const details = {
+      payout_type: d.payout_type || 'bank',
+      payout_method: d.payout_type || 'bank',
+      bank_name: d.bank_name || '',
+      account_number: d.account_number || '',
+      ifsc_code: d.ifsc_code || '',
+      upi_id: d.upi_id || '',
+      phone: d.phone_number || userPhone,
+      phone_number: d.phone_number || userPhone,
+      email: d.email_id || userEmail,
+      email_id: d.email_id || userEmail
+    };
 
     return res.json({
-      hasDetails: true,
-      details: {
-        ...rows[0],
-        phone_number: rows[0].phone_number || userPhone,
-        email_id: rows[0].email_id || userEmail
-      }
+      hasDetails: rows.length > 0,
+      payoutDetails: details,
+      details
     });
   } catch (err) {
     console.error('Get payout details error:', err);
@@ -228,7 +222,7 @@ export async function markAsPaidAdmin(req, res) {
       creator_id, 
       amount, 
       payment_method = 'Bank Transfer', 
-      payment_reference = '', 
+      payment_reference = req.body.admin_reference || '', 
       notes = '', 
       settled_views = 0,
       video_id = null 

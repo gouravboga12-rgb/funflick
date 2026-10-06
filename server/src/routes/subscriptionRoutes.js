@@ -5,7 +5,8 @@ import {
   updatePlanAdmin, 
   createPlanAdmin, 
   deletePlanAdmin, 
-  subscribeUser 
+  subscribeUser,
+  getUserSubscriptionStatus 
 } from '../controllers/subscriptionController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -14,8 +15,11 @@ const router = Router();
 // Public / User side: get active plans
 router.get('/plans', getActivePlans);
 
-// User side: activate subscription
+// User side: activate or extend subscription
 router.post('/subscribe', authenticateToken, subscribeUser);
+
+// User side: get subscription status, remaining validity and history
+router.get('/my-status', authenticateToken, getUserSubscriptionStatus);
 
 // Admin endpoints
 router.get('/admin/plans', authenticateToken, getAllPlansAdmin);

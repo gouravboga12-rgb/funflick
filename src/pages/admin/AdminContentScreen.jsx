@@ -21,8 +21,11 @@ import {
   Filter,
   Loader2,
   AlertCircle,
-  FileText
+  FileText,
+  Trash2,
+  UserX
 } from 'lucide-react';
+import { SuspendAccountModal } from '../../components/admin/SuspendAccountModal';
 
 export const AdminContentScreen = () => {
   const { showToast, fetchAdminStats } = useApp();
@@ -34,6 +37,35 @@ export const AdminContentScreen = () => {
   // Inspection / Preview Modal
   const [previewItem, setPreviewItem] = useState(null);
   const [isProcessingId, setIsProcessingId] = useState(null);
+  const [suspendingUser, setSuspendingUser] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+
+  // Permanently delete violating content
+  const handleDeleteContent = async (itemId) => {
+    if (!window.confirm('Are you sure you want to permanently delete this content from AWS S3 & database?')) {
+      return;
+    }
+    setDeletingId(itemId);
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      const res = await fetch(`/api/admin/content/${itemId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        showToast('🗑️ Content deleted successfully from platform!', 'success');
+        setContentList(prev => prev.filter(c => c.id !== itemId));
+        if (previewItem?.id === itemId) setPreviewItem(null);
+        if (fetchAdminStats) fetchAdminStats();
+      } else {
+        showToast('Failed to delete content', 'error');
+      }
+    } catch (e) {
+      showToast('Error deleting content', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // Fetch real content from backend based on selected tab
   const fetchContent = async (selectedTab = tab) => {
@@ -377,7 +409,7 @@ export const AdminContentScreen = () => {
                 </div>
 
                 {/* Moderation Actions Bar */}
-                <div className="pt-2 border-t border-white/5 flex items-center gap-2">
+                <div className="pt-2 border-t border-white/5 flex items-center gap-1.5 flex-wrap">
                   <button
                     onClick={() => setPreviewItem(item)}
                     className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition"
@@ -395,7 +427,7 @@ export const AdminContentScreen = () => {
                         className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-95 text-white font-bold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition flex items-center justify-center gap-1.5"
                       >
                         <Check className="w-3.5 h-3.5" />
-                        <span>Approve & Publish</span>
+                        <span>Approve</span>
                       </button>
 
                       <button
@@ -412,13 +444,13 @@ export const AdminContentScreen = () => {
                     <>
                       <div className="flex-1 text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Live on FunFlick</span>
+                        <span>Live</span>
                       </div>
 
                       <button
                         onClick={() => handleModerate(item.id, 'reopen')}
                         disabled={isProcessing}
-                        className="py-1.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-xs flex items-center gap-1 transition"
+                        className="py-1.5 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-xs flex items-center gap-1 transition"
                         title="Reopen review"
                       >
                         <RotateCcw className="w-3 h-3" />
@@ -446,7 +478,7 @@ export const AdminContentScreen = () => {
                       <button
                         onClick={() => handleModerate(item.id, 'reopen')}
                         disabled={isProcessing}
-                        className="py-1.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-xs flex items-center gap-1 transition"
+                        className="py-1.5 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-xs flex items-center gap-1 transition"
                       >
                         <RotateCcw className="w-3 h-3" />
                         <span>Reopen</span>
@@ -455,12 +487,30 @@ export const AdminContentScreen = () => {
                       <button
                         onClick={() => handleModerate(item.id, 'approve')}
                         disabled={isProcessing}
-                        className="py-1.5 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs transition"
+                        className="py-1.5 px-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs transition"
                       >
                         Approve
                       </button>
                     </>
                   )}
+
+                  {/* Suspend Creator & Permanent Delete Buttons */}
+                  <button
+                    onClick={() => setSuspendingUser({ id: item.userId, name: item.creatorName || item.creator, username: item.creator })}
+                    className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition"
+                    title="Suspend Creator Account"
+                  >
+                    <UserX className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteContent(item.id)}
+                    disabled={deletingId === item.id}
+                    className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
+                    title="Permanently Delete Media"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             );
@@ -572,7 +622,7 @@ export const AdminContentScreen = () => {
             </div>
 
             {/* Moderation Action Buttons in Modal */}
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center gap-2 pt-2 flex-wrap">
               <button
                 onClick={() => {
                   handleModerate(previewItem.id, 'reject');
@@ -588,7 +638,7 @@ export const AdminContentScreen = () => {
                   handleModerate(previewItem.id, 'reopen');
                 }}
                 disabled={isProcessingId === previewItem.id}
-                className="py-3 px-4 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-xs transition"
+                className="py-3 px-3 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-xs transition"
                 title="Reopen for Review"
               >
                 ↺ Reopen
@@ -603,9 +653,42 @@ export const AdminContentScreen = () => {
               >
                 ✓ Approve & Publish Live
               </button>
+
+              <button
+                onClick={() => setSuspendingUser({ id: previewItem.userId, name: previewItem.creatorName || previewItem.creator, username: previewItem.creator })}
+                className="py-3 px-3 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs flex items-center gap-1.5 transition"
+                title="Suspend Creator Account"
+              >
+                <UserX className="w-4 h-4" />
+                <span>Suspend</span>
+              </button>
+
+              <button
+                onClick={() => handleDeleteContent(previewItem.id)}
+                disabled={deletingId === previewItem.id}
+                className="py-3 px-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs flex items-center gap-1.5 transition"
+                title="Permanently Delete Media"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete</span>
+              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Account Suspension Modal */}
+      {suspendingUser && (
+        <SuspendAccountModal
+          isOpen={!!suspendingUser}
+          onClose={() => setSuspendingUser(null)}
+          user={suspendingUser}
+          onSuccess={() => {
+            showToast(`User @${suspendingUser.username || suspendingUser.name} suspended successfully`, 'success');
+            setSuspendingUser(null);
+            fetchContent(tab);
+          }}
+        />
       )}
     </AdminLayout>
   );

@@ -27,11 +27,14 @@ export const SubscriptionScreen = () => {
     recordSubscriptionPayment,
     showToast,
     publishingPlans = PUBLISHING_PLANS,
-    fetchSubscriptionPlans
+    fetchSubscriptionPlans,
+    subscriptionStatus,
+    fetchUserSubscriptionStatus
   } = useApp();
 
   useEffect(() => {
     if (fetchSubscriptionPlans) fetchSubscriptionPlans();
+    if (fetchUserSubscriptionStatus) fetchUserSubscriptionStatus();
   }, []);
 
   const activePlans = (publishingPlans && publishingPlans.length > 0) ? publishingPlans : PUBLISHING_PLANS;
@@ -160,21 +163,60 @@ export const SubscriptionScreen = () => {
           </p>
         </div>
 
-        {/* Current Active Plan Badge if subscribed */}
-        {currentUser.isInfluencer && (
-          <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+        {/* Current Subscription Validity & Status Card */}
+        {(subscriptionStatus?.isActive || currentUser.isInfluencer) && (
+          <div className="p-4 rounded-3xl bg-gradient-to-r from-emerald-950/60 via-purple-950/40 to-[#120d29] border border-emerald-500/40 shadow-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>{subscriptionStatus?.planName || currentUser.subscriptionPlan || 'Monthly Influencer Pro'}</span>
+                    <span className="px-2 py-0.2 rounded-full text-[9px] font-extrabold bg-emerald-500 text-black">ACTIVE</span>
+                  </h4>
+                  <span className="text-[10px] text-emerald-300">Creator Monetization & Reach Active</span>
+                </div>
+              </div>
+
+              {subscriptionStatus?.daysRemaining > 0 && (
+                <div className="text-right">
+                  <span className="text-base font-extrabold text-amber-300 font-mono block">
+                    {subscriptionStatus.daysRemaining}
+                  </span>
+                  <span className="text-[9px] text-gray-400 block -mt-1">days left</span>
+                </div>
+              )}
+            </div>
+
+            {/* Validity Timeline breakdown */}
+            <div className="grid grid-cols-2 gap-2 p-2.5 bg-black/40 rounded-2xl text-[11px] border border-white/5">
               <div>
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  ⭐ Influencer Active: {currentUser.subscriptionPlan || 'Monthly Influencer Pro'}
-                </span>
-                <span className="text-[10px] text-emerald-300">Eligible for Admin Performance Cash Rewards</span>
+                <span className="text-gray-400 block text-[10px]">Start Date:</span>
+                <strong className="text-gray-200">
+                  {subscriptionStatus?.startDate 
+                    ? new Date(subscriptionStatus.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                    : 'Active'}
+                </strong>
+              </div>
+              <div className="text-right">
+                <span className="text-gray-400 block text-[10px]">Valid Until / Expiry:</span>
+                <strong className="text-emerald-300">
+                  {subscriptionStatus?.expiresAt 
+                    ? new Date(subscriptionStatus.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                    : '30 Days'}
+                </strong>
               </div>
             </div>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white shadow">
-              INFLUENCER
-            </span>
+
+            {/* Extension Guarantee Callout */}
+            <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-200 flex items-start gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span>
+                <strong>Plan Extension Enabled:</strong> Purchasing another plan while this plan is active will <strong className="text-white underline">extend your existing expiry date</strong> (remaining {subscriptionStatus?.daysRemaining || 0} days + new plan duration).
+              </span>
+            </div>
           </div>
         )}
 

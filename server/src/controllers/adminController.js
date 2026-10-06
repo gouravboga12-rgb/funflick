@@ -2,33 +2,75 @@ import pool from '../config/db.js';
 
 export async function getAdminUsers(req, res) {
   try {
-    const [rows] = await pool.query(`
+    const { search = '', status = '', filter = '' } = req.query;
+
+    let query = `
       SELECT 
         u.id, u.name, u.username, u.email, u.phone, u.avatar_url,
-        u.role, u.is_influencer, u.subscription_plan, u.wallet_balance,
-        u.status, u.created_at,
-        (SELECT COUNT(*) FROM videos v WHERE v.user_id = u.id) AS posts_count
+        u.role, u.is_influencer, u.subscription_plan, u.subscription_start, u.subscription_expires_at, u.wallet_balance,
+        u.status, u.suspended_at, u.suspended_until, u.suspension_reason, u.created_at,
+        (SELECT COUNT(*) FROM videos v WHERE v.user_id = u.id) AS posts_count,
+        (SELECT COALESCE(SUM(views_count), 0) FROM videos v WHERE v.user_id = u.id) AS total_views
       FROM users u
-      ORDER BY u.created_at DESC
-    `);
+      WHERE 1=1
+    `;
+    const params = [];
 
-    const users = rows.map(r => ({
-      id: r.id,
-      name: r.name,
-      username: r.username,
-      email: r.email,
-      phone: r.phone || 'Not provided',
-      avatar: r.avatar_url || '/brand/default-avatar.svg',
-      role: r.role,
-      subscription: r.subscription_plan || (r.is_influencer ? 'Monthly (₹199)' : 'None'),
-      wallet: `₹${(r.wallet_balance || 0).toLocaleString()}`,
-      walletBalance: r.wallet_balance || 0,
-      joined: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-      status: r.status || 'Active',
-      postsCount: r.posts_count || 0
-    }));
+    if (search.trim()) {
+      query += ` AND (u.name LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)`;
+      const q = `%${search.trim()}%`;
+      params.push(q, q, q, q);
+    }
 
-    return res.json({ users, totalCount: users.length });
+    if (status && status !== 'all') {
+      query += ` AND u.status = ?`;
+      params.push(status);
+    }
+
+    if (filter === 'influencer') {
+      query += ` AND u.is_influencer = 1`;
+    }
+
+    query += ` ORDER BY u.created_at DESC`;
+
+    const [rows] = await pool.query(query, params);
+
+    const now = new Date();
+    const users = rows.map(r => {
+      const expDate = r.subscription_expires_at ? new Date(r.subscription_expires_at) : null;
+      const isSubActive = Boolean(r.is_influencer && expDate && expDate > now);
+
+      return {
+        id: r.id,
+        name: r.name,
+        username: r.username,
+        email: r.email,
+        phone: r.phone || 'Not provided',
+        avatar: r.avatar_url || '/brand/default-avatar.svg',
+        role: r.role,
+        isInfluencer: Boolean(r.is_influencer),
+        subscription: r.subscription_plan || (isSubActive ? 'Monthly Influencer Pro' : 'Free Member'),
+        subscriptionExpiresAt: r.subscription_expires_at,
+        subscriptionStart: r.subscription_start,
+        isSubscriptionActive: isSubActive,
+        wallet: `₹${(r.wallet_balance || 0).toLocaleString()}`,
+        walletBalance: r.wallet_balance || 0,
+        joined: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        status: r.status || 'Active',
+        suspendedAt: r.suspended_at,
+        suspendedUntil: r.suspended_until,
+        suspensionReason: r.suspension_reason,
+        postsCount: r.posts_count || 0,
+        totalViews: r.total_views || 0
+      };
+    });
+
+    return res.json({ 
+      users, 
+      totalCount: users.length,
+      activeCount: users.filter(u => u.status === 'Active').length,
+      suspendedCount: users.filter(u => u.status === 'Suspended').length
+    });
   } catch (err) {
     console.error('Get admin users error:', err);
     return res.status(500).json({ error: 'Failed to fetch registered users' });
@@ -38,16 +80,151 @@ export async function getAdminUsers(req, res) {
 export async function toggleUserStatus(req, res) {
   try {
     const { id } = req.params;
-    const [rows] = await pool.query('SELECT status FROM users WHERE id = ?', [id]);
+    const [rows] = await pool.query('SELECT status, username FROM users WHERE id = ?', [id]);
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
     const nextStatus = rows[0].status === 'Active' ? 'Suspended' : 'Active';
-    await pool.query('UPDATE users SET status = ? WHERE id = ?', [nextStatus, id]);
+    await pool.query('UPDATE users SET status = ?, suspended_until = NULL WHERE id = ?', [nextStatus, id]);
 
     return res.json({ success: true, status: nextStatus, message: `User status set to ${nextStatus}` });
   } catch (err) {
     console.error('Toggle user status error:', err);
     return res.status(500).json({ error: 'Failed to update user status' });
+  }
+}
+
+// Suspend account with duration: 1d, 3d, 7d, 30d, custom date, or permanent
+export async function suspendUserWithDuration(req, res) {
+  try {
+    const id = req.params.id || req.params.userId;
+    const { 
+      duration = '7d', // '1d' | '3d' | '7d' | '30d' | 'custom' | 'permanent'
+      customUntil = null,
+      reason = 'Violation of FunFlick community safety standards'
+    } = req.body;
+
+    const [rows] = await pool.query('SELECT id, name, username, email FROM users WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    const targetUser = rows[0];
+
+    const now = new Date();
+    let suspendedUntil = null;
+    let durationLabel = 'Permanent suspension';
+
+    if (duration === '1d') {
+      suspendedUntil = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
+      durationLabel = '1 Day (24 hours)';
+    } else if (duration === '3d') {
+      suspendedUntil = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+      durationLabel = '3 Days';
+    } else if (duration === '7d') {
+      suspendedUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      durationLabel = '7 Days';
+    } else if (duration === '30d') {
+      suspendedUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      durationLabel = '30 Days';
+    } else if (duration === 'custom' && customUntil) {
+      suspendedUntil = new Date(customUntil);
+      durationLabel = `Custom until ${suspendedUntil.toLocaleDateString('en-IN')}`;
+    } else {
+      suspendedUntil = null;
+      durationLabel = 'Permanent';
+    }
+
+    await pool.query(
+      `UPDATE users SET 
+        status = 'Suspended', 
+        suspended_at = NOW(), 
+        suspended_until = ?, 
+        suspension_reason = ? 
+       WHERE id = ?`,
+      [suspendedUntil, reason, id]
+    );
+
+    const endStr = suspendedUntil 
+      ? suspendedUntil.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : 'Permanent (Indefinite)';
+
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, actor_id, type, title, message)
+         VALUES (?, NULL, 'system', 'Account Suspended', ?)`,
+        [id, `⚠️ Your account has been suspended until ${endStr}. Reason: ${reason}`]
+      );
+    } catch (e) {}
+
+    return res.json({
+      success: true,
+      message: `Account @${targetUser.username} has been suspended (${durationLabel}).`,
+      user: {
+        id: targetUser.id,
+        username: targetUser.username,
+        status: 'Suspended',
+        suspendedAt: now,
+        suspendedUntil,
+        reason,
+        durationLabel
+      }
+    });
+  } catch (err) {
+    console.error('Suspend user with duration error:', err);
+    return res.status(500).json({ error: 'Failed to suspend user' });
+  }
+}
+
+// Reactivate user account
+export async function reactivateUser(req, res) {
+  try {
+    const id = req.params.id || req.params.userId;
+    const [rows] = await pool.query('SELECT id, username FROM users WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    await pool.query(
+      `UPDATE users SET status = 'Active', suspended_until = NULL, suspension_reason = NULL WHERE id = ?`,
+      [id]
+    );
+
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, actor_id, type, title, message)
+         VALUES (?, NULL, 'system', 'Account Reactivated', '✅ Your FunFlick account has been reactivated. You can now post and interact freely.')`,
+        [id]
+      );
+    } catch (e) {}
+
+    return res.json({
+      success: true,
+      message: `Account @${rows[0].username} has been reactivated.`,
+      status: 'Active'
+    });
+  } catch (err) {
+    console.error('Reactivate user error:', err);
+    return res.status(500).json({ error: 'Failed to reactivate user' });
+  }
+}
+
+// Delete content permanently from platform
+export async function deleteAdminContent(req, res) {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query('SELECT user_id, title FROM videos WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Content not found' });
+
+    const v = rows[0];
+    await pool.query('DELETE FROM videos WHERE id = ?', [id]);
+
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, actor_id, type, title, message)
+         VALUES (?, NULL, 'system', 'Content Removed', ?)`,
+        [v.user_id, `Your upload "${v.title || 'Video'}" was removed by Admin for violating community guidelines.`]
+      );
+    } catch (e) {}
+
+    return res.json({ success: true, message: 'Content permanently deleted' });
+  } catch (err) {
+    console.error('Delete admin content error:', err);
+    return res.status(500).json({ error: 'Failed to delete content' });
   }
 }
 
