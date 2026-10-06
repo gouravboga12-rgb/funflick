@@ -37,29 +37,42 @@ export const CreatePostScreen = () => {
 
   const fileInputRef = useRef(null);
 
-  // Real users for tagging from database
-  const [availableUsers, setAvailableUsers] = useState([]);
+  // Real users for tagging from database (searched on-demand only)
+  const [tagSearchResults, setTagSearchResults] = useState([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
+  const [taggedUserObjects, setTaggedUserObjects] = useState([]); // [{ username, name, avatar }]
 
+  // Live search users only when user types in search box
   useEffect(() => {
-    const fetchUsersForTagging = async () => {
+    const trimmed = tagSearchQuery.trim();
+    if (!trimmed) {
+      setTagSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingUsers(true);
       try {
         const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
-        const res = await fetch('/api/users?limit=25', {
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(trimmed)}&limit=10`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
         if (res.ok) {
           const data = await res.json();
           if (data.users && Array.isArray(data.users)) {
-            setAvailableUsers(data.users.filter(u => u.username !== currentUser?.username));
+            setTagSearchResults(data.users.filter(u => u.username !== currentUser?.username));
           }
         }
       } catch (e) {
-        console.warn('Failed to fetch users for tagging:', e);
+        console.warn('Failed to search users for tagging:', e);
+      } finally {
+        setIsSearchingUsers(false);
       }
-    };
-    fetchUsersForTagging();
-  }, [currentUser]);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [tagSearchQuery, currentUser]);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [mediaUrl, setMediaUrl] = useState('');
@@ -84,12 +97,18 @@ export const CreatePostScreen = () => {
     }
   };
 
-  const handleToggleTag = (username) => {
-    if (taggedUsers.includes(username)) {
-      setTaggedUsers(prev => prev.filter(u => u !== username));
-    } else {
-      setTaggedUsers(prev => [...prev, username]);
+  const handleAddTagUser = (user) => {
+    if (!taggedUsers.includes(user.username)) {
+      setTaggedUsers(prev => [...prev, user.username]);
+      setTaggedUserObjects(prev => [...prev, user]);
+      setTagSearchQuery('');
+      setTagSearchResults([]);
     }
+  };
+
+  const handleRemoveTagUser = (username) => {
+    setTaggedUsers(prev => prev.filter(u => u !== username));
+    setTaggedUserObjects(prev => prev.filter(u => u.username !== username));
   };
 
   const handleAddHashtag = (tag) => {
@@ -352,59 +371,104 @@ export const CreatePostScreen = () => {
           />
         </div>
 
-        {/* Tag People (Instagram Feature) - Real Database Users */}
+        {/* Tag People (Search-driven, optional) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5 text-pink-400" />
               <span>Tag People / Creators</span>
+              <span className="text-[10px] text-gray-500 font-normal">(optional)</span>
             </label>
             <span className="text-[10px] text-pink-300 font-semibold">{taggedUsers.length} tagged</span>
           </div>
 
-          {availableUsers.length > 5 && (
+          {/* User Search Input */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-3 pointer-events-none" />
             <input
               type="text"
               value={tagSearchQuery}
               onChange={e => setTagSearchQuery(e.target.value)}
-              placeholder="Search user to tag..."
-              className="w-full bg-[#100a22] text-white text-[11px] px-3 py-1.5 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500 placeholder-gray-500"
+              placeholder="Search by username or name to tag..."
+              className="w-full bg-[#150f2c] text-white text-xs pl-8 pr-3 py-2.5 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500 placeholder-gray-500"
             />
-          )}
-
-          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto no-scrollbar">
-            {availableUsers
-              .filter(u => !tagSearchQuery || u.username?.toLowerCase().includes(tagSearchQuery.toLowerCase()) || u.name?.toLowerCase().includes(tagSearchQuery.toLowerCase()))
-              .map(user => {
-                const isTagged = taggedUsers.includes(user.username);
-                return (
-                  <button
-                    key={user.id || user.username}
-                    type="button"
-                    onClick={() => handleToggleTag(user.username)}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
-                      isTagged
-                        ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-sm'
-                        : 'bg-white/5 border border-white/10 text-gray-300 hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    <img 
-                      src={user.avatar || '/brand/default-avatar.svg'} 
-                      alt="" 
-                      className="w-4 h-4 rounded-full object-cover" 
-                    />
-                    <span>@{user.username}</span>
-                    {user.name && user.name !== user.username && (
-                      <span className="text-[10px] opacity-75 font-normal">({user.name})</span>
-                    )}
-                    {isTagged && <Check className="w-3 h-3 stroke-[3]" />}
-                  </button>
-                );
-              })}
-            {availableUsers.length === 0 && (
-              <span className="text-[11px] text-gray-500 italic">No other registered users found to tag</span>
+            {isSearchingUsers && (
+              <span className="text-[10px] text-pink-400 absolute right-3 top-3 animate-pulse">Searching...</span>
             )}
           </div>
+
+          {/* Search Results Dropdown */}
+          {tagSearchQuery.trim() && (
+            <div className="bg-[#120a24] rounded-2xl p-2 border border-white/10 space-y-1 shadow-lg max-h-48 overflow-y-auto no-scrollbar">
+              {tagSearchResults.length > 0 ? (
+                tagSearchResults.map(u => (
+                  <div
+                    key={u.id || u.username}
+                    onClick={() => handleAddTagUser(u)}
+                    className="p-2 rounded-xl hover:bg-white/10 cursor-pointer flex items-center justify-between transition group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={u.avatar || '/brand/default-avatar.svg'}
+                        alt=""
+                        className="w-6 h-6 rounded-full object-cover border border-white/10"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-white group-hover:text-pink-300 block">
+                          @{u.username}
+                        </span>
+                        {u.name && u.name !== u.username && (
+                          <span className="text-[10px] text-gray-400 block">{u.name}</span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-[10px] font-semibold group-hover:bg-pink-500 group-hover:text-white"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                ))
+              ) : (
+                !isSearchingUsers && (
+                  <div className="p-2 text-center text-xs text-gray-400">
+                    No users found matching "{tagSearchQuery}"
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
+          {/* Tagged Users Selected List (with delete button) */}
+          {taggedUsers.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {taggedUsers.map(username => {
+                const userObj = taggedUserObjects.find(u => u.username === username);
+                return (
+                  <span
+                    key={username}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-pink-500/20 border border-pink-500/30 text-white text-xs font-medium"
+                  >
+                    <img
+                      src={userObj?.avatar || '/brand/default-avatar.svg'}
+                      alt=""
+                      className="w-4 h-4 rounded-full object-cover"
+                    />
+                    <span>@{username}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTagUser(username)}
+                      title="Remove tag"
+                      className="p-0.5 rounded-full hover:bg-pink-500/40 text-pink-300 hover:text-white transition"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Location & Category Grid */}
