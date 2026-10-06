@@ -134,6 +134,35 @@ export const SubscriptionScreen = () => {
     }, 900);
   };
 
+  const isUserSubscribed = Boolean(
+    subscriptionStatus?.isActive || 
+    currentUser?.isInfluencer || 
+    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+  );
+
+  const activePlanName = subscriptionStatus?.planName || currentUser?.subscriptionPlan || 'Influencer Pro Plan';
+  const activeStartDate = subscriptionStatus?.startDate || currentUser?.subscriptionStart;
+  const activeExpiresAt = subscriptionStatus?.expiresAt || currentUser?.subscriptionExpiresAt;
+  const activeDaysRemaining = subscriptionStatus?.daysRemaining !== undefined 
+    ? Number(subscriptionStatus.daysRemaining)
+    : (activeExpiresAt ? Math.max(0, Math.ceil((new Date(activeExpiresAt) - new Date()) / (1000 * 60 * 60 * 24))) : 0);
+
+  const getPlanDays = (plan) => {
+    if (plan.durationDays) return Number(plan.durationDays);
+    if (plan.id === 'weekly' || plan.period === 'week') return 7;
+    if (plan.id === 'quarterly' || plan.period === 'quarter') return 90;
+    if (plan.id === 'yearly' || plan.period === 'year') return 365;
+    return 30;
+  };
+
+  const calculateProjectedExpiry = (plan) => {
+    const daysToAdd = getPlanDays(plan);
+    const baseTime = (isUserSubscribed && activeExpiresAt && new Date(activeExpiresAt) > new Date())
+      ? new Date(activeExpiresAt).getTime()
+      : Date.now();
+    return new Date(baseTime + daysToAdd * 24 * 60 * 60 * 1000);
+  };
+
   return (
     <div className="w-full flex-1 flex flex-col bg-[#090514] min-h-full select-none">
       {/* Top Header */}
@@ -164,7 +193,7 @@ export const SubscriptionScreen = () => {
         </div>
 
         {/* Current Subscription Validity & Status Card */}
-        {(subscriptionStatus?.isActive || currentUser.isInfluencer) && (
+        {isUserSubscribed && (
           <div className="p-4 rounded-3xl bg-gradient-to-r from-emerald-950/60 via-purple-950/40 to-[#120d29] border border-emerald-500/40 shadow-xl space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -173,21 +202,19 @@ export const SubscriptionScreen = () => {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <span>{subscriptionStatus?.planName || currentUser.subscriptionPlan || 'Monthly Influencer Pro'}</span>
-                    <span className="px-2 py-0.2 rounded-full text-[9px] font-extrabold bg-emerald-500 text-black">ACTIVE</span>
+                    <span>{activePlanName}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500 text-black">ACTIVE & VALID</span>
                   </h4>
                   <span className="text-[10px] text-emerald-300">Creator Monetization & Reach Active</span>
                 </div>
               </div>
 
-              {subscriptionStatus?.daysRemaining > 0 && (
-                <div className="text-right">
-                  <span className="text-base font-extrabold text-amber-300 font-mono block">
-                    {subscriptionStatus.daysRemaining}
-                  </span>
-                  <span className="text-[9px] text-gray-400 block -mt-1">days left</span>
-                </div>
-              )}
+              <div className="text-right">
+                <span className="text-lg font-extrabold text-amber-300 font-mono block">
+                  {activeDaysRemaining}
+                </span>
+                <span className="text-[9px] text-gray-300 block -mt-1 font-medium">days remaining</span>
+              </div>
             </div>
 
             {/* Validity Timeline breakdown */}
@@ -195,17 +222,17 @@ export const SubscriptionScreen = () => {
               <div>
                 <span className="text-gray-400 block text-[10px]">Start Date:</span>
                 <strong className="text-gray-200">
-                  {subscriptionStatus?.startDate 
-                    ? new Date(subscriptionStatus.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                  {activeStartDate 
+                    ? new Date(activeStartDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
                     : 'Active'}
                 </strong>
               </div>
               <div className="text-right">
                 <span className="text-gray-400 block text-[10px]">Valid Until / Expiry:</span>
                 <strong className="text-emerald-300">
-                  {subscriptionStatus?.expiresAt 
-                    ? new Date(subscriptionStatus.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                    : '30 Days'}
+                  {activeExpiresAt 
+                    ? new Date(activeExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                    : `${activeDaysRemaining} Days`}
                 </strong>
               </div>
             </div>
@@ -214,7 +241,7 @@ export const SubscriptionScreen = () => {
             <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-200 flex items-start gap-2">
               <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
               <span>
-                <strong>Plan Extension Enabled:</strong> Purchasing another plan while this plan is active will <strong className="text-white underline">extend your existing expiry date</strong> (remaining {subscriptionStatus?.daysRemaining || 0} days + new plan duration).
+                <strong>Plan Extension Guarantee:</strong> Purchasing another plan while your subscription is active will <strong className="text-white underline">extend your existing expiry date</strong> by adding the new days to your remaining {activeDaysRemaining} days!
               </span>
             </div>
           </div>
@@ -285,10 +312,21 @@ export const SubscriptionScreen = () => {
                 {/* Direct 1-Click Pay & Subscribe Button for this Plan */}
                 <div className="mt-3.5 pt-3 border-t border-white/10 flex items-center justify-between gap-3">
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-400">Total payable</span>
+                    <span className="text-[10px] text-gray-400">
+                      {isUserSubscribed && activeDaysRemaining > 0 ? (
+                        <span className="text-emerald-400 font-semibold">+{getPlanDays(plan)} days stacked</span>
+                      ) : (
+                        <span>Valid for {getPlanDays(plan)} days</span>
+                      )}
+                    </span>
                     <span className="text-base font-extrabold text-white font-heading">
                       {plan.formattedPrice}
                     </span>
+                    {isUserSubscribed && activeDaysRemaining > 0 && (
+                      <span className="text-[9px] text-gray-400">
+                        Until {calculateProjectedExpiry(plan).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    )}
                   </div>
 
                   <button
@@ -298,7 +336,7 @@ export const SubscriptionScreen = () => {
                       handlePurchase(plan);
                     }}
                     disabled={processing && selectedPlanId === plan.id}
-                    className="py-2.5 px-4 sm:px-5 rounded-2xl bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca] text-white font-extrabold text-xs tracking-wide shadow-lg shadow-pink-500/25 hover:opacity-95 active:scale-[0.97] transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="py-2.5 px-3.5 sm:px-5 rounded-2xl bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca] text-white font-extrabold text-xs tracking-wide shadow-lg shadow-pink-500/25 hover:opacity-95 active:scale-[0.97] transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     {processing && selectedPlanId === plan.id ? (
                       <div className="flex items-center gap-2">
@@ -308,7 +346,11 @@ export const SubscriptionScreen = () => {
                     ) : (
                       <>
                         <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
-                        <span>Pay {plan.formattedPrice}</span>
+                        <span>
+                          {isUserSubscribed && activeDaysRemaining > 0 
+                            ? `Extend (+${getPlanDays(plan)}d) · ${plan.formattedPrice}`
+                            : `Pay ${plan.formattedPrice}`}
+                        </span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </>
                     )}

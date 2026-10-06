@@ -22,13 +22,26 @@ import {
   Check, 
   AlertCircle,
   ExternalLink,
-  Award
+  Award,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const AdminInfluencerMediaScreen = () => {
-  const { influencerMedia, sendInfluencerReward, showToast, theme } = useApp();
+  const { influencerMedia, sendInfluencerReward, showToast, theme, fetchInfluencerMedia } = useApp();
   const isLight = theme === 'light';
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  React.useEffect(() => {
+    if (fetchInfluencerMedia) fetchInfluencerMedia();
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    if (fetchInfluencerMedia) await fetchInfluencerMedia();
+    setIsRefreshing(false);
+    showToast('✅ Influencer media refreshed from database!', 'success');
+  };
 
   // Filters state (Default filter: Influencers / Subscription Members first!)
   const [userFilter, setUserFilter] = useState('influencers'); // 'all' | 'influencers' | 'users'
@@ -127,6 +140,18 @@ export const AdminInfluencerMediaScreen = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition ${
+                isLight 
+                  ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' 
+                  : 'bg-white/5 border-white/10 text-gray-300 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-pink-400' : ''}`} />
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh Media'}</span>
+            </button>
             <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-gray-400'} font-medium`}>
               Showing <strong>{filteredItems.length}</strong> items
             </span>
@@ -303,9 +328,19 @@ export const AdminInfluencerMediaScreen = () => {
             <div className={`p-12 text-center rounded-3xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border`}>
               <Filter className="w-10 h-10 text-gray-500 mx-auto mb-2 opacity-50" />
               <h3 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>No matching media items found</h3>
-              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} mt-1`}>
-                Try adjusting your filters or search query to see influencer content.
+              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} mt-1 max-w-sm mx-auto`}>
+                {userFilter === 'influencers' 
+                  ? 'No subscribed influencer content found under this filter. View all uploaded creator videos to review and reward creators.'
+                  : 'Try adjusting your filters or search query to see media items.'}
               </p>
+              {userFilter === 'influencers' && (influencerMedia || []).length > 0 && (
+                <button
+                  onClick={() => setUserFilter('all')}
+                  className="mt-4 px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xs shadow-lg shadow-pink-500/20 hover:opacity-95 transition cursor-pointer"
+                >
+                  Show All Creator Media ({(influencerMedia || []).length} items)
+                </button>
+              )}
             </div>
           ) : (
             filteredItems.map(item => {

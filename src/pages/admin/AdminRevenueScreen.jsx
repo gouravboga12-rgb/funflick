@@ -69,12 +69,10 @@ export const AdminRevenueScreen = () => {
     { label: 'Custom Range', key: 'Custom' }
   ];
 
-  // Base date for prototype (October 5, 2026)
-  const referenceDate = new Date('2026-10-05T12:00:00.000Z');
-
-  // Filtered Transactions Calculation
+  // Filtered Transactions Calculation (Dynamic based on real current date)
   const filteredTransactions = useMemo(() => {
     let list = subscriptionTransactions || [];
+    const now = new Date();
 
     // Filter by Date
     if (dateFilter !== 'All Time') {
@@ -83,41 +81,34 @@ export const AdminRevenueScreen = () => {
         const txDate = new Date(item.date);
 
         if (dateFilter === 'Today') {
-          // Same calendar day as reference date (2026-10-05)
-          return (
-            txDate.getUTCFullYear() === referenceDate.getUTCFullYear() &&
-            txDate.getUTCMonth() === referenceDate.getUTCMonth() &&
-            txDate.getUTCDate() === referenceDate.getUTCDate()
-          );
+          return txDate.toDateString() === now.toDateString();
         }
 
         if (dateFilter === 'Yesterday') {
-          const yesterday = new Date(referenceDate);
-          yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-          return (
-            txDate.getUTCFullYear() === yesterday.getUTCFullYear() &&
-            txDate.getUTCMonth() === yesterday.getUTCMonth() &&
-            txDate.getUTCDate() === yesterday.getUTCDate()
-          );
+          const yesterday = new Date(now);
+          yesterday.setDate(yesterday.getDate() - 1);
+          return txDate.toDateString() === yesterday.toDateString();
         }
 
         if (dateFilter === 'This Week') {
-          const sevenDaysAgo = new Date(referenceDate);
-          sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
-          return txDate >= sevenDaysAgo && txDate <= referenceDate;
+          const sevenDaysAgo = new Date(now);
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          return txDate >= sevenDaysAgo && txDate <= now;
         }
 
         if (dateFilter === 'This Month') {
           return (
-            txDate.getUTCFullYear() === referenceDate.getUTCFullYear() &&
-            txDate.getUTCMonth() === referenceDate.getUTCMonth()
+            txDate.getFullYear() === now.getFullYear() &&
+            txDate.getMonth() === now.getMonth()
           );
         }
 
         if (dateFilter === 'Last Month') {
-          const lastMonthIndex = referenceDate.getUTCMonth() === 0 ? 11 : referenceDate.getUTCMonth() - 1;
-          const lastMonthYear = referenceDate.getUTCMonth() === 0 ? referenceDate.getUTCFullYear() - 1 : referenceDate.getUTCFullYear();
-          return txDate.getUTCFullYear() === lastMonthYear && txDate.getUTCMonth() === lastMonthIndex;
+          const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          return (
+            txDate.getFullYear() === lastMonth.getFullYear() &&
+            txDate.getMonth() === lastMonth.getMonth()
+          );
         }
 
         if (dateFilter === 'Fiscal Q3') {

@@ -672,3 +672,190 @@ export async function getAdminStats(req, res) {
     return res.status(500).json({ error: 'Failed to load platform stats' });
   }
 }
+
+// 9. Get all In-App Ads for Admin Management & Mobile Feeds
+export async function getAdminAds(req, res) {
+  try {
+    const [rows] = await pool.query('SELECT * FROM platform_ads ORDER BY created_at DESC');
+    const ads = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      type: r.type,
+      mediaUrl: r.media_url,
+      thumbnailUrl: r.thumbnail_url || r.media_url,
+      duration: Number(r.duration) || 20,
+      allowCloseAfter: Number(r.allow_close_after) || 8,
+      active: Boolean(r.active),
+      startDate: r.start_date || '2026-10-01',
+      endDate: r.end_date || '2026-11-30',
+      frequency: r.frequency || 'Every 3 Reels',
+      actionUrl: r.action_url || 'https://funflick.in',
+      actionText: r.action_text || 'Learn More',
+      impressions: Number(r.impressions) || 0,
+      clicks: Number(r.clicks) || 0
+    }));
+    return res.json({ ads });
+  } catch (err) {
+    console.error('Get admin ads error:', err);
+    return res.status(500).json({ error: 'Failed to fetch advertisements' });
+  }
+}
+
+// 10. Create or update an ad
+export async function createAdminAd(req, res) {
+  try {
+    const {
+      id = `ad_${Date.now()}`,
+      title,
+      type = 'video',
+      mediaUrl,
+      thumbnailUrl,
+      duration = 20,
+      allowCloseAfter = 8,
+      active = true,
+      startDate = '2026-10-01',
+      endDate = '2026-11-30',
+      frequency = 'Every 3 Reels',
+      actionUrl = 'https://funflick.in',
+      actionText = 'Learn More'
+    } = req.body;
+
+    if (!title || !mediaUrl) {
+      return res.status(400).json({ error: 'Title and media URL are required' });
+    }
+
+    await pool.query(
+      `INSERT INTO platform_ads 
+        (id, title, type, media_url, thumbnail_url, duration, allow_close_after, active, start_date, end_date, frequency, action_url, action_text)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+        title = VALUES(title),
+        type = VALUES(type),
+        media_url = VALUES(media_url),
+        thumbnail_url = VALUES(thumbnail_url),
+        duration = VALUES(duration),
+        allow_close_after = VALUES(allow_close_after),
+        active = VALUES(active),
+        start_date = VALUES(start_date),
+        end_date = VALUES(end_date),
+        frequency = VALUES(frequency),
+        action_url = VALUES(action_url),
+        action_text = VALUES(action_text)`,
+      [
+        id,
+        title,
+        type,
+        mediaUrl,
+        thumbnailUrl || mediaUrl,
+        duration,
+        allowCloseAfter,
+        active ? 1 : 0,
+        startDate,
+        endDate,
+        frequency,
+        actionUrl,
+        actionText
+      ]
+    );
+
+    return res.json({ success: true, message: 'Ad created successfully', id });
+  } catch (err) {
+    console.error('Create admin ad error:', err);
+    return res.status(500).json({ error: 'Failed to save advertisement' });
+  }
+}
+
+// 11. Delete an ad
+export async function deleteAdminAd(req, res) {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM platform_ads WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Ad deleted successfully' });
+  } catch (err) {
+    console.error('Delete admin ad error:', err);
+    return res.status(500).json({ error: 'Failed to delete advertisement' });
+  }
+}
+
+// 12. Record Ad Impression / Click (Accessible by mobile feed)
+export async function recordAdMetric(req, res) {
+  try {
+    const { id } = req.params;
+    const { action } = req.body; // 'impression' | 'click'
+    if (action === 'click') {
+      await pool.query('UPDATE platform_ads SET clicks = clicks + 1 WHERE id = ?', [id]);
+    } else {
+      await pool.query('UPDATE platform_ads SET impressions = impressions + 1 WHERE id = ?', [id]);
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to record ad metric' });
+  }
+}
+
+// 13. Get all Influencer & Creator Media for Admin Review & Rewards
+export async function getAdminInfluencerMedia(req, res) {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        v.id,
+        v.title,
+        v.video_url,
+        v.thumbnail_url,
+        v.category,
+        v.views_count,
+        v.likes_count,
+        v.comments_count,
+        v.shares_count,
+        v.created_at,
+        u.id AS user_id,
+        u.name AS user_name,
+        u.username,
+        u.avatar_url,
+        u.is_influencer,
+        u.subscription_plan,
+        u.subscription_expires_at
+      FROM videos v
+      JOIN users u ON v.user_id = u.id
+      ORDER BY v.views_count DESC, v.created_at DESC
+      LIMIT 250
+    `);
+
+    const media = rows.map(r => {
+      const isVideo = !(/\.(jpg|jpeg|png|webp|gif)($|\?)/i.test(r.video_url || '') || r.category === 'Photo' || r.category === 'Post');
+      const views = Number(r.views_count) || 0;
+      const likes = Number(r.likes_count) || 0;
+      const comments = Number(r.comments_count) || 0;
+      const shares = Number(r.shares_count) || 0;
+      const totalInteractions = likes + comments + shares;
+      const engRate = views > 0 ? ((totalInteractions / views) * 100).toFixed(1) + '%' : '3.8%';
+
+      return {
+        id: r.id,
+        title: r.title || 'Creator Media',
+        mediaUrl: r.video_url,
+        thumbnailUrl: r.thumbnail_url || r.video_url,
+        contentType: isVideo ? 'video' : 'post',
+        isInfluencer: Boolean(r.is_influencer),
+        influencerName: r.user_name || 'Creator',
+        username: r.username || 'user',
+        influencerAvatar: r.avatar_url || '/brand/default-avatar.svg',
+        subscriptionPlan: r.subscription_plan || (r.is_influencer ? 'Monthly Influencer Pro' : 'Free Member'),
+        viewsCount: views,
+        likesCount: likes,
+        commentsCount: comments,
+        sharesCount: shares,
+        engagementRate: engRate,
+        paymentStatus: 'Pending Reward',
+        paidAmount: 0,
+        publishedDate: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+      };
+    });
+
+    return res.json({ media, totalCount: media.length });
+  } catch (err) {
+    console.error('Get admin influencer media error:', err);
+    return res.status(500).json({ error: 'Failed to fetch influencer media' });
+  }
+}
+

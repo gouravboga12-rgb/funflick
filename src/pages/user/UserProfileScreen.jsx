@@ -109,6 +109,19 @@ export const UserProfileScreen = () => {
   const realLikedCount = posts.filter(p => p.isLiked).length;
   const realSavedCount = posts.filter(p => p.isSaved).length;
 
+  // Subscription validity resolution from MySQL / context
+  const isUserSubscribed = Boolean(
+    currentUser?.isInfluencer || 
+    subscriptionStatus?.isActive || 
+    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+  );
+  const userPlanExpiresAt = subscriptionStatus?.expiresAt || currentUser?.subscriptionExpiresAt;
+  const userPlanStartDate = subscriptionStatus?.startDate || currentUser?.subscriptionStart;
+  const userPlanName = subscriptionStatus?.planName || currentUser?.subscriptionPlan || 'Monthly Influencer Pro';
+  const userDaysRemaining = subscriptionStatus?.daysRemaining !== undefined 
+    ? Number(subscriptionStatus.daysRemaining) 
+    : (userPlanExpiresAt ? Math.max(0, Math.ceil((new Date(userPlanExpiresAt) - new Date()) / (1000 * 60 * 60 * 24))) : 0);
+
   const [activeProfileMode, setActiveProfileMode] = useState(initialTab); // 'viewer' | 'influencer'
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -148,8 +161,12 @@ export const UserProfileScreen = () => {
       icon: Crown,
       color: 'text-amber-400',
       label: 'Influencer Membership Plans',
-      badge: currentUser.isInfluencer ? '⭐ Influencer Active' : 'Upgrade to Influencer',
-      badgeColor: currentUser.isInfluencer ? 'bg-amber-500/20 text-amber-300' : 'bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold animate-pulse',
+      badge: isUserSubscribed 
+        ? `⭐ Active (${userDaysRemaining}d left)` 
+        : 'Upgrade to Influencer',
+      badgeColor: isUserSubscribed 
+        ? 'bg-amber-500/20 text-amber-300' 
+        : 'bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold animate-pulse',
       path: '/subscription'
     },
     {
@@ -440,7 +457,7 @@ export const UserProfileScreen = () => {
             >
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 ${
-                  currentUser.isInfluencer 
+                  isUserSubscribed 
                     ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
                     : 'bg-gradient-to-tr from-pink-500 to-amber-500 shadow'
                 }`}>
@@ -449,24 +466,25 @@ export const UserProfileScreen = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-white font-heading">
-                      {currentUser.isInfluencer
-                        ? `Influencer Plan: ${subscriptionStatus?.planName || currentUser.subscriptionPlan || 'Monthly Pass'}`
+                      {isUserSubscribed
+                        ? `Influencer Plan: ${userPlanName}`
                         : 'Upgrade to Influencer Status'}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold ${
-                      currentUser.isInfluencer
+                      isUserSubscribed
                         ? 'bg-emerald-500/20 text-emerald-300'
                         : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
                     }`}>
-                      {currentUser.isInfluencer ? 'ACTIVE' : 'BOOST REACH'}
+                      {isUserSubscribed ? 'ACTIVE & VALID' : 'BOOST REACH'}
                     </span>
                   </div>
                   <p className="text-[10px] text-gray-300 mt-0.5">
-                    {currentUser.isInfluencer
+                    {isUserSubscribed
                       ? (
                         <span>
-                          Valid until <strong className="text-emerald-300">{subscriptionStatus?.expiresAt ? new Date(subscriptionStatus.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Active'}</strong>
-                          {subscriptionStatus?.daysRemaining > 0 && <span className="text-amber-300 ml-1">({subscriptionStatus.daysRemaining} days left)</span>}
+                          {userPlanStartDate && <span className="text-gray-400 mr-1.5">Started: {new Date(userPlanStartDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ·</span>}
+                          Valid until <strong className="text-emerald-300">{userPlanExpiresAt ? new Date(userPlanExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Active'}</strong>
+                          {userDaysRemaining > 0 && <span className="text-amber-300 font-semibold ml-1.5">({userDaysRemaining} days left)</span>}
                         </span>
                       )
                       : 'Free uploads active for everyone. Subscribe to become an Influencer and unlock deep analytics & rewards!'}

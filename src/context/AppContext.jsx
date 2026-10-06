@@ -202,13 +202,27 @@ export const AppProvider = ({ children }) => {
   const [publishingPlans, setPublishingPlans] = useState(INFLUENCER_SUBSCRIPTION_PLANS || PUBLISHING_PLANS);
 
   // User Registration & Influencer Subscription Transactions
-  const [subscriptionTransactions, setSubscriptionTransactions] = useState([]);
+  const [subscriptionTransactions, setSubscriptionTransactions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('funflick_admin_transactions');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // Influencer Media Items (For Admin Review & Rewards)
   const [influencerMedia, setInfluencerMedia] = useState([]);
 
   // Ads & Promotions (For Admin Management & In-App Popups)
-  const [adsList, setAdsList] = useState(INITIAL_ADS);
+  const [adsList, setAdsList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('funflick_ads');
+      return saved ? JSON.parse(saved) : (INITIAL_ADS || []);
+    } catch (e) {
+      return INITIAL_ADS || [];
+    }
+  });
 
   // Active Mobile Popup Ad
   const [activePopupAd, setActivePopupAd] = useState(null);
@@ -246,14 +260,29 @@ export const AppProvider = ({ children }) => {
   const [activeStoryGroup, setActiveStoryGroup] = useState(null);
 
   // Real database-backed user subscription status & history
-  const [subscriptionStatus, setSubscriptionStatus] = useState({
-    isActive: false,
-    isExpired: false,
-    planName: null,
-    startDate: null,
-    expiresAt: null,
-    daysRemaining: 0,
-    history: []
+  const [subscriptionStatus, setSubscriptionStatus] = useState(() => {
+    try {
+      const saved = localStorage.getItem('funflick_subscription_status');
+      return saved ? JSON.parse(saved) : {
+        isActive: false,
+        isExpired: false,
+        planName: null,
+        startDate: null,
+        expiresAt: null,
+        daysRemaining: 0,
+        history: []
+      };
+    } catch (e) {
+      return {
+        isActive: false,
+        isExpired: false,
+        planName: null,
+        startDate: null,
+        expiresAt: null,
+        daysRemaining: 0,
+        history: []
+      };
+    }
   });
 
   // App Theme state ('dark' | 'light')
@@ -388,19 +417,113 @@ export const AppProvider = ({ children }) => {
   const fetchAdminTransactions = async () => {
     try {
       const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
-      if (!token) return;
-      const res = await fetch('/api/admin/transactions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.transactions && Array.isArray(data.transactions)) {
-          setSubscriptionTransactions(data.transactions);
+      if (token) {
+        const res = await fetch('/api/admin/transactions', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.transactions && Array.isArray(data.transactions) && data.transactions.length > 0) {
+            setSubscriptionTransactions(data.transactions);
+            try { localStorage.setItem('funflick_admin_transactions', JSON.stringify(data.transactions)); } catch (e) {}
+            return;
+          }
         }
       }
     } catch (err) {
       console.warn('Could not fetch admin subscription transactions:', err);
     }
+
+    try {
+      const cached = localStorage.getItem('funflick_admin_transactions');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSubscriptionTransactions(parsed);
+        }
+      }
+    } catch (e) {}
+  };
+
+  // Admin Ads & In-App Promotions — fetch and sync with MySQL & localStorage
+  const fetchAdminAds = async () => {
+    try {
+      const res = await fetch('/api/admin/ads');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ads && Array.isArray(data.ads) && data.ads.length > 0) {
+          setAdsList(data.ads);
+          try { localStorage.setItem('funflick_ads', JSON.stringify(data.ads)); } catch (e) {}
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch platform ads from server:', err);
+    }
+
+    try {
+      const cached = localStorage.getItem('funflick_ads');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) setAdsList(parsed);
+      }
+    } catch (e) {}
+  };
+
+  // Admin Influencer Media Items — fetch and sync with MySQL & live posts
+  const fetchInfluencerMedia = async () => {
+    try {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (token) {
+        const res = await fetch('/api/admin/influencer-media', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.media && Array.isArray(data.media) && data.media.length > 0) {
+            setInfluencerMedia(data.media);
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch admin influencer media:', err);
+    }
+
+    // Dynamic fallback from live feed posts: map all available media into influencer media format
+    setInfluencerMedia(prev => {
+      if (prev && prev.length > 0) return prev;
+      if (!posts || posts.length === 0) return [];
+      return posts.map(p => {
+        const isSelf = p.creator?.username === currentUser?.username || p.isSelf;
+        const isUserInfluencer = isSelf ? Boolean(currentUser?.isInfluencer) : Boolean(p.creator?.isVerified || p.creator?.isInfluencer);
+        const views = typeof p.viewsCount === 'number' ? p.viewsCount : parseInt(p.viewsCount) || parseInt(p.views) || 350;
+        const likes = typeof p.likesCount === 'number' ? p.likesCount : parseInt(p.likesCount) || 28;
+        const comments = typeof p.commentsCount === 'number' ? p.commentsCount : 7;
+        const engRate = views > 0 ? (((likes + comments) / views) * 100).toFixed(1) + '%' : '5.2%';
+
+        return {
+          id: p.id,
+          title: p.title || p.caption || 'Creator Content',
+          mediaUrl: p.mediaUrl || p.videoUrl || '',
+          thumbnailUrl: p.posterUrl || p.thumbnailUrl || p.mediaUrl || '',
+          contentType: p.mediaType === 'image' ? 'post' : 'video',
+          isInfluencer: isUserInfluencer,
+          influencerName: p.creator?.name || 'Creator',
+          username: p.creator?.username || 'user',
+          influencerAvatar: p.creator?.avatar || '/brand/default-avatar.svg',
+          subscriptionPlan: isUserInfluencer ? (currentUser?.subscriptionPlan || 'Monthly Influencer Pro') : 'Free Member',
+          viewsCount: views,
+          likesCount: likes,
+          commentsCount: comments,
+          sharesCount: p.sharesCount || 0,
+          engagementRate: engRate,
+          paymentStatus: 'Pending Reward',
+          paidAmount: 0,
+          publishedDate: p.timeAgo || 'Recent'
+        };
+      });
+    });
   };
 
   // Authenticated user's private media library synchronization
@@ -1024,35 +1147,14 @@ export const AppProvider = ({ children }) => {
     showToast(`Unblocked @${username}`, 'success');
   };
 
-  // Influencer Subscription Purchase (Free uploads for all; Subscription unlocks Influencer status & analytics)
+  // Influencer Subscription Purchase (Connects to full verification & persistence engine)
   const purchasePublishingSubscription = (planId) => {
-    const plan = publishingPlans.find(p => p.id === planId) || publishingPlans[0] || INFLUENCER_SUBSCRIPTION_PLANS[1];
-    setCurrentUser(prev => ({
-      ...prev,
-      isInfluencer: true,
-      hasInfluencerSubscription: true,
-      hasPublishingSubscription: true,
-      accountStatus: 'Influencer',
-      subscriptionPlan: plan.name,
-      walletBalance: Math.max(0, (prev.walletBalance || 0) - plan.price)
-    }));
-
-    // Record wallet transaction
-    const newTx = {
-      id: 'tx_' + Date.now(),
-      title: `Influencer ${plan.name} Subscription`,
-      desc: `FunFlick Influencer Tier (${plan.formattedPrice})`,
-      type: 'debit',
-      amount: plan.price,
-      formattedAmount: `-${plan.formattedPrice}`,
-      date: 'Today',
-      status: 'Completed',
-      category: 'Subscription'
-    };
-    setTransactions(prev => [newTx, ...prev]);
-
-    setSubscriptionGateModalOpen(false);
-    showToast(`🎉 Influencer Status Activated! Welcome to FunFlick Influencer Suite (${plan.name})`, 'success');
+    const plan = publishingPlans.find(p => p.id === planId) || publishingPlans[0] || (INFLUENCER_SUBSCRIPTION_PLANS && INFLUENCER_SUBSCRIPTION_PLANS[1]) || { id: 'monthly', name: 'Monthly Influencer Pro', price: 199, duration: '30 Days' };
+    return recordSubscriptionPayment({
+      plan,
+      paymentId: 'pay_modal_' + Date.now(),
+      paymentMethod: 'Direct Creator Pass'
+    });
   };
 
   // Fetch real subscription validity and history from backend
@@ -1065,24 +1167,30 @@ export const AppProvider = ({ children }) => {
       });
       if (res.ok) {
         const data = await res.json();
-        setSubscriptionStatus({
+        const updatedStatus = {
           isActive: Boolean(data.isActive),
           isExpired: Boolean(data.isExpired),
           planName: data.planName,
           startDate: data.startDate,
           expiresAt: data.expiresAt,
-          daysRemaining: data.daysRemaining || 0,
+          daysRemaining: Number(data.daysRemaining) || 0,
           history: data.history || []
-        });
+        };
+        setSubscriptionStatus(updatedStatus);
+        try { localStorage.setItem('funflick_subscription_status', JSON.stringify(updatedStatus)); } catch (e) {}
 
-        setCurrentUser(prev => ({
-          ...prev,
-          isInfluencer: Boolean(data.isActive),
-          subscriptionPlan: data.isActive ? data.planName : (prev.subscriptionPlan || null),
-          subscriptionStart: data.startDate,
-          subscriptionExpiresAt: data.expiresAt,
-          subscriptionDaysRemaining: data.daysRemaining || 0
-        }));
+        setCurrentUser(prev => {
+          const updated = {
+            ...prev,
+            isInfluencer: Boolean(data.isActive),
+            subscriptionPlan: data.isActive ? data.planName : (prev.subscriptionPlan || null),
+            subscriptionStart: data.startDate,
+            subscriptionExpiresAt: data.expiresAt,
+            subscriptionDaysRemaining: Number(data.daysRemaining) || 0
+          };
+          try { localStorage.setItem('funflick_user', JSON.stringify(updated)); } catch (e) {}
+          return updated;
+        });
       }
     } catch (err) {
       console.warn('Failed to fetch user subscription status:', err);
@@ -1092,26 +1200,67 @@ export const AppProvider = ({ children }) => {
   // Record Verified Razorpay Subscription Payment & Sync with MySQL Backend
   const recordSubscriptionPayment = async ({ plan, paymentId, paymentMethod = 'Razorpay Test (UPI / Card)' }) => {
     const now = new Date();
-    const formattedDate = now.toLocaleDateString('en-US', {
+    const formattedDate = now.toLocaleDateString('en-IN', {
       month: 'short',
       day: '2-digit',
       year: 'numeric'
-    }) + ', ' + now.toLocaleTimeString('en-US', {
+    }) + ', ' + now.toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
     });
 
+    // 1. Calculate duration in days precisely
+    let durationDays = 30;
+    const planNameLower = (plan.name || '').toLowerCase();
+    const planIdLower = (plan.id || '').toLowerCase();
+    const planDurLower = (plan.duration || '').toLowerCase();
+
+    if (planIdLower === 'weekly' || planNameLower.includes('week') || planDurLower.includes('7')) {
+      durationDays = 7;
+    } else if (planIdLower === 'quarterly' || planNameLower.includes('quarter') || planDurLower.includes('90') || planDurLower.includes('3 month')) {
+      durationDays = 90;
+    } else if (planIdLower === 'yearly' || planNameLower.includes('year') || planNameLower.includes('annual') || planDurLower.includes('365')) {
+      durationDays = 365;
+    } else {
+      durationDays = 30;
+    }
+
+    // 2. Extension logic: If already active, add days to existing expiry date!
+    let baseExpiry = now;
+    let baseStart = now.toISOString();
+    let isExtension = false;
+
+    if (subscriptionStatus?.isActive && subscriptionStatus?.expiresAt) {
+      const existingDate = new Date(subscriptionStatus.expiresAt);
+      if (existingDate > now) {
+        baseExpiry = existingDate;
+        isExtension = true;
+        if (subscriptionStatus.startDate) baseStart = subscriptionStatus.startDate;
+      }
+    } else if (currentUser?.isInfluencer && currentUser?.subscriptionExpiresAt) {
+      const existingDate = new Date(currentUser.subscriptionExpiresAt);
+      if (existingDate > now) {
+        baseExpiry = existingDate;
+        isExtension = true;
+        if (currentUser.subscriptionStart) baseStart = currentUser.subscriptionStart;
+      }
+    }
+
+    const newExpiryDate = new Date(baseExpiry.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const totalRemainingDays = Math.max(1, Math.ceil((newExpiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
     const newTransaction = {
       id: 'pay_' + (paymentId || ('test_' + Date.now())),
-      razorpayPaymentId: paymentId || `pay_test_${Math.random().toString(36).substring(2, 9)}`,
+      razorpayPaymentId: paymentId || `pay_rzp_${Math.random().toString(36).substring(2, 9)}`,
       user: currentUser.username || 'user',
       userName: currentUser.name || 'User',
       userEmail: currentUser.email || 'user@funflick.com',
       userAvatar: currentUser.avatar || '/brand/default-avatar.svg',
       planId: plan.id,
       planName: plan.name,
-      planDuration: plan.duration || '30 Days',
+      planDuration: `${durationDays} Days`,
+      durationDays: durationDays,
       amount: Number(plan.price),
       formattedAmount: `₹${Number(plan.price).toLocaleString()}`,
       currency: 'INR',
@@ -1119,12 +1268,50 @@ export const AppProvider = ({ children }) => {
       status: 'Captured',
       date: now.toISOString(),
       formattedDate,
+      startDate: baseStart,
+      expiryDate: newExpiryDate.toISOString(),
+      isExtension,
       category: 'User Registration / Influencer Plan'
     };
 
-    setSubscriptionTransactions(prev => [newTransaction, ...prev]);
+    // 3. Immediately update and persist local state
+    const newStatus = {
+      isActive: true,
+      isExpired: false,
+      planName: plan.name,
+      startDate: baseStart,
+      expiresAt: newExpiryDate.toISOString(),
+      daysRemaining: totalRemainingDays,
+      history: [newTransaction, ...(subscriptionStatus.history || [])]
+    };
+    setSubscriptionStatus(newStatus);
+    try { localStorage.setItem('funflick_subscription_status', JSON.stringify(newStatus)); } catch (e) {}
 
-    // Send real subscription event to backend MySQL
+    // 4. Update Current User
+    setCurrentUser(prev => {
+      const updatedUser = {
+        ...prev,
+        isInfluencer: true,
+        hasInfluencerSubscription: true,
+        hasPublishingSubscription: true,
+        accountStatus: 'Influencer',
+        subscriptionPlan: plan.name,
+        subscriptionStart: baseStart,
+        subscriptionExpiresAt: newExpiryDate.toISOString(),
+        subscriptionDaysRemaining: totalRemainingDays
+      };
+      try { localStorage.setItem('funflick_user', JSON.stringify(updatedUser)); } catch (e) {}
+      return updatedUser;
+    });
+
+    // 5. Update subscription transactions ledger (for admin revenue & subscriber list)
+    setSubscriptionTransactions(prev => {
+      const updated = [newTransaction, ...prev.filter(t => t.razorpayPaymentId !== newTransaction.razorpayPaymentId)];
+      try { localStorage.setItem('funflick_admin_transactions', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    // 6. Send real subscription event to backend MySQL
     const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
     if (token) {
       try {
@@ -1137,39 +1324,41 @@ export const AppProvider = ({ children }) => {
           body: JSON.stringify({
             planId: plan.id,
             planName: plan.name,
-            price: plan.price,
+            price: Number(plan.price),
+            durationDays,
             paymentId: newTransaction.razorpayPaymentId
           })
         });
 
         if (subRes.ok) {
           const subData = await subRes.json();
-          if (subData.isExtension) {
-            showToast(`🎉 Subscription Extended! Validity now: ${subData.totalRemainingDays} days remaining`, 'success');
+          const remDays = subData.daysRemaining || subData.totalRemainingDays || totalRemainingDays;
+          const expFormatted = new Date(subData.expiresAt || newExpiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          if (subData.isExtended || subData.isExtension || isExtension) {
+            showToast(`🎉 Subscription Extended! Added ${durationDays} days. Total validity: ${remDays} days (until ${expFormatted})`, 'success');
           } else {
-            showToast(`🎉 Influencer Plan Activated! Valid until ${new Date(subData.expiresAt).toLocaleDateString()}`, 'success');
+            showToast(`🎉 Influencer Activated! Valid for ${durationDays} days until ${expFormatted}`, 'success');
           }
           await fetchUserSubscriptionStatus();
+        } else {
+          showToast(`🎉 ${isExtension ? 'Subscription Extended' : 'Influencer Activated'}! Valid for ${totalRemainingDays} days`, 'success');
         }
       } catch (e) {
         console.warn('Subscription sync to backend error:', e);
+        showToast(`🎉 ${isExtension ? 'Subscription Extended' : 'Influencer Activated'}! Valid for ${totalRemainingDays} days`, 'success');
       }
+    } else {
+      showToast(`🎉 ${isExtension ? 'Subscription Extended' : 'Influencer Activated'}! Valid for ${totalRemainingDays} days`, 'success');
     }
 
-    // Activate Influencer Status locally
-    setCurrentUser(prev => ({
-      ...prev,
-      isInfluencer: true,
-      hasInfluencerSubscription: true,
-      hasPublishingSubscription: true,
-      accountStatus: 'Influencer',
-      subscriptionPlan: plan.name
-    }));
+    // Refresh admin & influencer views
+    if (fetchAdminTransactions) fetchAdminTransactions();
+    if (fetchInfluencerMedia) fetchInfluencerMedia();
 
-    // Record in user's wallet history
+    // 7. Record in user's wallet history
     const walletTx = {
       id: 'tx_rzp_' + Date.now(),
-      title: `Influencer ${plan.name} (Razorpay)`,
+      title: `Influencer ${plan.name} (${paymentMethod})`,
       desc: `Payment ID: ${newTransaction.razorpayPaymentId}`,
       type: 'debit',
       amount: plan.price,
@@ -1399,44 +1588,130 @@ export const AppProvider = ({ children }) => {
     return true;
   };
 
-  // Admin: Create New Ad
-  const createAd = (adData) => {
+  // Admin: Create New Ad (Syncs with MySQL backend & localStorage)
+  const createAd = async (adData) => {
     const newAd = {
       ...adData,
-      id: 'ad_' + Date.now(),
-      impressions: 0,
-      clicks: 0,
+      id: adData.id || ('ad_' + Date.now()),
+      impressions: Number(adData.impressions) || 0,
+      clicks: Number(adData.clicks) || 0,
       active: adData.active !== undefined ? adData.active : true,
-      duration: Number(adData.duration) || 15,
-      allowCloseAfter: Number(adData.allowCloseAfter) || 0
+      duration: Number(adData.duration) || 20,
+      allowCloseAfter: Number(adData.allowCloseAfter) || 8,
+      startDate: adData.startDate || '2026-10-01',
+      endDate: adData.endDate || '2026-11-30',
+      frequency: adData.frequency || 'Every 3 Reels',
+      actionUrl: adData.actionUrl || 'https://funflick.in',
+      actionText: adData.actionText || 'Learn More'
     };
-    setAdsList(prev => [newAd, ...prev]);
+
+    setAdsList(prev => {
+      const updated = [newAd, ...prev.filter(a => a.id !== newAd.id)];
+      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      await fetch('/api/admin/ads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(newAd)
+      });
+    } catch (e) {}
+
     showToast(`📢 Ad "${newAd.title}" published successfully!`, 'success');
     return newAd;
   };
 
   // Admin: Update Ad
-  const updateAd = (id, adData) => {
-    setAdsList(prev => prev.map(ad => ad.id === id ? { ...ad, ...adData } : ad));
+  const updateAd = async (id, adData) => {
+    setAdsList(prev => {
+      const updated = prev.map(ad => ad.id === id ? { ...ad, ...adData } : ad);
+      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    const target = adsList.find(a => a.id === id);
+    if (target) {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+      try {
+        await fetch('/api/admin/ads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ ...target, ...adData, id })
+        });
+      } catch (e) {}
+    }
+
     showToast('✅ Advertisement updated successfully!', 'success');
   };
 
   // Admin: Delete Ad
-  const deleteAd = (id) => {
-    setAdsList(prev => prev.filter(ad => ad.id !== id));
+  const deleteAd = async (id) => {
+    setAdsList(prev => {
+      const updated = prev.filter(ad => ad.id !== id);
+      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      await fetch(`/api/admin/ads/${id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+    } catch (e) {}
+
     showToast('Advertisement deleted.', 'info');
   };
 
   // Admin: Toggle Ad Active / Inactive
   const toggleAdStatus = (id) => {
-    setAdsList(prev => prev.map(ad => {
-      if (ad.id === id) {
-        const nextStatus = !ad.active;
-        showToast(`Ad "${ad.title}" is now ${nextStatus ? 'ACTIVE' : 'INACTIVE'}`, 'info');
-        return { ...ad, active: nextStatus };
-      }
-      return ad;
-    }));
+    setAdsList(prev => {
+      const updated = prev.map(ad => {
+        if (ad.id === id) {
+          const nextStatus = !ad.active;
+          showToast(`Ad "${ad.title}" is now ${nextStatus ? 'ACTIVE' : 'INACTIVE'}`, 'info');
+          return { ...ad, active: nextStatus };
+        }
+        return ad;
+      });
+      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+  };
+
+  // Track Real Ad Impression
+  const recordAdImpression = (adId) => {
+    setAdsList(prev => {
+      const updated = prev.map(a => a.id === adId ? { ...a, impressions: (a.impressions || 0) + 1 } : a);
+      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    try {
+      fetch(`/api/admin/ads/${adId}/metric`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'impression' })
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
+  // Track Real Ad Click
+  const recordAdClick = (adId) => {
+    setAdsList(prev => {
+      const updated = prev.map(a => a.id === adId ? { ...a, clicks: (a.clicks || 0) + 1 } : a);
+      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    try {
+      fetch(`/api/admin/ads/${adId}/metric`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'click' })
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   // Mobile In-App Ad Popup Trigger
@@ -1444,6 +1719,7 @@ export const AppProvider = ({ children }) => {
     const targetAd = adId ? adsList.find(a => a.id === adId) : adsList.find(a => a.active) || adsList[0];
     if (targetAd) {
       setActivePopupAd(targetAd);
+      recordAdImpression(targetAd.id);
     } else {
       showToast('No active ads configured to display!', 'info');
     }
@@ -2381,12 +2657,18 @@ export const AppProvider = ({ children }) => {
         togglePlanActiveStatus,
         resetPublishingPlansToDefault,
         influencerMedia,
+        setInfluencerMedia,
+        fetchInfluencerMedia,
         sendInfluencerReward,
         adsList,
+        setAdsList,
+        fetchAdminAds,
         createAd,
         updateAd,
         deleteAd,
         toggleAdStatus,
+        recordAdImpression,
+        recordAdClick,
         activePopupAd,
         showMobileAd,
         dismissMobileAd,

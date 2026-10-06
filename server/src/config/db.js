@@ -153,6 +153,24 @@ export async function initDatabase() {
       ) ENGINE=InnoDB;
     `);
 
+    // Stories Table (Must be created before story_likes due to foreign key constraint)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS stories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        media_url TEXT NOT NULL,
+        media_type ENUM('image', 'video') DEFAULT 'image',
+        caption TEXT DEFAULT NULL,
+        music VARCHAR(150) DEFAULT NULL,
+        sticker VARCHAR(50) DEFAULT NULL,
+        likes_count INT DEFAULT 0,
+        status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Approved',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+    `);
+
     // Story Likes Table
     await connection.query(`
       CREATE TABLE IF NOT EXISTS story_likes (
@@ -208,22 +226,6 @@ export async function initDatabase() {
       ) ENGINE=InnoDB;
     `);
 
-    // Stories table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS stories (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        media_url TEXT NOT NULL,
-        media_type ENUM('image', 'video') DEFAULT 'image',
-        caption TEXT DEFAULT NULL,
-        music VARCHAR(150) DEFAULT NULL,
-        sticker VARCHAR(50) DEFAULT NULL,
-        status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        expires_at TIMESTAMP NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB;
-    `);
 
     // Migration helper: stories status column
     try {
@@ -454,6 +456,29 @@ export async function initDatabase() {
         status ENUM('Pending', 'Resolved', 'Dismissed') DEFAULT 'Pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+    `);
+
+    // In-App Popup Ads and Promotions Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS platform_ads (
+        id VARCHAR(100) PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        type ENUM('video', 'image') DEFAULT 'video',
+        media_url TEXT NOT NULL,
+        thumbnail_url TEXT,
+        duration INT DEFAULT 20,
+        allow_close_after INT DEFAULT 8,
+        active TINYINT DEFAULT 1,
+        start_date VARCHAR(50) DEFAULT NULL,
+        end_date VARCHAR(50) DEFAULT NULL,
+        frequency VARCHAR(100) DEFAULT 'Every 3 Reels',
+        action_url TEXT,
+        action_text VARCHAR(100) DEFAULT 'Learn More',
+        impressions INT DEFAULT 0,
+        clicks INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB;
     `);
 

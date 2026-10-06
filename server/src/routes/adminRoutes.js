@@ -14,7 +14,12 @@ import {
   getAdminActiveStories,
   deleteAdminStory,
   getAdminStats,
-  getAdminTransactions
+  getAdminTransactions,
+  getAdminAds,
+  createAdminAd,
+  deleteAdminAd,
+  recordAdMetric,
+  getAdminInfluencerMedia
 } from '../controllers/adminController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -52,4 +57,14 @@ router.put('/stories/users/:userId/reactivate', authenticateToken, requireAdmin,
 // Admin subscription transaction ledger for revenue page
 router.get('/transactions', authenticateToken, requireAdmin, getAdminTransactions);
 
+// Influencer Media & Rewards review
+router.get('/influencer-media', authenticateToken, requireAdmin, getAdminInfluencerMedia);
+
+// Ads & In-App Promotions management
+router.get('/ads', getAdminAds);
+router.post('/ads', authenticateToken, requireAdmin, createAdminAd);
+router.delete('/ads/:id', authenticateToken, requireAdmin, deleteAdminAd);
+router.post('/ads/:id/metric', recordAdMetric);
+
 export default router;
+

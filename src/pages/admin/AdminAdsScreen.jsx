@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useApp } from '../../context/AppContext';
 import api from '../../services/api';
@@ -29,8 +29,12 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const AdminAdsScreen = () => {
-  const { adsList, createAd, updateAd, deleteAd, toggleAdStatus, showMobileAd, showToast, theme } = useApp();
+  const { adsList, createAd, updateAd, deleteAd, toggleAdStatus, showMobileAd, showToast, theme, fetchAdminAds } = useApp();
   const isLight = theme === 'light';
+
+  useEffect(() => {
+    if (fetchAdminAds) fetchAdminAds();
+  }, []);
 
   // Create / Edit Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -224,40 +228,53 @@ export const AdminAdsScreen = () => {
           </button>
         </div>
 
-        {/* Ad Metrics Summary */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
-            <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Active Ads</span>
-            <div className={`text-2xl font-black font-heading mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              {(adsList || []).filter(a => a.active).length}
-            </div>
-            <span className="text-[10px] text-emerald-400 font-semibold mt-1 block">Live in user mobile feed</span>
-          </div>
+        {/* Ad Metrics Summary (Real database & interaction calculations) */}
+        {(() => {
+          const activeCount = (adsList || []).filter(a => a.active).length;
+          const totalImp = (adsList || []).reduce((acc, a) => acc + (Number(a.impressions) || 0), 0);
+          const totalClk = (adsList || []).reduce((acc, a) => acc + (Number(a.clicks) || 0), 0);
+          const ctr = totalImp > 0 ? ((totalClk / totalImp) * 100).toFixed(1) + '%' : '0.0%';
+          const vidCount = (adsList || []).filter(a => a.type === 'video').length;
+          const imgCount = (adsList || []).filter(a => a.type === 'image').length;
 
-          <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
-            <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Total Impressions</span>
-            <div className={`text-2xl font-black font-heading mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              20.4K
-            </div>
-            <span className="text-[10px] text-blue-400 font-semibold mt-1 block">+15.8% reach increase</span>
-          </div>
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
+                <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Active Ads</span>
+                <div className={`text-2xl font-black font-heading mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  {activeCount}
+                </div>
+                <span className="text-[10px] text-emerald-400 font-semibold mt-1 block">Live in user mobile feed</span>
+              </div>
 
-          <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
-            <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Total Click-Throughs</span>
-            <div className={`text-2xl font-black font-heading mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              3,050
-            </div>
-            <span className="text-[10px] text-pink-400 font-semibold mt-1 block">14.9% CTR average</span>
-          </div>
+              <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
+                <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Total Impressions</span>
+                <div className={`text-2xl font-black font-heading mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  {totalImp > 999 ? `${(totalImp / 1000).toFixed(1)}K` : totalImp}
+                </div>
+                <span className="text-[10px] text-blue-400 font-semibold mt-1 block">Real views in user sessions</span>
+              </div>
 
-          <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
-            <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Ad Formats</span>
-            <div className={`text-2xl font-black font-heading mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              Image & Video
+              <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
+                <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Total Click-Throughs</span>
+                <div className={`text-2xl font-black font-heading mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  {totalClk.toLocaleString()}
+                </div>
+                <span className="text-[10px] text-pink-400 font-semibold mt-1 block">{ctr} CTR average</span>
+              </div>
+
+              <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
+                <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Ad Formats</span>
+                <div className={`text-2xl font-black font-heading mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  {adsList && adsList.length > 0 ? `${vidCount} Video · ${imgCount} Img` : '0 Active'}
+                </div>
+                <span className="text-[10px] text-purple-400 font-semibold mt-1 block">
+                  {adsList ? `${adsList.length} configured` : 'No campaigns'}
+                </span>
+              </div>
             </div>
-            <span className="text-[10px] text-purple-400 font-semibold mt-1 block">With close timers & rules</span>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Ads Cards List */}
         <div className="space-y-4">

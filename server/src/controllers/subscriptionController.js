@@ -244,8 +244,10 @@ export async function subscribeUser(req, res) {
       startDate: baseStartDate,
       expiresAt: newExpiryDate,
       daysRemaining: totalRemainingDays,
+      totalRemainingDays: totalRemainingDays,
       durationDaysAdded: durationDays,
-      isExtended: isExtension
+      isExtended: isExtension,
+      isExtension: isExtension
     });
   } catch (err) {
     console.error('Subscribe user error:', err);

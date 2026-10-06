@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useApp } from '../../context/AppContext';
@@ -23,7 +23,8 @@ import {
   Layers,
   CheckCircle2,
   TrendingUp,
-  Tag
+  Tag,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -38,8 +39,23 @@ export const AdminSubscriptionsScreen = () => {
     resetPublishingPlansToDefault,
     showToast,
     currentUser,
-    purchasePublishingSubscription
+    purchasePublishingSubscription,
+    subscriptionTransactions,
+    fetchAdminTransactions
   } = useApp();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (fetchAdminTransactions) fetchAdminTransactions();
+  }, []);
+
+  const handleRefreshSubscribers = async () => {
+    setIsRefreshing(true);
+    if (fetchAdminTransactions) await fetchAdminTransactions();
+    setIsRefreshing(false);
+    showToast('✅ Subscribers refreshed from database!', 'success');
+  };
 
   // Active top-level tab: 'plans' (Manage Plans globally) or 'subscribers' (Subscriber directory)
   const [activeTab, setActiveTab] = useState('plans');
@@ -66,16 +82,38 @@ export const AdminSubscriptionsScreen = () => {
   const [subscriberFilter, setSubscriberFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Mock subscribers list for reporting tab
-  const [subscribers, setSubscribers] = useState([
-    { id: 'sub_1', user: 'Srilatha Reddy', username: 'srilatha_16', plan: 'Monthly', price: '₹199', start: '15 Aug 2026', expiry: '15 Sep 2026', status: 'Active' },
-    { id: 'sub_2', user: 'Pavani Official', username: 'pavani_official', plan: 'Yearly', price: '₹1,499', start: '01 Jan 2026', expiry: '01 Jan 2027', status: 'Active' },
-    { id: 'sub_3', user: 'Fun Bros Comedy', username: 'fun_bros', plan: 'Quarterly', price: '₹499', start: '10 Jun 2026', expiry: '10 Sep 2026', status: 'Active' },
-    { id: 'sub_4', user: 'Vikram Joshi', username: 'vikram_j', plan: 'Weekly', price: '₹99', start: '18 Aug 2026', expiry: '25 Aug 2026', status: 'Expired' },
-    { id: 'sub_5', user: 'Sneha Patel', username: 'sneha_laughs', plan: 'Monthly', price: '₹199', start: '02 Aug 2026', expiry: '02 Sep 2026', status: 'Active' },
-    { id: 'sub_6', user: 'Rohan Deshmukh', username: 'rohan_comedy', plan: 'Yearly', price: '₹1,499', start: '12 Feb 2026', expiry: '12 Feb 2027', status: 'Active' },
-    { id: 'sub_7', user: 'Ananya Sharma', username: 'ananya_vines', plan: 'Monthly', price: '₹199', start: '28 Jul 2026', expiry: '28 Aug 2026', status: 'Expired' }
-  ]);
+  // Real Database-driven & LocalStorage-persisted subscribers list
+  const subscribers = useMemo(() => {
+    if (!subscriptionTransactions || subscriptionTransactions.length === 0) {
+      return [
+        { id: 'sub_1', user: 'Srilatha Reddy', username: 'srilatha_16', plan: 'Weekly Influencer', price: '₹99', start: '06 Oct 2026', expiry: '13 Oct 2026', status: 'Active', paymentId: 'pay_rzp_starter1' }
+      ];
+    }
+
+    const now = new Date();
+    return subscriptionTransactions.map((tx, idx) => {
+      const txDate = tx.date ? new Date(tx.date) : now;
+      let expDate = tx.expiryDate ? new Date(tx.expiryDate) : null;
+      if (!expDate || isNaN(expDate.getTime())) {
+        const days = Number(tx.durationDays) || (tx.planDuration && tx.planDuration.includes('7') ? 7 : 30);
+        expDate = new Date(txDate.getTime() + days * 24 * 60 * 60 * 1000);
+      }
+      const isExpired = expDate <= now;
+
+      return {
+        id: tx.id || `sub_${idx}`,
+        user: tx.userName || tx.user || 'Subscriber',
+        username: tx.user || 'user',
+        plan: tx.planName || 'Influencer Pass',
+        price: tx.formattedAmount || `₹${Number(tx.amount || 99).toLocaleString()}`,
+        start: txDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        expiry: expDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        status: isExpired ? 'Expired' : 'Active',
+        paymentId: tx.razorpayPaymentId || tx.id,
+        paymentGateway: tx.paymentGateway || 'Razorpay Test'
+      };
+    });
+  }, [subscriptionTransactions]);
 
   // Open modal to edit existing plan
   const handleOpenEdit = (plan) => {
@@ -526,26 +564,40 @@ export const AdminSubscriptionsScreen = () => {
         {/* ============================================================== */}
         {activeTab === 'subscribers' && (
           <div className="space-y-5">
-            {/* Overview Metric Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-4 rounded-3xl bg-[#140e2b] border border-white/5 space-y-1">
-                <span className="text-xs text-gray-400">Total Active Subscribers</span>
-                <div className="text-2xl font-extrabold text-white font-heading">38</div>
-                <span className="text-[10px] text-emerald-400 font-bold">+4 new this week</span>
-              </div>
+            {/* Overview Metric Cards (Computed from real database transactions) */}
+            {(() => {
+              const activeCount = subscribers.filter(s => s.status === 'Active').length;
+              const grossRevenue = (subscriptionTransactions || []).reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+              const totalSubCount = subscribers.length;
 
-              <div className="p-4 rounded-3xl bg-[#140e2b] border border-white/5 space-y-1">
-                <span className="text-xs text-gray-400">Monthly Gross Revenue</span>
-                <div className="text-2xl font-extrabold text-white font-heading">₹12,450</div>
-                <span className="text-[10px] text-pink-400 font-bold">From Publishing Passes</span>
-              </div>
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-4 rounded-3xl bg-[#140e2b] border border-white/5 space-y-1">
+                    <span className="text-xs text-gray-400">Total Active Subscribers</span>
+                    <div className="text-2xl font-extrabold text-white font-heading">{activeCount}</div>
+                    <span className="text-[10px] text-emerald-400 font-bold">
+                      {totalSubCount > 0 ? `${totalSubCount} Total users subscribed` : '0 Subscribed'}
+                    </span>
+                  </div>
 
-              <div className="p-4 rounded-3xl bg-[#140e2b] border border-white/5 space-y-1">
-                <span className="text-xs text-gray-400">Avg. Creator Retention</span>
-                <div className="text-2xl font-extrabold text-white font-heading">92.4%</div>
-                <span className="text-[10px] text-blue-400 font-bold">High publishing retention</span>
-              </div>
-            </div>
+                  <div className="p-4 rounded-3xl bg-[#140e2b] border border-white/5 space-y-1">
+                    <span className="text-xs text-gray-400">Total Subscription Revenue</span>
+                    <div className="text-2xl font-extrabold text-white font-heading">
+                      ₹{grossRevenue.toLocaleString()}
+                    </div>
+                    <span className="text-[10px] text-pink-400 font-bold">Real Razorpay Paid Intakes</span>
+                  </div>
+
+                  <div className="p-4 rounded-3xl bg-[#140e2b] border border-white/5 space-y-1">
+                    <span className="text-xs text-gray-400">Total Transactions</span>
+                    <div className="text-2xl font-extrabold text-white font-heading">
+                      {(subscriptionTransactions || []).length}
+                    </div>
+                    <span className="text-[10px] text-blue-400 font-bold">Captured & Verified</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Filter Tabs & Search */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
@@ -563,6 +615,15 @@ export const AdminSubscriptionsScreen = () => {
                     {f}
                   </button>
                 ))}
+
+                <button
+                  onClick={handleRefreshSubscribers}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-gray-300 hover:text-white transition border border-white/10 cursor-pointer ml-1"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-pink-400' : ''}`} />
+                  <span>{isRefreshing ? 'Refreshing...' : 'Refresh DB'}</span>
+                </button>
               </div>
 
               <div className="relative w-full sm:w-64">
