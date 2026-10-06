@@ -195,6 +195,27 @@ export async function initDatabase() {
       ) ENGINE=InnoDB;
     `);
 
+    // Messages table (Instagram-style 1-to-1 direct messaging)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sender_id INT NOT NULL,
+        recipient_id INT NOT NULL,
+        message_text TEXT,
+        media_url VARCHAR(500) DEFAULT NULL,
+        media_type VARCHAR(50) DEFAULT NULL,
+        media_name VARCHAR(255) DEFAULT NULL,
+        media_size VARCHAR(50) DEFAULT NULL,
+        is_read TINYINT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_sender_recip (sender_id, recipient_id),
+        INDEX idx_recipient (recipient_id),
+        INDEX idx_created (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
     // Dynamic Subscription Plans Table
     await connection.query(`
       CREATE TABLE IF NOT EXISTS subscription_plans (

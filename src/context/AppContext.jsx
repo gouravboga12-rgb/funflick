@@ -89,6 +89,7 @@ export const AppProvider = ({ children }) => {
     if (!token) return;
 
     fetchLiveNotifications();
+    fetchLiveConversations();
     fetchAdminPendingContent();
 
     fetch('/api/auth/me', {
@@ -359,6 +360,68 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.warn('Could not fetch live notifications:', err);
     }
+  };
+
+  // Live Conversations synchronization with AWS MySQL backend
+  const fetchLiveConversations = async () => {
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (!token) return;
+      const res = await fetch('/api/messages/conversations', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.conversations && Array.isArray(data.conversations)) {
+          setConversations(prev => {
+            return data.conversations.map(conv => {
+              const existing = prev.find(p => p.id === conv.id || p.userId === conv.userId || p.user?.username === conv.user?.username);
+              return {
+                ...conv,
+                messages: existing?.messages && existing.messages.length > 0 ? existing.messages : []
+              };
+            });
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch live conversations:', err);
+    }
+  };
+
+  // Live Message History fetching with a specific user
+  const fetchConversationMessages = async (targetPartner) => {
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (!token || !targetPartner) return [];
+      const res = await fetch(`/api/messages/${targetPartner}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.messages && Array.isArray(data.messages)) {
+          setConversations(prev => prev.map(conv => {
+            const matches = 
+              conv.id === targetPartner ||
+              String(conv.userId) === String(targetPartner) ||
+              conv.user?.username === targetPartner ||
+              conv.id === `conv_${targetPartner}`;
+            if (matches) {
+              return {
+                ...conv,
+                unreadCount: 0,
+                messages: data.messages
+              };
+            }
+            return conv;
+          }));
+          return data.messages;
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch messages for partner:', err);
+    }
+    return [];
   };
 
   const fetchComments = async (postId) => {
@@ -1365,57 +1428,87 @@ export const AppProvider = ({ children }) => {
     });
   };
 
-  // Send message in chat (supports text & media up to 5MB)
-  const sendMessage = (conversationId, text, media = null) => {
+  // Send message in chat - Real 1-to-1 direct messaging (no automated bots)
+  const sendMessage = async (conversationId, text, media = null) => {
     if (!text?.trim() && !media) return;
+
+    // Find conversation partner
+    const conv = conversations.find(c => 
+      c.id === conversationId || 
+      String(c.userId) === String(conversationId) || 
+      c.user?.username === conversationId
+    );
+    const partnerParam = conv?.userId || conv?.user?.username || conversationId.replace(/^conv_/, '');
+
     const myMsg = {
       id: 'm_' + Date.now(),
       sender: 'me',
+      senderId: currentUser?.id,
       text: text?.trim() || '',
       media: media || null,
-      time: 'Just now'
+      time: 'Just now',
+      createdAt: new Date().toISOString()
     };
 
-    setConversations(prev => prev.map(conv => {
-      if (conv.id === conversationId) {
+    // Optimistically show message immediately in chat
+    setConversations(prev => prev.map(c => {
+      const match = c.id === conversationId || 
+                    String(c.userId) === String(conversationId) || 
+                    c.user?.username === conversationId;
+      if (match) {
         return {
-          ...conv,
+          ...c,
           lastMessage: media ? (media.type === 'video' ? '🎥 Video' : '📷 Photo') : text,
           time: 'Just now',
-          messages: [...conv.messages, myMsg]
+          messages: [...(c.messages || []), myMsg]
         };
       }
-      return conv;
+      return c;
     }));
 
-    // Simulate smart mock auto-reply after 1.5 seconds
-    setTimeout(() => {
-      const replies = [
-        'Haha totally agree! 😂 Let us make a video on this!',
-        'Super cool! Check out the draft I just sent you 🎬',
-        'Awesome!! FunFlick is blowing up right now 🔥',
-        'Love that! Catch you at the studio tomorrow ☕'
-      ];
-      const randomReply = replies[Math.floor(Math.random() * replies.length)];
-      const theirMsg = {
-        id: 'm_reply_' + Date.now(),
-        sender: 'them',
-        text: randomReply,
-        time: 'Just now'
-      };
+    // Persist real message to AWS MySQL backend
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (token) {
+      try {
+        const res = await fetch(`/api/messages/${partnerParam}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            text: text?.trim() || '',
+            media: media ? {
+              url: media.url,
+              type: media.type,
+              name: media.name,
+              size: media.size
+            } : null
+          })
+        });
 
-      setConversations(prev => prev.map(conv => {
-        if (conv.id === conversationId) {
-          return {
-            ...conv,
-            lastMessage: randomReply,
-            time: 'Just now',
-            messages: [...conv.messages, theirMsg]
-          };
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.message) {
+            setConversations(prev => prev.map(c => {
+              const match = c.id === conversationId || 
+                            String(c.userId) === String(conversationId) || 
+                            c.user?.username === conversationId;
+              if (match) {
+                return {
+                  ...c,
+                  messages: (c.messages || []).map(m => m.id === myMsg.id ? resData.message : m)
+                };
+              }
+              return c;
+            }));
+          }
         }
-        return conv;
-      }));
-    }, 1500);
+      } catch (err) {
+        console.error('Failed to save message to MySQL backend:', err);
+      }
+    }
+    // No automated mock replies! Only the real person can reply.
   };
 
   // Open or create conversation with a user (by username or user object)
@@ -1424,18 +1517,24 @@ export const AppProvider = ({ children }) => {
     const username = typeof targetUser === 'string' ? targetUser : targetUser.username;
     const name = typeof targetUser === 'string' ? targetUser : (targetUser.name || targetUser.username);
     const avatar = (typeof targetUser === 'object' && targetUser.avatar) ? targetUser.avatar : '/brand/default-avatar.svg';
+    const userId = (typeof targetUser === 'object' && targetUser.id) ? targetUser.id : null;
 
     // Check if conversation already exists
-    const existing = conversations.find(c => c.user?.username?.toLowerCase() === username.toLowerCase());
+    const existing = conversations.find(c => 
+      c.user?.username?.toLowerCase() === username.toLowerCase() ||
+      (userId && c.userId === userId)
+    );
     if (existing) {
       return existing.id;
     }
 
-    // Create new conversation
-    const newConvId = 'conv_' + username + '_' + Date.now();
+    // Create new clean direct conversation
+    const newConvId = `conv_${userId || username}`;
     const newConv = {
       id: newConvId,
+      userId: userId,
       user: {
+        id: userId,
         name,
         username,
         avatar,
@@ -2008,6 +2107,8 @@ export const AppProvider = ({ children }) => {
         fetchLiveVideos,
         fetchLiveStories,
         fetchLiveNotifications,
+        fetchLiveConversations,
+        fetchConversationMessages,
         fetchLiveCreators,
         fetchAdminPendingContent,
         blockedUsers,

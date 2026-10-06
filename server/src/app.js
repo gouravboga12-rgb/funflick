@@ -14,6 +14,7 @@ import payoutRoutes from './routes/payoutRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import messageRoutes from './routes/messageRoutes.js';
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use('/api/videos', videoRoutes);
 app.use('/api/stories', storyRoutes);
 app.use('/api/follows', followRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/messages', messageRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('/api/admin', adminRoutes);

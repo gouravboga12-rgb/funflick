@@ -16,35 +16,76 @@ import {
   Loader2
 } from 'lucide-react';
 
+import { uploadFileToS3 } from '../../services/s3UploadService';
+
 const MAX_MEDIA_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB max limit
 
 export const MessagesScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { conversations, sendMessage, openOrCreateConversation, currentUser, showToast } = useApp();
+  const { 
+    conversations, 
+    sendMessage, 
+    openOrCreateConversation, 
+    fetchLiveConversations,
+    fetchConversationMessages,
+    currentUser, 
+    showToast 
+  } = useApp();
 
   const [activeConvId, setActiveConvId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [inputText, setInputText] = useState('');
-  const [attachedMedia, setAttachedMedia] = useState(null); // { type, url, name, size }
+  const [attachedMedia, setAttachedMedia] = useState(null); // { file, type, url, name, size }
+  const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef(null);
 
   // Database searched users
   const [dbUsers, setDbUsers] = useState([]);
   const [isSearchingDb, setIsSearchingDb] = useState(false);
 
+  // Poll conversation list so incoming messages from other users appear in inbox
+  useEffect(() => {
+    if (fetchLiveConversations) fetchLiveConversations();
+    const interval = setInterval(() => {
+      if (fetchLiveConversations) fetchLiveConversations();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Auto-open chat if navigated with ?user=username
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const targetUsername = params.get('user');
     if (targetUsername) {
-      // Find or create conversation with this user
       const convId = openOrCreateConversation(targetUsername);
       if (convId) {
         setActiveConvId(convId);
+        if (fetchConversationMessages) {
+          fetchConversationMessages(targetUsername);
+        }
       }
     }
   }, [location.search]);
+
+  // Load message history when entering active conversation & poll for replies
+  useEffect(() => {
+    if (!activeConvId) return;
+    const conv = conversations.find(c => c.id === activeConvId);
+    const partner = conv?.userId || conv?.user?.username;
+    if (!partner) return;
+
+    if (fetchConversationMessages) {
+      fetchConversationMessages(partner);
+    }
+
+    const interval = setInterval(() => {
+      if (fetchConversationMessages) {
+        fetchConversationMessages(partner);
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeConvId]);
 
   // Live search users in MySQL database when user types in search box
   useEffect(() => {
@@ -81,19 +122,23 @@ export const MessagesScreen = () => {
   const activeConv = conversations.find(c => c.id === activeConvId);
 
   const filteredConvs = conversations.filter(c => 
-    c.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.user.username.toLowerCase().includes(searchQuery.toLowerCase())
+    c.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.user?.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleStartChatWithDbUser = (user) => {
     const convId = openOrCreateConversation({
+      id: user.id,
       username: user.username,
       name: user.name || user.username,
-      avatar: user.avatar || '/brand/default-avatar.svg'
+      avatar: user.avatar || user.avatar_url || '/brand/default-avatar.svg'
     });
     if (convId) {
       setActiveConvId(convId);
       setSearchQuery('');
+      if (fetchConversationMessages) {
+        fetchConversationMessages(user.id || user.username);
+      }
     }
   };
 
@@ -119,6 +164,7 @@ export const MessagesScreen = () => {
 
     const objectUrl = URL.createObjectURL(file);
     setAttachedMedia({
+      file,
       type: isVideo ? 'video' : 'image',
       url: objectUrl,
       name: file.name,
@@ -133,14 +179,50 @@ export const MessagesScreen = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
-    if ((!inputText.trim() && !attachedMedia) || !activeConvId) return;
+    if ((!inputText.trim() && !attachedMedia) || !activeConvId || isSending) return;
 
-    sendMessage(activeConvId, inputText, attachedMedia);
-    setInputText('');
-    setAttachedMedia(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setIsSending(true);
+    let finalMedia = null;
+
+    try {
+      if (attachedMedia) {
+        if (attachedMedia.file) {
+          try {
+            const s3Url = await uploadFileToS3(attachedMedia.file, 'chat');
+            finalMedia = {
+              type: attachedMedia.type,
+              url: s3Url,
+              name: attachedMedia.name,
+              size: attachedMedia.size
+            };
+          } catch (e) {
+            console.warn('Direct upload fallback:', e);
+            finalMedia = {
+              type: attachedMedia.type,
+              url: attachedMedia.url,
+              name: attachedMedia.name,
+              size: attachedMedia.size
+            };
+          }
+        } else {
+          finalMedia = attachedMedia;
+        }
+      }
+
+      const textToSend = inputText;
+      setInputText('');
+      setAttachedMedia(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      await sendMessage(activeConvId, textToSend, finalMedia);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      showToast('Failed to send message', 'error');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (

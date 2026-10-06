@@ -219,43 +219,11 @@ export const TRENDING_HASHTAGS = [
 // Wallet Transactions (Empty initially)
 export const INITIAL_TRANSACTIONS = [];
 
-// Notifications (Clean Welcome Notification)
-export const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'notif_welcome',
-    type: 'system',
-    user: 'Fanplex Support',
-    avatar: '/brand/funflick-logo.png',
-    text: 'Welcome to FunFlick / Fanplex! Upload your first post or reel to get started.',
-    time: 'Just now',
-    unread: false
-  }
-];
+// Notifications (Live from AWS MySQL)
+export const INITIAL_NOTIFICATIONS = [];
 
-// Messages / Conversations (Single Fanplex Official Desk account)
-export const INITIAL_CONVERSATIONS = [
-  {
-    id: 'conv_fanplex_support',
-    user: {
-      name: 'Fanplex Official Desk',
-      username: 'fanplex_support',
-      avatar: '/brand/funflick-logo.png',
-      isVerified: true,
-      isOnline: true
-    },
-    lastMessage: 'Welcome to Fanplex! Official Creator Support is here to help you 24/7.',
-    time: 'Just now',
-    unreadCount: 1,
-    messages: [
-      {
-        id: 'msg_fp_1',
-        sender: 'them',
-        text: 'Welcome to Fanplex! Official Creator Support is here to help you 24/7. Upload your posts and reels anytime!',
-        time: 'Just now'
-      }
-    ]
-  }
-];
+// Messages / Conversations (Live from AWS MySQL)
+export const INITIAL_CONVERSATIONS = [];
 
 // Creator Studio Videos List (Empty initially)
 export const CREATOR_VIDEOS = [];
