@@ -18,7 +18,8 @@ import {
   Hash,
   Smile,
   ShieldCheck,
-  Tag
+  Tag,
+  Search
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UploadSuccessMonetizationModal } from '../../../components/common/UploadSuccessMonetizationModal';

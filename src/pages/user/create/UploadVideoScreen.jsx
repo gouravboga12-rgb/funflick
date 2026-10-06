@@ -26,7 +26,8 @@ import {
   X,
   Check,
   Film,
-  Info
+  Info,
+  Search
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UploadSuccessMonetizationModal } from '../../../components/common/UploadSuccessMonetizationModal';
