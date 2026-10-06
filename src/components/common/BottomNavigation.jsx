@@ -57,7 +57,9 @@ export const BottomNavigation = () => {
             );
           }
 
-          const isActive = currentPath === item.path || (item.path === '/feed' && currentPath === '/');
+          const isActive = currentPath === item.path || 
+            (item.path === '/feed' && currentPath === '/') ||
+            (item.label === 'Profile' && (currentPath === '/profile' || (currentUser?.username && currentPath.toLowerCase() === `/creator/${currentUser.username.toLowerCase()}`)));
           const Icon = item.icon;
 
           return (

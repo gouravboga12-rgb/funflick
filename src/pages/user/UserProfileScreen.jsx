@@ -33,7 +33,8 @@ import {
   Zap,
   Info,
   Trash2,
-  Lock
+  Lock,
+  User
 } from 'lucide-react';
 
 export const UserProfileScreen = () => {
@@ -111,6 +112,14 @@ export const UserProfileScreen = () => {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   const viewerMenuItems = [
+    {
+      icon: User,
+      color: 'text-pink-400',
+      label: 'My Profile',
+      badge: 'Feed & Videos',
+      badgeColor: 'bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold',
+      path: `/creator/${currentUser?.username}`
+    },
     {
       icon: Heart,
       color: 'text-pink-400',
@@ -226,13 +235,17 @@ export const UserProfileScreen = () => {
         
         {/* User Card */}
         <div className="flex flex-col items-center text-center space-y-2.5 pt-1">
-          <div className="relative">
+          <div 
+            className="relative cursor-pointer group"
+            onClick={() => navigate(`/creator/${currentUser?.username}`)}
+            title="Click to view My Profile"
+          >
             {/* Same profile icon style for both Users and Influencers */}
             <img
               src={currentUser.avatar || currentUser.avatar_url || '/brand/default-avatar.svg'}
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
               alt={currentUser.name}
-              className="w-20 h-20 rounded-full object-cover border-2 border-pink-500 shadow-xl bg-gray-900"
+              className="w-20 h-20 rounded-full object-cover border-2 border-pink-500 shadow-xl bg-gray-900 group-hover:scale-105 transition-transform"
             />
             {currentUser.isInfluencer && (
               <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-gradient-to-r from-amber-400 to-pink-500 flex items-center justify-center text-xs shadow-md border-2 border-[#090514]" title="Active Influencer Subscription">
@@ -300,6 +313,28 @@ export const UserProfileScreen = () => {
               </span>
               <span className="text-[11px] text-gray-400">Followers</span>
             </div>
+          </div>
+
+          {/* Prominent My Profile Button */}
+          <div className="w-full pt-1">
+            <button
+              onClick={() => navigate(`/creator/${currentUser?.username}`)}
+              className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca] hover:opacity-95 text-white font-extrabold text-xs tracking-wide shadow-lg shadow-pink-500/25 flex items-center justify-between transition active:scale-95 group"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                  <User className="w-4 h-4 text-white" />
+                </div>
+                <div className="text-left">
+                  <span className="block text-xs font-bold leading-tight">My Profile</span>
+                  <span className="block text-[10px] text-white/80 font-normal">View your uploaded videos, reels & likes</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-bold text-white/90 group-hover:translate-x-0.5 transition-transform">
+                <span>View</span>
+                <ChevronRight className="w-4 h-4" />
+              </div>
+            </button>
           </div>
 
           {/* Profile CTA Buttons */}

@@ -2,7 +2,7 @@ import pool from '../config/db.js';
 
 export async function listVideos(req, res) {
   try {
-    const { category, limit = 50, offset = 0 } = req.query;
+    const { category, username, userId, creator_id, limit = 50, offset = 0 } = req.query;
     const currentUserId = req.user?.id || 0;
 
     let query = `
@@ -24,6 +24,17 @@ export async function listVideos(req, res) {
       params.push(category);
     }
 
+    if (username) {
+      query += ' AND u.username = ?';
+      params.push(username);
+    }
+
+    const targetUserId = userId || creator_id;
+    if (targetUserId) {
+      query += ' AND u.id = ?';
+      params.push(targetUserId);
+    }
+
     query += ' ORDER BY v.created_at DESC LIMIT ? OFFSET ?';
     params.push(Number(limit), Number(offset));
 
@@ -32,6 +43,33 @@ export async function listVideos(req, res) {
   } catch (err) {
     console.error('List videos error:', err);
     return res.status(500).json({ error: 'Failed to fetch videos' });
+  }
+}
+
+// Authenticated user's private liked videos (only visible to the user who liked them)
+export async function getLikedVideos(req, res) {
+  try {
+    const currentUserId = req.user.id;
+
+    const [rows] = await pool.query(`
+      SELECT 
+        v.id, v.title, v.description, v.category, v.video_url, v.thumbnail_url,
+        v.media_type, v.hashtags, v.location, v.audio_title,
+        v.duration, v.views_count, v.likes_count, v.created_at, v.status,
+        (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id) AS comments_count,
+        1 AS user_liked,
+        u.id AS creator_id, u.name AS creator_name, u.username AS creator_username, u.avatar_url AS creator_avatar
+      FROM likes l
+      JOIN videos v ON l.video_id = v.id
+      JOIN users u ON v.user_id = u.id
+      WHERE l.user_id = ? AND v.status = 'Approved' AND (u.status IS NULL OR u.status != 'Suspended')
+      ORDER BY l.created_at DESC
+    `, [currentUserId]);
+
+    return res.json({ videos: rows, count: rows.length });
+  } catch (err) {
+    console.error('Get liked videos error:', err);
+    return res.status(500).json({ error: 'Failed to fetch liked videos' });
   }
 }
 

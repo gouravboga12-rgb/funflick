@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { 
   listVideos, 
   getMyMedia,
+  getLikedVideos,
   createVideo, 
   toggleLike, 
   getComments, 
@@ -20,6 +21,9 @@ router.get('/', optionalAuth, listVideos);
 
 // Protected: Get authenticated user's own media library (independent per account)
 router.get('/my-media', authenticateToken, getMyMedia);
+
+// Protected: Get authenticated user's private liked videos
+router.get('/liked', authenticateToken, getLikedVideos);
 
 // Protected: Publish video to feed
 router.post('/', authenticateToken, createVideo);

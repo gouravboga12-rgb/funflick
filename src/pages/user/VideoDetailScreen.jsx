@@ -8,9 +8,40 @@ import { ChevronLeft, Share2 } from 'lucide-react';
 export const VideoDetailScreen = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { posts, showToast } = useApp();
+  const { posts, myMedia, currentUser, showToast } = useApp();
 
-  const post = posts.find(p => p.id === id) || posts[0];
+  let post = posts.find(p => String(p.id) === String(id));
+  if (!post && myMedia && Array.isArray(myMedia)) {
+    const raw = myMedia.find(m => String(m.id) === String(id));
+    if (raw) {
+      post = {
+        id: raw.id,
+        title: raw.title || 'FunFlick Post',
+        caption: raw.caption || raw.title || '',
+        category: raw.category || 'Comedy',
+        mediaType: raw.mediaType || 'video',
+        mediaUrl: raw.mediaUrl,
+        posterUrl: raw.posterUrl || raw.thumbnail,
+        likesCount: Number(raw.likes) || 0,
+        viewsCount: String(raw.views || '0'),
+        commentsCount: Number(raw.commentsCount) || 0,
+        creator: {
+          id: currentUser?.id,
+          name: currentUser?.name || 'You',
+          username: currentUser?.username || 'you',
+          avatar: currentUser?.avatar || currentUser?.avatar_url || '/brand/default-avatar.svg',
+          isVerified: true,
+          isPrivate: false
+        },
+        timeAgo: raw.date || 'Recently',
+        isLiked: Boolean(raw.user_liked),
+        isFollowing: false,
+        isSaved: false,
+        comments: []
+      };
+    }
+  }
+  if (!post) post = posts[0];
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#090514] min-h-full select-none">
