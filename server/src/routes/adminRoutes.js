@@ -41,6 +41,7 @@ router.put('/users/:id/reactivate', authenticateToken, requireAdmin, reactivateU
 router.get('/creators', authenticateToken, requireAdmin, getAdminCreators);
 router.get('/reports', authenticateToken, requireAdmin, getAdminReports);
 router.put('/reports/:id/resolve', authenticateToken, requireAdmin, resolveAdminReport);
+router.patch('/reports/:id/resolve', authenticateToken, requireAdmin, resolveAdminReport);
 
 // Permanent content moderation (Videos, Reels, Photos, Posts)
 router.get('/content', authenticateToken, requireAdmin, getAdminContent);

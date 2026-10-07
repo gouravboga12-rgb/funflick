@@ -40,30 +40,61 @@ export const ReportModal = ({ post, isOpen, onClose }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!selectedReason) return;
 
-    setSubmitted(true);
-    setTimeout(() => {
-      if (isCopyrightFlow) {
-        submitCopyrightReport({
-          originalTitle: selectedOriginal ? selectedOriginal.title : (customOriginalTitle || 'My Original Video'),
-          originalThumbnail: selectedOriginal?.thumbnail || post.thumbnail,
-          accusedUsername: post.creator?.username || post.creator || 'user',
-          accusedTitle: post.title || post.caption || 'Video Reel',
-          accusedThumbnail: post.thumbnail || post.mediaUrl,
-          description: copyrightDescription || 'User screen recorded and reposted my original content without permission.'
-        });
-      } else {
-        showToast('Thank you! Report received and sent to FunFlick Admin Moderation.', 'info');
-      }
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (!token) {
+      showToast('Please log in to report content', 'error');
+      return;
+    }
 
+    setSubmitted(true);
+    try {
+      const detailsText = isCopyrightFlow 
+        ? `Copyright claim: ${copyrightDescription || 'Stolen video reposted without permission'}. Original: "${selectedOriginal?.title || customOriginalTitle || 'My original post'}"`
+        : `User reported: ${selectedReason}`;
+
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          targetVideoId: post.id,
+          reason: selectedReason,
+          details: detailsText
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || 'Thank you! Report received and sent to FunFlick Admin Moderation.', 'success');
+        if (isCopyrightFlow && submitCopyrightReport) {
+          submitCopyrightReport({
+            originalTitle: selectedOriginal ? selectedOriginal.title : (customOriginalTitle || 'My Original Video'),
+            originalThumbnail: selectedOriginal?.thumbnail || post.thumbnail,
+            accusedUsername: post.creator?.username || post.creator || 'user',
+            accusedTitle: post.title || post.caption || 'Video Reel',
+            accusedThumbnail: post.thumbnail || post.mediaUrl,
+            description: copyrightDescription || 'User screen recorded and reposted my original content without permission.'
+          });
+        }
+        setSelectedReason(null);
+        setIsCopyrightFlow(false);
+        setCopyrightDescription('');
+        onClose();
+      } else {
+        showToast(data.error || 'Failed to submit report', 'error');
+      }
+    } catch (err) {
+      console.error('Report submission error:', err);
+      showToast('Network error submitting report. Please try again.', 'error');
+    } finally {
       setSubmitted(false);
-      setSelectedReason(null);
-      setIsCopyrightFlow(false);
-      onClose();
-    }, 600);
+    }
   };
 
   return (

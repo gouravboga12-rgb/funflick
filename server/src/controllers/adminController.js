@@ -273,25 +273,44 @@ export async function getAdminReports(req, res) {
     const [rows] = await pool.query(`
       SELECT 
         cr.id, cr.reason, cr.details, cr.status, cr.created_at,
-        u.name AS reporter_name, u.username AS reporter_username,
-        v.title AS target_title, v.id AS video_id
+        u.id AS reporter_id, u.name AS reporter_name, u.username AS reporter_username, u.avatar_url AS reporter_avatar,
+        v.id AS video_id, v.title AS target_title, v.video_url, v.thumbnail_url, v.category, v.status AS video_status,
+        creator.id AS creator_id, creator.name AS creator_name, creator.username AS creator_username, 
+        creator.avatar_url AS creator_avatar, creator.status AS creator_status
       FROM content_reports cr
       JOIN users u ON cr.reporter_id = u.id
       LEFT JOIN videos v ON cr.target_video_id = v.id
+      LEFT JOIN users creator ON v.user_id = creator.id
       WHERE cr.status = 'Pending'
       ORDER BY cr.created_at DESC
     `);
 
-    const reports = rows.map(r => ({
-      id: r.id,
-      type: 'Content Violation',
-      targetTitle: r.target_title || 'Video Post',
-      reason: r.reason,
-      reporter: r.reporter_username || 'Anonymous',
-      date: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-      status: r.status,
-      videoId: r.video_id
-    }));
+    const reports = rows.map(r => {
+      const isVideo = !(/\.(jpg|jpeg|png|webp|gif)($|\?)/i.test(r.video_url || '') || r.category === 'Photo' || r.category === 'Post');
+      return {
+        id: r.id,
+        type: isVideo ? 'Video / Reel' : 'Photo / Post',
+        targetType: isVideo ? 'Video' : 'Post',
+        targetTitle: r.target_title || 'Community Content',
+        mediaUrl: r.video_url,
+        thumbnailUrl: r.thumbnail_url || r.video_url,
+        reason: r.reason,
+        details: r.details,
+        reporter: r.reporter_username || 'Anonymous',
+        reporterName: r.reporter_name,
+        reporterAvatar: r.reporter_avatar,
+        creatorId: r.creator_id,
+        creatorUsername: r.creator_username || 'user',
+        creatorName: r.creator_name || 'Creator',
+        creatorAvatar: r.creator_avatar,
+        creatorStatus: r.creator_status || 'Active',
+        date: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        createdAt: r.created_at,
+        status: r.status,
+        videoId: r.video_id,
+        videoStatus: r.video_status
+      };
+    });
 
     return res.json({ reports, totalPending: reports.length });
   } catch (err) {
@@ -303,24 +322,70 @@ export async function getAdminReports(req, res) {
 export async function resolveAdminReport(req, res) {
   try {
     const { id } = req.params;
-    const { action } = req.body; // 'remove' | 'dismiss'
+    const { action, suspendReason } = req.body; // 'remove' | 'dismiss' | 'suspend_user'
 
-    if (action === 'remove') {
-      const [rRows] = await pool.query('SELECT target_video_id FROM content_reports WHERE id = ?', [id]);
-      if (rRows.length > 0 && rRows[0].target_video_id) {
-        await pool.query('DELETE FROM videos WHERE id = ?', [rRows[0].target_video_id]);
-      }
-      await pool.query("UPDATE content_reports SET status = 'Resolved' WHERE id = ?", [id]);
-    } else {
-      await pool.query("UPDATE content_reports SET status = 'Dismissed' WHERE id = ?", [id]);
+    // Fetch report and associated video/creator
+    const [rRows] = await pool.query(
+      `SELECT cr.id, cr.target_video_id, cr.reason, v.user_id AS creator_id, v.title AS video_title
+       FROM content_reports cr
+       LEFT JOIN videos v ON cr.target_video_id = v.id
+       WHERE cr.id = ?`,
+      [id]
+    );
+
+    if (rRows.length === 0) {
+      return res.status(404).json({ error: 'Report not found' });
     }
 
-    return res.json({ success: true, message: 'Report handled' });
+    const report = rRows[0];
+    const targetVideoId = report.target_video_id;
+    const creatorId = report.creator_id;
+
+    if (action === 'remove') {
+      if (targetVideoId) {
+        await pool.query('DELETE FROM videos WHERE id = ?', [targetVideoId]);
+      }
+      await pool.query("UPDATE content_reports SET status = 'Resolved' WHERE id = ?", [id]);
+      return res.json({ success: true, message: 'Violating content has been deleted and report marked as resolved.' });
+    } else if (action === 'suspend_user') {
+      // 1. Delete violating content
+      if (targetVideoId) {
+        await pool.query('DELETE FROM videos WHERE id = ?', [targetVideoId]);
+      }
+      // 2. Suspend creator account
+      if (creatorId) {
+        const reason = suspendReason || `Content violation report #${id}: ${report.reason}`;
+        await pool.query(
+          `UPDATE users SET 
+            status = 'Suspended', 
+            suspended_at = NOW(), 
+            suspended_until = NULL, 
+            suspension_reason = ? 
+           WHERE id = ?`,
+          [reason, creatorId]
+        );
+        try {
+          await pool.query(
+            `INSERT INTO notifications (user_id, actor_id, type, title, message)
+             VALUES (?, NULL, 'system', 'Account Suspended', ?)`,
+            [creatorId, `⚠️ Your account has been permanently suspended due to repeated content guidelines violations (${report.reason}).`]
+          );
+        } catch (e) {}
+      }
+      // 3. Mark report as resolved
+      await pool.query("UPDATE content_reports SET status = 'Resolved' WHERE id = ?", [id]);
+      return res.json({ success: true, message: 'Violating content deleted and offending creator account suspended.' });
+    } else {
+      // Dismiss
+      await pool.query("UPDATE content_reports SET status = 'Dismissed' WHERE id = ?", [id]);
+      return res.json({ success: true, message: 'Report dismissed as non-violating.' });
+    }
   } catch (err) {
     console.error('Resolve report error:', err);
     return res.status(500).json({ error: 'Failed to resolve report' });
   }
 }
+
 
 // 1. Get all content filtered by status (Pending, Approved, Rejected, all)
 export async function getAdminContent(req, res) {
