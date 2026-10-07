@@ -278,6 +278,25 @@ export async function login(req, res) {
     // Case 1: Exactly one account matched password -> instant login!
     if (matchingAccounts.length === 1) {
       const user = matchingAccounts[0];
+
+      // Check suspension & auto-restoration
+      if (user.status === 'Suspended') {
+        if (user.suspended_until && new Date(user.suspended_until) <= new Date()) {
+          // Suspension duration has expired! Auto-restore account to Active.
+          await pool.query('UPDATE users SET status = "Active", suspended_until = NULL, suspension_reason = NULL WHERE id = ?', [user.id]);
+          user.status = 'Active';
+        } else {
+          const endStr = user.suspended_until 
+            ? `until ${new Date(user.suspended_until).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` 
+            : 'permanently';
+          return res.status(403).json({
+            error: `Your account has been suspended ${endStr}. Reason: ${user.suspension_reason || 'Violation of FunFlick community guidelines'}. The account cannot be accessed until the suspension period expires.`,
+            isSuspended: true,
+            suspendedUntil: user.suspended_until
+          });
+        }
+      }
+
       const token = jwt.sign(
         { id: user.id, username: user.username, email: user.email, role: user.role },
         process.env.JWT_SECRET || 'funflick_secret',
@@ -348,6 +367,23 @@ export async function selectAccountLogin(req, res) {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid password for this account' });
+    }
+
+    // Check suspension & auto-restoration
+    if (user.status === 'Suspended') {
+      if (user.suspended_until && new Date(user.suspended_until) <= new Date()) {
+        await pool.query('UPDATE users SET status = "Active", suspended_until = NULL, suspension_reason = NULL WHERE id = ?', [user.id]);
+        user.status = 'Active';
+      } else {
+        const endStr = user.suspended_until 
+          ? `until ${new Date(user.suspended_until).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` 
+          : 'permanently';
+        return res.status(403).json({
+          error: `Your account has been suspended ${endStr}. Reason: ${user.suspension_reason || 'Violation of FunFlick community guidelines'}. The account cannot be accessed until the suspension period expires.`,
+          isSuspended: true,
+          suspendedUntil: user.suspended_until
+        });
+      }
     }
 
     const token = jwt.sign(

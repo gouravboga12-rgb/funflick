@@ -322,13 +322,19 @@ export async function getAdminReports(req, res) {
 export async function resolveAdminReport(req, res) {
   try {
     const { id } = req.params;
-    const { action, suspendReason } = req.body; // 'remove' | 'dismiss' | 'suspend_user'
+    const { 
+      action, 
+      suspendDuration = 'permanent', 
+      customUntil = null, 
+      suspendReason = '' 
+    } = req.body; // 'remove' | 'dismiss' | 'suspend_user'
 
     // Fetch report and associated video/creator
     const [rRows] = await pool.query(
-      `SELECT cr.id, cr.target_video_id, cr.reason, v.user_id AS creator_id, v.title AS video_title
+      `SELECT cr.id, cr.target_video_id, cr.reason, v.user_id AS creator_id, v.title AS video_title, u.username AS creator_username
        FROM content_reports cr
        LEFT JOIN videos v ON cr.target_video_id = v.id
+       LEFT JOIN users u ON v.user_id = u.id
        WHERE cr.id = ?`,
       [id]
     );
@@ -348,10 +354,33 @@ export async function resolveAdminReport(req, res) {
       await pool.query("UPDATE content_reports SET status = 'Resolved' WHERE id = ?", [id]);
       return res.json({ success: true, message: 'Violating content has been deleted and report marked as resolved.' });
     } else if (action === 'suspend_user') {
+      // Calculate suspension duration
+      const now = new Date();
+      let suspendedUntil = null;
+      let durationLabel = 'Permanent (Indefinite)';
+
+      if (suspendDuration === '1w' || suspendDuration === '7d' || suspendDuration === '1_week') {
+        suspendedUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        durationLabel = '1 Week (7 Days)';
+      } else if (suspendDuration === '1m' || suspendDuration === '30d' || suspendDuration === '1_month') {
+        suspendedUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        durationLabel = '1 Month (30 Days)';
+      } else if (suspendDuration === '1y' || suspendDuration === '365d' || suspendDuration === '1_year') {
+        suspendedUntil = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+        durationLabel = '1 Year (365 Days)';
+      } else if (suspendDuration === 'custom' && customUntil) {
+        suspendedUntil = new Date(customUntil);
+        durationLabel = `Custom until ${suspendedUntil.toLocaleDateString('en-IN')}`;
+      } else {
+        suspendedUntil = null;
+        durationLabel = 'Permanent (Indefinite)';
+      }
+
       // 1. Delete violating content
       if (targetVideoId) {
         await pool.query('DELETE FROM videos WHERE id = ?', [targetVideoId]);
       }
+
       // 2. Suspend creator account
       if (creatorId) {
         const reason = suspendReason || `Content violation report #${id}: ${report.reason}`;
@@ -359,22 +388,33 @@ export async function resolveAdminReport(req, res) {
           `UPDATE users SET 
             status = 'Suspended', 
             suspended_at = NOW(), 
-            suspended_until = NULL, 
+            suspended_until = ?, 
             suspension_reason = ? 
            WHERE id = ?`,
-          [reason, creatorId]
+          [suspendedUntil, reason, creatorId]
         );
+
+        const endStr = suspendedUntil 
+          ? `until ${suspendedUntil.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` 
+          : 'permanently';
+
         try {
           await pool.query(
             `INSERT INTO notifications (user_id, actor_id, type, title, message)
              VALUES (?, NULL, 'system', 'Account Suspended', ?)`,
-            [creatorId, `⚠️ Your account has been permanently suspended due to repeated content guidelines violations (${report.reason}).`]
+            [creatorId, `⚠️ Your account has been suspended ${endStr} due to content violation (${report.reason}).`]
           );
         } catch (e) {}
       }
+
       // 3. Mark report as resolved
       await pool.query("UPDATE content_reports SET status = 'Resolved' WHERE id = ?", [id]);
-      return res.json({ success: true, message: 'Violating content deleted and offending creator account suspended.' });
+      return res.json({ 
+        success: true, 
+        message: `Violating content deleted and @${report.creator_username || 'creator'} suspended for ${durationLabel}.`,
+        durationLabel,
+        suspendedUntil
+      });
     } else {
       // Dismiss
       await pool.query("UPDATE content_reports SET status = 'Dismissed' WHERE id = ?", [id]);

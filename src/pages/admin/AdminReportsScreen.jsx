@@ -50,7 +50,10 @@ export const AdminReportsScreen = () => {
     fetchReports();
   }, []);
 
-  const handleResolve = async (id, action, suspendReason = '') => {
+  const [suspendDuration, setSuspendDuration] = useState('7d');
+  const [customUntilDate, setCustomUntilDate] = useState('');
+
+  const handleResolve = async (id, action, duration = '7d', customUntil = null, suspendReason = '') => {
     const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     setIsProcessing(true);
     try {
@@ -60,7 +63,12 @@ export const AdminReportsScreen = () => {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ action, suspendReason })
+        body: JSON.stringify({ 
+          action, 
+          suspendDuration: duration, 
+          customUntil, 
+          suspendReason 
+        })
       });
       const data = await res.json();
       if (res.ok) {
@@ -366,23 +374,111 @@ export const AdminReportsScreen = () => {
                 )}
               </div>
 
+              {/* Suspension Duration Options */}
+              <div className="space-y-2 pt-1">
+                <label className="text-xs font-bold text-gray-300 block">
+                  Select Suspension Duration:
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {[
+                    { id: '7d', label: '1 Week', desc: '7 Days lock' },
+                    { id: '30d', label: '1 Month', desc: '30 Days lock' },
+                    { id: '1y', label: '1 Year', desc: '365 Days lock' },
+                    { id: 'permanent', label: 'Permanent', desc: 'Indefinite ban' }
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSuspendDuration(opt.id)}
+                      className={`p-2.5 rounded-2xl text-left border transition cursor-pointer ${
+                        suspendDuration === opt.id
+                          ? 'bg-rose-950/60 border-rose-500 text-white font-bold shadow-md shadow-rose-950/40'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">{opt.label}</span>
+                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                          suspendDuration === opt.id ? 'border-rose-500 bg-rose-500' : 'border-gray-500'
+                        }`}>
+                          {suspendDuration === opt.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-gray-400 block mt-0.5">{opt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Optional Custom Date Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setSuspendDuration(suspendDuration === 'custom' ? '7d' : 'custom')}
+                  className={`w-full py-1.5 px-3 rounded-xl border text-[11px] transition text-center cursor-pointer ${
+                    suspendDuration === 'custom'
+                      ? 'bg-rose-950/60 border-rose-500 text-rose-300 font-bold'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  📅 Need a custom date instead?
+                </button>
+
+                {suspendDuration === 'custom' && (
+                  <div className="p-2.5 rounded-xl bg-black/40 border border-white/10 text-xs space-y-1">
+                    <label className="text-[10px] text-gray-400 block">Suspend until date:</label>
+                    <input
+                      type="date"
+                      value={customUntilDate}
+                      onChange={e => setCustomUntilDate(e.target.value)}
+                      className="w-full bg-[#1b1236] border border-white/10 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+                )}
+
+                {/* Expiration Preview Note */}
+                <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-200 leading-relaxed">
+                  {suspendDuration === '7d' && (
+                    <span>⏳ <strong>1 Week Lock:</strong> Account automatically unlocks after 7 days ({new Date(Date.now() + 7 * 86400000).toLocaleDateString('en-IN')}). Creator cannot retrieve or log in to the account until then.</span>
+                  )}
+                  {suspendDuration === '30d' && (
+                    <span>⏳ <strong>1 Month Lock:</strong> Account automatically unlocks after 30 days ({new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-IN')}). Creator cannot retrieve or log in to the account until then.</span>
+                  )}
+                  {suspendDuration === '1y' && (
+                    <span>⏳ <strong>1 Year Lock:</strong> Account automatically unlocks after 365 days ({new Date(Date.now() + 365 * 86400000).toLocaleDateString('en-IN')}). Creator cannot retrieve or log in to the account until then.</span>
+                  )}
+                  {suspendDuration === 'permanent' && (
+                    <span>🚫 <strong>Permanent Ban:</strong> Account cannot be retrieved unless an Admin manually reactivates it from the Users directory.</span>
+                  )}
+                  {suspendDuration === 'custom' && (
+                    <span>⏳ <strong>Custom Lock:</strong> Account cannot be retrieved until {customUntilDate ? new Date(customUntilDate).toLocaleDateString('en-IN') : 'selected date'}.</span>
+                  )}
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
                 <button
                   type="button"
                   disabled={isProcessing}
                   onClick={() => setConfirmSuspendReport(null)}
-                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-gray-300 font-semibold text-xs transition"
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-gray-300 font-semibold text-xs transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  disabled={isProcessing}
-                  onClick={() => handleResolve(confirmSuspendReport.id, 'suspend_user')}
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition flex items-center gap-1.5"
+                  disabled={isProcessing || (suspendDuration === 'custom' && !customUntilDate)}
+                  onClick={() => handleResolve(
+                    confirmSuspendReport.id, 
+                    'suspend_user', 
+                    suspendDuration, 
+                    suspendDuration === 'custom' ? customUntilDate : null,
+                    confirmSuspendReport.reason
+                  )}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserX className="w-3.5 h-3.5" />}
-                  <span>Confirm Delete &amp; Suspend</span>
+                  <span>
+                    Confirm &amp; Suspend ({suspendDuration === '7d' ? '1 Week' : suspendDuration === '30d' ? '1 Month' : suspendDuration === '1y' ? '1 Year' : suspendDuration === 'permanent' ? 'Permanent' : 'Custom'})
+                  </span>
                 </button>
               </div>
             </motion.div>
