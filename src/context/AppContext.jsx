@@ -433,7 +433,21 @@ export const AppProvider = ({ children }) => {
         if (res.ok) {
           const data = await res.json();
           if (data.media && Array.isArray(data.media) && data.media.length > 0) {
-            setInfluencerMedia(data.media);
+            const normalized = data.media.map(m => ({
+              ...m,
+              thumbnail: m.thumbnail || m.thumbnailUrl || m.mediaUrl,
+              thumbnailUrl: m.thumbnailUrl || m.thumbnail || m.mediaUrl,
+              avatar: m.avatar || m.influencerAvatar || m.avatarUrl || '/brand/default-avatar.svg',
+              influencerAvatar: m.influencerAvatar || m.avatar || m.avatarUrl || '/brand/default-avatar.svg',
+              category: m.category || 'Reel',
+              views: m.views !== undefined ? m.views : (m.viewsCount >= 1000 ? (m.viewsCount / 1000).toFixed(1) + 'K' : (m.viewsCount || 0)),
+              likes: m.likes !== undefined ? m.likes : (m.likesCount >= 1000 ? (m.likesCount / 1000).toFixed(1) + 'K' : (m.likesCount || 0)),
+              comments: m.comments !== undefined ? m.comments : (m.commentsCount || 0),
+              shares: m.shares !== undefined ? m.shares : (m.sharesCount || 0),
+              date: m.date || m.publishedDate || 'Recent',
+              publishedDate: m.publishedDate || m.date || 'Recent'
+            }));
+            setInfluencerMedia(normalized);
             return;
           }
         }
@@ -453,26 +467,38 @@ export const AppProvider = ({ children }) => {
         const likes = typeof p.likesCount === 'number' ? p.likesCount : parseInt(p.likesCount) || 28;
         const comments = typeof p.commentsCount === 'number' ? p.commentsCount : 7;
         const engRate = views > 0 ? (((likes + comments) / views) * 100).toFixed(1) + '%' : '5.2%';
+        const poster = p.posterUrl || p.thumbnailUrl || p.mediaUrl || '';
+        const userAvatar = p.creator?.avatar || '/brand/default-avatar.svg';
 
         return {
           id: p.id,
           title: p.title || p.caption || 'Creator Content',
           mediaUrl: p.mediaUrl || p.videoUrl || '',
-          thumbnailUrl: p.posterUrl || p.thumbnailUrl || p.mediaUrl || '',
+          videoUrl: p.videoUrl || p.mediaUrl || '',
+          thumbnailUrl: poster,
+          thumbnail: poster,
           contentType: p.mediaType === 'image' ? 'post' : 'video',
+          category: p.category || 'Reel',
           isInfluencer: isUserInfluencer,
           influencerName: p.creator?.name || 'Creator',
           username: p.creator?.username || 'user',
-          influencerAvatar: p.creator?.avatar || '/brand/default-avatar.svg',
+          influencerAvatar: userAvatar,
+          avatar: userAvatar,
+          avatarUrl: userAvatar,
           subscriptionPlan: isUserInfluencer ? (currentUser?.subscriptionPlan || 'Monthly Influencer Pro') : 'Free Member',
           viewsCount: views,
+          views: views >= 1000 ? (views / 1000).toFixed(1) + 'K' : views,
           likesCount: likes,
+          likes: likes >= 1000 ? (likes / 1000).toFixed(1) + 'K' : likes,
           commentsCount: comments,
+          comments: comments,
           sharesCount: p.sharesCount || 0,
+          shares: p.sharesCount || 0,
           engagementRate: engRate,
           paymentStatus: 'Pending Reward',
           paidAmount: 0,
-          publishedDate: p.timeAgo || 'Recent'
+          publishedDate: p.timeAgo || 'Recent',
+          date: p.timeAgo || 'Recent'
         };
       });
     });

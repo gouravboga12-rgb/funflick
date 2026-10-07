@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useApp } from '../../context/AppContext';
+import { AdminVideoPlayer } from '../../components/admin/AdminVideoPlayer';
 import { 
   Sparkles, 
   Crown, 
@@ -23,14 +24,124 @@ import {
   AlertCircle,
   ExternalLink,
   Award,
-  RefreshCw
+  RefreshCw,
+  Play,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// Reliable Creator Avatar with image fallback & initials badge
+const InfluencerAvatar = ({ item }) => {
+  const [avatarErr, setAvatarErr] = useState(false);
+  const avatarSrc = item?.avatar || item?.influencerAvatar || item?.avatarUrl;
+  const name = item?.influencerName || item?.username || 'Creator';
+  const initials = name
+    .split(' ')
+    .filter(Boolean)
+    .map(p => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'C';
+
+  if (!avatarSrc || avatarErr) {
+    return (
+      <div 
+        className="w-7 h-7 rounded-full bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-[10px] font-extrabold text-white border border-pink-400/50 shadow-sm shrink-0 select-none"
+        title={name}
+      >
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={avatarSrc}
+      alt={name}
+      onError={() => setAvatarErr(true)}
+      className="w-7 h-7 rounded-full object-cover border border-pink-500 bg-purple-950/40 shrink-0"
+    />
+  );
+};
+
+// Robust Media Thumbnail supporting video previews (#t=0.5), static images & fallback graphics
+const InfluencerMediaThumbnail = ({ item, onClick }) => {
+  const [imgError, setImgError] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+
+  const mediaUrl = item?.mediaUrl || item?.videoUrl || '';
+  const thumbnailUrl = item?.thumbnail || item?.thumbnailUrl || '';
+
+  const isVideoFile = (url) => {
+    if (!url) return false;
+    return /\.(mp4|mov|webm|m4v|ogg)($|\?)/i.test(url) || url.includes('/video/') || url.includes('video');
+  };
+
+  const isImageFile = (url) => {
+    if (!url) return false;
+    return /\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(url) || url.startsWith('data:image/');
+  };
+
+  const hasStaticImage = thumbnailUrl && isImageFile(thumbnailUrl) && !imgError;
+  const isVideo = item?.contentType === 'video' || isVideoFile(mediaUrl) || isVideoFile(thumbnailUrl);
+  const videoSrc = (isVideoFile(thumbnailUrl) ? thumbnailUrl : mediaUrl) || mediaUrl;
+
+  return (
+    <div 
+      onClick={onClick}
+      className="relative w-20 h-24 sm:w-24 sm:h-28 rounded-2xl overflow-hidden bg-slate-900 shrink-0 border border-white/10 group cursor-pointer shadow-md hover:border-pink-500/60 transition-all select-none"
+      title="Click to preview & watch media"
+    >
+      {hasStaticImage ? (
+        <img
+          src={thumbnailUrl}
+          alt={item?.title || 'Creator Media'}
+          onError={() => setImgError(true)}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+      ) : isVideo && videoSrc && !videoError ? (
+        <video
+          src={`${videoSrc}#t=0.5`}
+          preload="metadata"
+          muted
+          playsInline
+          onError={() => setVideoError(true)}
+          className="w-full h-full object-cover pointer-events-none group-hover:scale-105 transition-transform duration-300"
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-tr from-purple-950 via-pink-950/80 to-[#120b24] flex flex-col items-center justify-center p-2 text-center">
+          {isVideo ? (
+            <Video className="w-6 h-6 text-pink-400 mb-1" />
+          ) : (
+            <ImageIcon className="w-6 h-6 text-purple-400 mb-1" />
+          )}
+          <span className="text-[9px] font-bold text-gray-300 line-clamp-1">
+            {item?.category || item?.contentType || 'Media'}
+          </span>
+        </div>
+      )}
+
+      {/* Play/Preview hover overlay */}
+      <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-[1px]">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
+          {isVideo ? <Play className="w-3.5 h-3.5 fill-white ml-0.5" /> : <Eye className="w-3.5 h-3.5" />}
+        </div>
+      </div>
+
+      {/* Format Badge */}
+      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-black/80 text-white backdrop-blur-sm border border-white/10 flex items-center gap-1 shadow">
+        {isVideo ? <Video className="w-2.5 h-2.5 text-pink-400" /> : <ImageIcon className="w-2.5 h-2.5 text-blue-400" />}
+        <span>{item?.contentType || (isVideo ? 'video' : 'post')}</span>
+      </span>
+    </div>
+  );
+};
 
 export const AdminInfluencerMediaScreen = () => {
   const { influencerMedia, sendInfluencerReward, showToast, theme, fetchInfluencerMedia } = useApp();
   const isLight = theme === 'light';
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [previewItem, setPreviewItem] = useState(null);
 
   React.useEffect(() => {
     if (fetchInfluencerMedia) fetchInfluencerMedia();
@@ -72,6 +183,14 @@ export const AdminInfluencerMediaScreen = () => {
     setTimeout(() => {
       sendInfluencerReward(item.id, Number(amount));
       setSubmittingId(null);
+      if (previewItem && previewItem.id === item.id) {
+        setPreviewItem(prev => ({
+          ...prev,
+          paymentStatus: 'Paid',
+          paidAmount: Number(amount),
+          paidDate: 'Just now'
+        }));
+      }
     }, 600);
   };
 
@@ -94,16 +213,21 @@ export const AdminInfluencerMediaScreen = () => {
       const matchName = item.influencerName?.toLowerCase().includes(q);
       const matchUser = item.username?.toLowerCase().includes(q);
       const matchTitle = item.title?.toLowerCase().includes(q);
-      if (!matchName && !matchUser && !matchTitle) return false;
+      const matchCat = item.category?.toLowerCase().includes(q);
+      if (!matchName && !matchUser && !matchTitle && !matchCat) return false;
     }
 
     return true;
   }).sort((a, b) => {
     if (sortFilter === 'views') {
-      return (b.viewsCount || 0) - (a.viewsCount || 0);
+      const viewsA = typeof a.viewsCount === 'number' ? a.viewsCount : parseInt(a.viewsCount) || parseInt(a.views) || 0;
+      const viewsB = typeof b.viewsCount === 'number' ? b.viewsCount : parseInt(b.viewsCount) || parseInt(b.views) || 0;
+      return viewsB - viewsA;
     }
     if (sortFilter === 'likes') {
-      return (b.likesCount || 0) - (a.likesCount || 0);
+      const likesA = typeof a.likesCount === 'number' ? a.likesCount : parseInt(a.likesCount) || parseInt(a.likes) || 0;
+      const likesB = typeof b.likesCount === 'number' ? b.likesCount : parseInt(b.likesCount) || parseInt(b.likes) || 0;
+      return likesB - likesA;
     }
     if (sortFilter === 'engagement') {
       const engA = parseFloat(a.engagementRate) || 0;
@@ -117,7 +241,7 @@ export const AdminInfluencerMediaScreen = () => {
   const totalInfluencerPosts = (influencerMedia || []).filter(m => m.isInfluencer).length;
   const pendingRewardsCount = (influencerMedia || []).filter(m => m.paymentStatus === 'Pending Reward').length;
   const totalPaidSum = (influencerMedia || []).reduce((acc, curr) => acc + (curr.paidAmount || 0), 0);
-  const totalViewsCount = (influencerMedia || []).reduce((acc, curr) => acc + (typeof curr.viewsCount === 'number' ? curr.viewsCount : parseInt(curr.viewsCount) || 0), 0);
+  const totalViewsCount = (influencerMedia || []).reduce((acc, curr) => acc + (typeof curr.viewsCount === 'number' ? curr.viewsCount : parseInt(curr.viewsCount) || parseInt(curr.views) || 0), 0);
 
   return (
     <AdminLayout title="Influencer Media & Content Rewards">
@@ -143,7 +267,7 @@ export const AdminInfluencerMediaScreen = () => {
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
                 isLight 
                   ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' 
                   : 'bg-white/5 border-white/10 text-gray-300 hover:text-white hover:bg-white/10'
@@ -213,7 +337,7 @@ export const AdminInfluencerMediaScreen = () => {
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-black/20 border border-white/5">
               <button
                 onClick={() => setUserFilter('influencers')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   userFilter === 'influencers'
                     ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md'
                     : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-gray-400 hover:text-white'
@@ -224,7 +348,7 @@ export const AdminInfluencerMediaScreen = () => {
               </button>
               <button
                 onClick={() => setUserFilter('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                   userFilter === 'all'
                     ? 'bg-white/10 text-white border border-white/10'
                     : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-gray-400 hover:text-white'
@@ -234,7 +358,7 @@ export const AdminInfluencerMediaScreen = () => {
               </button>
               <button
                 onClick={() => setUserFilter('users')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                   userFilter === 'users'
                     ? 'bg-white/10 text-white border border-white/10'
                     : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-gray-400 hover:text-white'
@@ -249,7 +373,7 @@ export const AdminInfluencerMediaScreen = () => {
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search influencer or title..."
+                placeholder="Search influencer, title or category..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full pl-9 pr-3 py-1.5 rounded-xl text-xs ${
@@ -274,7 +398,7 @@ export const AdminInfluencerMediaScreen = () => {
                 <button
                   key={t.id}
                   onClick={() => setMediaTypeFilter(t.id)}
-                  className={`px-2.5 py-1 rounded-lg font-medium transition ${
+                  className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
                     mediaTypeFilter === t.id
                       ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
                       : isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/5 text-gray-400 hover:text-white'
@@ -295,7 +419,7 @@ export const AdminInfluencerMediaScreen = () => {
                   onChange={(e) => setSortFilter(e.target.value)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                     isLight ? 'bg-slate-100 text-slate-800 border-slate-300' : 'bg-[#1a1236] text-white border-white/10'
-                  } border focus:outline-none`}
+                  } border focus:outline-none cursor-pointer`}
                 >
                   <option value="views">Highest Views</option>
                   <option value="likes">Highest Likes</option>
@@ -311,7 +435,7 @@ export const AdminInfluencerMediaScreen = () => {
                   onChange={(e) => setPaymentFilter(e.target.value)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                     isLight ? 'bg-slate-100 text-slate-800 border-slate-300' : 'bg-[#1a1236] text-white border-white/10'
-                  } border focus:outline-none`}
+                  } border focus:outline-none cursor-pointer`}
                 >
                   <option value="all">All Status</option>
                   <option value="pending">Pending Reward</option>
@@ -350,6 +474,12 @@ export const AdminInfluencerMediaScreen = () => {
 
               const isPaid = item.paymentStatus === 'Paid';
               const isSubmitting = submittingId === item.id;
+              const displayViews = item.views !== undefined ? item.views : (item.viewsCount >= 1000 ? (item.viewsCount / 1000).toFixed(1) + 'K' : (item.viewsCount || 0));
+              const displayLikes = item.likes !== undefined ? item.likes : (item.likesCount >= 1000 ? (item.likesCount / 1000).toFixed(1) + 'K' : (item.likesCount || 0));
+              const displayComments = item.comments !== undefined ? item.comments : (item.commentsCount || 0);
+              const displayShares = item.shares !== undefined ? item.shares : (item.sharesCount || 0);
+              const displayCategory = item.category || (item.contentType === 'video' ? 'Reel' : 'Post');
+              const displayDate = item.date || item.publishedDate || 'Recent';
 
               return (
                 <div
@@ -362,30 +492,20 @@ export const AdminInfluencerMediaScreen = () => {
                 >
                   {/* Left: Thumbnail & Creator info */}
                   <div className="flex items-start gap-4 flex-1">
-                    <div className="relative w-20 h-24 sm:w-24 sm:h-28 rounded-2xl overflow-hidden bg-black/40 shrink-0 border border-white/10 group">
-                      <img
-                        src={item.thumbnail}
-                        alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                      <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-black/70 text-white backdrop-blur-sm">
-                        {item.contentType}
-                      </span>
-                    </div>
+                    <InfluencerMediaThumbnail 
+                      item={item} 
+                      onClick={() => setPreviewItem(item)} 
+                    />
 
                     <div className="space-y-1.5 flex-1 min-w-0">
                       {/* Influencer Profile Badge */}
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="flex items-center gap-1.5">
-                          <img
-                            src={item.avatar}
-                            alt={item.influencerName}
-                            className="w-6 h-6 rounded-full object-cover border border-pink-500"
-                          />
+                          <InfluencerAvatar item={item} />
                           <span className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            {item.influencerName}
+                            {item.influencerName || 'Creator'}
                           </span>
-                          <span className="text-[11px] text-gray-400">@{item.username}</span>
+                          <span className="text-[11px] text-gray-400">@{item.username || 'user'}</span>
                         </div>
 
                         {item.isInfluencer ? (
@@ -399,38 +519,41 @@ export const AdminInfluencerMediaScreen = () => {
                           </span>
                         )}
 
-                        <span className="text-[10px] text-gray-500">· {item.date}</span>
+                        <span className="text-[10px] text-gray-500">· {displayDate}</span>
                       </div>
 
                       {/* Content Title */}
-                      <h3 className={`text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'} leading-snug`}>
+                      <h3 
+                        onClick={() => setPreviewItem(item)}
+                        className={`text-sm font-bold ${isLight ? 'text-slate-900 hover:text-pink-600' : 'text-white hover:text-pink-400'} leading-snug cursor-pointer transition`}
+                      >
                         {item.title}
                       </h3>
                       <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-pink-500/10 text-pink-300">
-                        #{item.category}
+                        #{displayCategory}
                       </span>
 
                       {/* Metrics Bar */}
                       <div className="flex flex-wrap items-center gap-4 pt-1 text-xs">
-                        <div className="flex items-center gap-1 text-blue-400 font-semibold">
+                        <div className="flex items-center gap-1 text-blue-400 font-semibold" title="Total Views">
                           <Eye className="w-3.5 h-3.5" />
-                          <span>{item.views}</span>
+                          <span>{displayViews}</span>
                         </div>
-                        <div className="flex items-center gap-1 text-pink-400 font-semibold">
+                        <div className="flex items-center gap-1 text-pink-400 font-semibold" title="Likes">
                           <Heart className="w-3.5 h-3.5" />
-                          <span>{item.likes}</span>
+                          <span>{displayLikes}</span>
                         </div>
-                        <div className="flex items-center gap-1 text-purple-400 font-semibold">
+                        <div className="flex items-center gap-1 text-purple-400 font-semibold" title="Comments">
                           <MessageCircle className="w-3.5 h-3.5" />
-                          <span>{item.comments}</span>
+                          <span>{displayComments}</span>
                         </div>
-                        <div className="flex items-center gap-1 text-amber-400 font-semibold">
+                        <div className="flex items-center gap-1 text-amber-400 font-semibold" title="Shares">
                           <Share2 className="w-3.5 h-3.5" />
-                          <span>{item.shares}</span>
+                          <span>{displayShares}</span>
                         </div>
                         <div className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
                           <TrendingUp className="w-3.5 h-3.5" />
-                          <span>{item.engagementRate} Engagement</span>
+                          <span>{item.engagementRate || '4.5%'} Engagement</span>
                         </div>
                       </div>
                     </div>
@@ -517,6 +640,119 @@ export const AdminInfluencerMediaScreen = () => {
         </div>
 
       </div>
+
+      {/* Media Preview & Playback Modal */}
+      <AnimatePresence>
+        {previewItem && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            onClick={() => setPreviewItem(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`relative w-full max-w-2xl rounded-3xl overflow-hidden border ${
+                isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/10'
+              } shadow-2xl flex flex-col max-h-[90vh]`}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <InfluencerAvatar item={previewItem} />
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                        {previewItem.influencerName || 'Creator'}
+                      </span>
+                      <span className="text-xs text-gray-400">@{previewItem.username || 'user'}</span>
+                      {previewItem.isInfluencer && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-400 text-black flex items-center gap-0.5">
+                          <Crown className="w-2.5 h-2.5" />
+                          <span>{previewItem.subscriptionPlan || 'Influencer Pro'}</span>
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-gray-500">· {previewItem.date || previewItem.publishedDate || 'Recent'}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPreviewItem(null)}
+                  className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Media Player / Image Viewer */}
+              <div className="relative bg-black flex items-center justify-center min-h-[300px] max-h-[480px] overflow-hidden">
+                {previewItem.contentType === 'video' || (previewItem.mediaUrl && /\.(mp4|mov|webm|m4v)($|\?)/i.test(previewItem.mediaUrl)) ? (
+                  <AdminVideoPlayer
+                    src={previewItem.mediaUrl || previewItem.videoUrl}
+                    poster={previewItem.thumbnailUrl || previewItem.thumbnail}
+                    autoPlay={true}
+                    className="w-full h-full max-h-[480px]"
+                  />
+                ) : (
+                  <img
+                    src={previewItem.mediaUrl || previewItem.thumbnailUrl || previewItem.thumbnail}
+                    alt={previewItem.title}
+                    className="max-h-[480px] w-auto object-contain"
+                  />
+                )}
+              </div>
+
+              {/* Modal Footer info & Quick Reward button */}
+              <div className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className={`text-base font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                      {previewItem.title}
+                    </h3>
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-pink-500/10 text-pink-300">
+                      #{previewItem.category || (previewItem.contentType === 'video' ? 'Reel' : 'Post')}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                      previewItem.paymentStatus === 'Paid'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    }`}>
+                      {previewItem.paymentStatus === 'Paid' ? `Paid ₹${(previewItem.paidAmount || 2500).toLocaleString()}` : 'Pending Reward'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 text-xs pt-1 border-t border-white/5">
+                  <div className="flex items-center gap-1 text-blue-400 font-semibold">
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>{previewItem.views || previewItem.viewsCount || 0} Views</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-pink-400 font-semibold">
+                    <Heart className="w-3.5 h-3.5" />
+                    <span>{previewItem.likes || previewItem.likesCount || 0} Likes</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-purple-400 font-semibold">
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>{previewItem.comments || previewItem.commentsCount || 0} Comments</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-amber-400 font-semibold">
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>{previewItem.shares || previewItem.sharesCount || 0} Shares</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>{previewItem.engagementRate || '4.5%'} Engagement</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </AdminLayout>
   );
 };

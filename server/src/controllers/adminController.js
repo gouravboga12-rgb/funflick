@@ -830,25 +830,39 @@ export async function getAdminInfluencerMedia(req, res) {
       const totalInteractions = likes + comments + shares;
       const engRate = views > 0 ? ((totalInteractions / views) * 100).toFixed(1) + '%' : '3.8%';
 
+      const formattedDate = new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const safeAvatar = r.avatar_url || '/brand/default-avatar.svg';
+      const safeThumbnail = r.thumbnail_url || r.video_url;
+
       return {
         id: r.id,
         title: r.title || 'Creator Media',
         mediaUrl: r.video_url,
-        thumbnailUrl: r.thumbnail_url || r.video_url,
+        videoUrl: r.video_url,
+        thumbnailUrl: safeThumbnail,
+        thumbnail: safeThumbnail,
         contentType: isVideo ? 'video' : 'post',
+        category: r.category || 'Reel',
         isInfluencer: Boolean(r.is_influencer),
         influencerName: r.user_name || 'Creator',
         username: r.username || 'user',
-        influencerAvatar: r.avatar_url || '/brand/default-avatar.svg',
+        influencerAvatar: safeAvatar,
+        avatar: safeAvatar,
+        avatarUrl: safeAvatar,
         subscriptionPlan: r.subscription_plan || (r.is_influencer ? 'Monthly Influencer Pro' : 'Free Member'),
         viewsCount: views,
+        views: views >= 1000 ? (views / 1000).toFixed(1) + 'K' : views,
         likesCount: likes,
+        likes: likes >= 1000 ? (likes / 1000).toFixed(1) + 'K' : likes,
         commentsCount: comments,
+        comments: comments >= 1000 ? (comments / 1000).toFixed(1) + 'K' : comments,
         sharesCount: shares,
+        shares: shares >= 1000 ? (shares / 1000).toFixed(1) + 'K' : shares,
         engagementRate: engRate,
         paymentStatus: 'Pending Reward',
         paidAmount: 0,
-        publishedDate: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+        publishedDate: formattedDate,
+        date: formattedDate
       };
     });
 
