@@ -259,7 +259,7 @@ export async function markAsPaidAdmin(req, res) {
 
     // Lock ONLY this creator's row — other creators are never touched
     const [cRows] = await conn.query(
-      'SELECT id, name, username, email, phone FROM users WHERE id = ? FOR UPDATE',
+      'SELECT id, name, username, email, phone, is_influencer, subscription_expires_at, subscription_plan FROM users WHERE id = ? FOR UPDATE',
       [creatorId]
     );
     if (cRows.length === 0) {
@@ -267,6 +267,17 @@ export async function markAsPaidAdmin(req, res) {
       return res.status(404).json({ error: 'Creator not found' });
     }
     const creator = cRows[0];
+
+    // STRICT SUBSCRIPTION RULE: Payouts are exclusively reserved for subscribed creators
+    const isSubscribed = Boolean(creator.is_influencer) && (
+      !creator.subscription_expires_at || new Date(creator.subscription_expires_at) > new Date()
+    );
+    if (!isSubscribed) {
+      await conn.rollback();
+      return res.status(403).json({
+        error: `Payout rejected: @${creator.username} is not an active subscribed influencer. Platform rewards are strictly reserved for creators with an active influencer subscription.`
+      });
+    }
 
     // Per-video milestone validation (incremental settlement)
     let video = null;

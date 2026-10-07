@@ -68,6 +68,10 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
   const newlySettled = Math.max(0, settleNum - previousSettled);
   const milestoneInvalid = video && (settleNum <= previousSettled || settleNum > currentViews);
 
+  const isSubscribed = Boolean(
+    creator.isInfluencer ?? creator.is_influencer ?? (creator.planName && creator.planName !== 'Free User' && creator.subscriptionPlan !== 'Free User')
+  );
+
   const copyToClipboard = (text, fieldName) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
@@ -97,6 +101,10 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
 
   const handleMarkAsPaid = async (e) => {
     e.preventDefault();
+    if (!isSubscribed) {
+      showToast('⚠️ Payouts are strictly reserved for subscribed VIP creators. This creator is on a Free account.', 'error');
+      return;
+    }
     const num = parseInt(payAmount, 10);
     if (!num || num <= 0) {
       showToast('Please enter a valid payout amount', 'error');
@@ -267,6 +275,19 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
                 <span className="text-sm font-extrabold text-emerald-400 font-heading">₹{fmt(creator.walletBalance)}</span>
               </div>
             </div>
+
+            {/* Non-subscribed Creator Policy Alert */}
+            {!isSubscribed && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+                <div className="space-y-0.5">
+                  <strong className="block text-white font-bold text-xs">Free Creator Account (Not Subscribed)</strong>
+                  <p className="text-[11px] text-amber-300/90 leading-snug">
+                    Per platform rules, milestone rewards are strictly reserved for creators with an active VIP Influencer Subscription. Disbursal is disabled.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Video milestone (video-level payouts only) */}
             {video && (
@@ -455,11 +476,16 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
                 </button>
                 <button
                   type="submit"
-                  disabled={processing || milestoneInvalid}
-                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-indigo-600 text-white font-bold text-xs hover:opacity-95 disabled:opacity-50 shadow-xl shadow-emerald-500/20 transition flex items-center justify-center gap-2"
+                  disabled={processing || milestoneInvalid || !isSubscribed}
+                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-indigo-600 text-white font-bold text-xs hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/20 transition flex items-center justify-center gap-2"
                 >
                   {processing ? (
                     <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  ) : !isSubscribed ? (
+                    <>
+                      <AlertTriangle className="w-4 h-4 text-amber-300" />
+                      <span>Subscription Required</span>
+                    </>
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
