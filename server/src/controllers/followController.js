@@ -27,13 +27,24 @@ export async function followUser(req, res) {
       [currentUserId, targetUser.id]
     );
 
-    // Create real notification for target user
+    // Create or update real notification for target user (prevent duplicate rows)
     try {
-      await pool.query(
-        `INSERT INTO notifications (user_id, actor_id, type, title, message)
-         VALUES (?, ?, 'follow', 'New Follower', ?)`,
-        [targetUser.id, currentUserId, `started following you.`]
+      const [existingNotif] = await pool.query(
+        'SELECT id FROM notifications WHERE user_id = ? AND actor_id = ? AND type = "follow" LIMIT 1',
+        [targetUser.id, currentUserId]
       );
+      if (existingNotif.length > 0) {
+        await pool.query(
+          'UPDATE notifications SET created_at = CURRENT_TIMESTAMP, is_read = 0 WHERE id = ?',
+          [existingNotif[0].id]
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO notifications (user_id, actor_id, type, title, message)
+           VALUES (?, ?, 'follow', 'New Follower', 'started following you.')`,
+          [targetUser.id, currentUserId]
+        );
+      }
     } catch (e) {}
 
     return res.json({ success: true, following: true, message: `Now following @${targetUser.username}` });

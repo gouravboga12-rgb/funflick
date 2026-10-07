@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 export const AdminRevenueScreen = () => {
-  const { subscriptionTransactions, theme, showToast, recordSubscriptionPayment, publishingPlans, fetchAdminTransactions } = useApp();
+  const { subscriptionTransactions, theme, showToast, publishingPlans, fetchAdminTransactions } = useApp();
   const isLight = theme === 'light';
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -262,24 +262,6 @@ export const AdminRevenueScreen = () => {
     showToast('📥 Revenue CSV Report downloaded successfully!', 'success');
   };
 
-  // Quick Simulation Helper for testing from admin panel
-  const handleSimulateNewPayment = () => {
-    const plans = [
-      { id: 'monthly', name: 'Monthly Influencer Pro', price: 199, duration: '30 Days' },
-      { id: 'quarterly', name: 'Quarterly Influencer Star', price: 499, duration: '90 Days' },
-      { id: 'annual', name: 'Annual Influencer VIP', price: 1499, duration: '365 Days' }
-    ];
-    const pickedPlan = plans[Math.floor(Math.random() * plans.length)];
-    const mockRzpId = `pay_test_${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
-
-    recordSubscriptionPayment({
-      plan: pickedPlan,
-      paymentId: mockRzpId,
-      paymentMethod: 'Razorpay Test (Direct Simulated)'
-    });
-    showToast(`⚡ Test payment of ₹${pickedPlan.price} recorded with ID ${mockRzpId}!`, 'success');
-  };
-
   return (
     <AdminLayout title="User Registration & Subscription Revenue">
       {/* Top Banner & Quick Actions */}
@@ -290,9 +272,9 @@ export const AdminRevenueScreen = () => {
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" />
-              <span>Razorpay Test Gateway Connected (`rzp_test_...5VmT8`)</span>
+              <span>Razorpay Live Ledger (AWS MySQL)</span>
             </span>
-            <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>• Live Sync</span>
+            <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>• Real Database Sync</span>
           </div>
           <h2 className={`text-lg md:text-xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'} font-heading`}>
             Registration & Influencer Fee Ledger
@@ -306,7 +288,7 @@ export const AdminRevenueScreen = () => {
           <button
             onClick={handleRefreshTransactions}
             disabled={isRefreshing}
-            className="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-60"
+            className="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-60 cursor-pointer"
             title="Refresh revenue from database"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -314,17 +296,8 @@ export const AdminRevenueScreen = () => {
           </button>
 
           <button
-            onClick={handleSimulateNewPayment}
-            className="px-3.5 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-bold transition flex items-center gap-1.5"
-            title="Inject a test transaction into the ledger"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Simulate Payment</span>
-          </button>
-
-          <button
             onClick={handleExportCSV}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca] text-white text-xs font-bold shadow-md shadow-pink-500/25 hover:opacity-95 transition flex items-center gap-2"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ff007a] via-[#ff4b2b] to-[#7928ca] text-white text-xs font-bold shadow-md shadow-pink-500/25 hover:opacity-95 transition flex items-center gap-2 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export CSV</span>

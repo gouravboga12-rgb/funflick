@@ -286,13 +286,25 @@ export async function getUserSubscriptionStatus(req, res) {
       [userId]
     );
 
+    const hasStackedPacks = historyRows.length > 1 && isActive;
+    const futurePacksCount = historyRows.length > 1 ? historyRows.length - 1 : 0;
+    const totalDaysAdded = historyRows.reduce((acc, h) => acc + (Number(h.duration_days) || 0), 0);
+    const formattedExpiry = expiresAt ? expiresAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+    const formattedStart = u.subscription_start ? new Date(u.subscription_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+
     return res.json({
       isActive,
       isExpired: Boolean(expiresAt && expiresAt <= now),
       planName: u.subscription_plan || (isActive ? 'Monthly Influencer Pro' : 'Free Member'),
       startDate: u.subscription_start,
+      formattedStart,
       expiresAt: u.subscription_expires_at,
+      formattedExpiry,
       daysRemaining,
+      totalRemainingDays: daysRemaining,
+      hasStackedPacks,
+      futurePacksCount,
+      totalDaysAdded,
       history: historyRows.map(h => ({
         id: h.id,
         planId: h.plan_id,

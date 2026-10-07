@@ -406,6 +406,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+
   // Admin Ads & In-App Promotions — fetch and sync with AWS MySQL exclusively
   const fetchAdminAds = async () => {
     try {
@@ -1200,8 +1201,14 @@ export const AppProvider = ({ children }) => {
           isExpired: Boolean(data.isExpired),
           planName: data.planName,
           startDate: data.startDate,
+          formattedStart: data.formattedStart,
           expiresAt: data.expiresAt,
+          formattedExpiry: data.formattedExpiry,
           daysRemaining: Number(data.daysRemaining) || 0,
+          totalRemainingDays: Number(data.totalRemainingDays || data.daysRemaining) || 0,
+          hasStackedPacks: Boolean(data.hasStackedPacks),
+          futurePacksCount: Number(data.futurePacksCount) || 0,
+          totalDaysAdded: Number(data.totalDaysAdded) || 0,
           history: data.history || []
         };
         setSubscriptionStatus(updatedStatus);
@@ -1209,6 +1216,8 @@ export const AppProvider = ({ children }) => {
         setCurrentUser(prev => ({
           ...prev,
           isInfluencer: Boolean(data.isActive),
+          hasInfluencerSubscription: Boolean(data.isActive),
+          hasPublishingSubscription: true,
           subscriptionPlan: data.isActive ? data.planName : (prev.subscriptionPlan || null),
           subscriptionStart: data.startDate,
           subscriptionExpiresAt: data.expiresAt,

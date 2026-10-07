@@ -237,6 +237,28 @@ export const SubscriptionScreen = () => {
               </div>
             </div>
 
+            {/* Future Pack Stacked Activation Callout */}
+            {(subscriptionStatus?.hasStackedPacks || (subscriptionStatus?.history && subscriptionStatus.history.length > 1)) && (
+              <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-pink-500/20 to-purple-500/20 border border-amber-400/40 text-[11px] text-amber-200 flex items-center justify-between gap-2 shadow-lg">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-amber-400 text-black font-extrabold flex items-center justify-center text-xs">
+                    ⭐
+                  </span>
+                  <div>
+                    <strong className="text-white block font-heading">
+                      Future Pack Activated & Stacked
+                    </strong>
+                    <span className="text-[10px] text-amber-300">
+                      Future plan tenure added to your existing plan ({activeDaysRemaining} days total active validity)
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-400 text-black shrink-0">
+                  STACKED
+                </span>
+              </div>
+            )}
+
             {/* Extension Guarantee Callout */}
             <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-200 flex items-start gap-2">
               <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />

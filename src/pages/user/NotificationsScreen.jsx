@@ -26,7 +26,9 @@ export const NotificationsScreen = () => {
     acceptFollowRequest,
     declineFollowRequest,
     markAllNotificationsAsRead,
-    fetchLiveNotifications
+    fetchLiveNotifications,
+    toggleFollowCreator,
+    followingList
   } = useApp();
   const [filter, setFilter] = useState('All');
 
@@ -203,48 +205,61 @@ export const NotificationsScreen = () => {
             </div>
           )}
 
-          {filter !== 'Requests' && filteredNotifs.map(notif => (
-            <motion.div
-              key={notif.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`p-3.5 rounded-2xl border transition flex items-start gap-3 ${
-                notif.unread
-                  ? 'bg-pink-950/20 border-pink-500/30'
-                  : 'bg-[#140e2b] border-white/5'
-              }`}
-            >
-              <div className="relative shrink-0">
-                <img
-                  src={notif.avatar}
-                  alt={notif.user}
-                  className="w-10 h-10 rounded-full object-cover border border-white/10"
-                  onError={e => { e.currentTarget.src = '/brand/default-avatar.svg'; }}
-                />
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#1b1434] border border-white/10 flex items-center justify-center">
-                  {getNotifIcon(notif.type)}
+          {filter !== 'Requests' && filteredNotifs.map(notif => {
+            const rawUser = notif.actorUsername || notif.user || 'FunFlick';
+            const cleanUser = rawUser.replace(/^@+/, '');
+            const isFollowingActor = followingList?.some(u => u.username?.toLowerCase() === cleanUser.toLowerCase());
+
+            return (
+              <motion.div
+                key={notif.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`p-3.5 rounded-2xl border transition flex items-start gap-3 ${
+                  notif.unread
+                    ? 'bg-pink-950/20 border-pink-500/30'
+                    : 'bg-[#140e2b] border-white/5'
+                }`}
+              >
+                <div className="relative shrink-0">
+                  <img
+                    src={notif.avatar}
+                    alt={cleanUser}
+                    className="w-10 h-10 rounded-full object-cover border border-white/10"
+                    onError={e => { e.currentTarget.src = '/brand/default-avatar.svg'; }}
+                  />
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#1b1434] border border-white/10 flex items-center justify-center">
+                    {getNotifIcon(notif.type)}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex-1 text-xs">
-                <p className="text-gray-300 leading-snug">
-                  <strong className="text-white">@{notif.user}</strong> {notif.text}
-                </p>
-                <span className="text-[10px] text-gray-500 mt-1 block">
-                  {notif.time}
-                </span>
-                {notif.type === 'follow' && (
-                  <button className="mt-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-[#ff007a] to-[#7928ca] text-white text-[10px] font-bold shadow-sm active:scale-95 transition">
-                    Follow Back
-                  </button>
+                <div className="flex-1 text-xs">
+                  <p className="text-gray-300 leading-snug">
+                    <strong className="text-white">@{cleanUser}</strong> {notif.text}
+                  </p>
+                  <span className="text-[10px] text-gray-500 mt-1 block">
+                    {notif.time}
+                  </span>
+                  {notif.type === 'follow' && (
+                    <button
+                      onClick={() => toggleFollowCreator(cleanUser)}
+                      className={`mt-1.5 px-3 py-1 rounded-full text-[10px] font-bold shadow-sm active:scale-95 transition cursor-pointer ${
+                        isFollowingActor
+                          ? 'bg-white/10 text-gray-300 hover:bg-white/20 border border-white/10'
+                          : 'bg-gradient-to-r from-[#ff007a] to-[#7928ca] text-white hover:opacity-95'
+                      }`}
+                    >
+                      {isFollowingActor ? 'Following' : 'Follow Back'}
+                    </button>
+                  )}
+                </div>
+
+                {notif.unread && (
+                  <div className="w-2 h-2 rounded-full bg-[#ff007a] shrink-0 mt-1.5" />
                 )}
-              </div>
-
-              {notif.unread && (
-                <div className="w-2 h-2 rounded-full bg-[#ff007a] shrink-0 mt-1.5" />
-              )}
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
 
         {/* Bottom spacer */}

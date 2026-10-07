@@ -384,6 +384,45 @@ export const UserProfileScreen = () => {
               </button>
             )}
           </div>
+
+          {/* Prominent Active Subscription Validity Banner (Always Visible on Profile) */}
+          {isUserSubscribed && (
+            <div 
+              onClick={() => navigate('/subscription')}
+              className="w-full mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-purple-950/40 to-[#120d29] border border-emerald-500/40 shadow-lg cursor-pointer hover:border-emerald-400 transition space-y-2 select-none"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold border border-emerald-500/30">
+                    👑
+                  </span>
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>{userPlanName}</span>
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500 text-black">ACTIVE</span>
+                    </h4>
+                    <span className="text-[10px] text-emerald-300">Influencer Monetization & Reach Enabled</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-base font-extrabold text-amber-300 font-mono block">
+                    {userDaysRemaining}
+                  </span>
+                  <span className="text-[9px] text-gray-300 -mt-1 block font-medium">days left</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1 border-t border-white/5 text-[10px] text-gray-300">
+                <span>Valid until <strong className="text-emerald-300">{userPlanExpiresAt ? new Date(userPlanExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Active'}</strong></span>
+                {subscriptionStatus?.hasStackedPacks && (
+                  <span className="inline-flex items-center gap-1 text-amber-300 font-bold bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                    <span>⭐</span>
+                    <span>Future Pack Stacked</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ======================================================== */}

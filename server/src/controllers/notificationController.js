@@ -16,19 +16,49 @@ export async function listNotifications(req, res) {
       [currentUserId]
     );
 
-    const notifications = rows.map(r => ({
-      id: r.id,
-      type: r.type,
-      user: r.actor_username ? `@${r.actor_username}` : 'FunFlick',
-      actorName: r.actor_name || 'FunFlick',
-      avatar: r.actor_avatar || '/brand/funflick-logo.png',
-      text: r.actor_name ? `${r.actor_name} ${r.message}` : r.message,
-      title: r.title,
-      time: 'Recently',
-      created_at: r.created_at,
-      unread: !r.is_read,
-      targetId: r.target_id
-    }));
+    const rawList = rows.map(r => {
+      const actorName = r.actor_name || '';
+      const rawMsg = r.message || '';
+      let cleanText = rawMsg;
+
+      if (actorName) {
+        if (rawMsg.startsWith('started following you')) {
+          cleanText = `${actorName} ${rawMsg}`;
+        } else if (!rawMsg.toLowerCase().startsWith(actorName.toLowerCase())) {
+          cleanText = `${actorName}: ${rawMsg}`;
+        }
+      }
+
+      return {
+        id: r.id,
+        type: r.type,
+        user: r.actor_username ? r.actor_username.replace(/^@+/, '') : 'FunFlick',
+        actorUsername: r.actor_username ? r.actor_username.replace(/^@+/, '') : '',
+        actorName: r.actor_name || 'FunFlick',
+        avatar: r.actor_avatar || '/brand/funflick-logo.png',
+        text: cleanText,
+        title: r.title,
+        time: 'Recently',
+        created_at: r.created_at,
+        unread: !r.is_read,
+        targetId: r.target_id
+      };
+    });
+
+    // Deduplicate repeat notifications (e.g. repeated follow clicks or identical messages)
+    const seen = new Set();
+    const notifications = [];
+
+    for (const notif of rawList) {
+      const dedupKey = notif.type === 'follow'
+        ? `follow_${notif.actorUsername || notif.user}`
+        : `${notif.type}_${notif.actorUsername || notif.user}_${notif.text}`;
+
+      if (!seen.has(dedupKey)) {
+        seen.add(dedupKey);
+        notifications.push(notif);
+      }
+    }
 
     return res.json({ notifications, unreadCount: notifications.filter(n => n.unread).length });
   } catch (err) {
