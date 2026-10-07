@@ -13,7 +13,7 @@ import { Sparkles, TrendingUp, Flame, Video, Plus } from 'lucide-react';
 
 export const HomeScreen = () => {
   const navigate = useNavigate();
-  const { posts, blockedUsers } = useApp();
+  const { posts, blockedUsers, activePlayingVideoId, setActivePlayingVideoId } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
 
   const filteredPosts = posts.filter(post => {
@@ -24,6 +24,16 @@ export const HomeScreen = () => {
     if (activeTab === 'Latest') return post.timeAgo?.includes('hour') || post.timeAgo?.includes('Just');
     return true; // For You shows all
   });
+
+  // Activate the first video on the Home feed automatically if none active
+  useEffect(() => {
+    if (!activePlayingVideoId && filteredPosts.length > 0) {
+      const firstVideo = filteredPosts.find(p => p.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(p.mediaUrl || ''));
+      if (firstVideo && setActivePlayingVideoId) {
+        setActivePlayingVideoId(firstVideo.id);
+      }
+    }
+  }, [filteredPosts, activePlayingVideoId, setActivePlayingVideoId]);
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#090514] min-h-full">
@@ -72,7 +82,7 @@ export const HomeScreen = () => {
                               url.startsWith('data:image/');
               const isVideo = !isImage && (post.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(url));
               if (isVideo) {
-                return <VideoPostCard key={post.id} post={post} />;
+                return <VideoPostCard key={post.id} post={post} isReel={true} />;
               }
               return <StandardPostCard key={post.id} post={post} />;
             })

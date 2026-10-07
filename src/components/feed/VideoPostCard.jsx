@@ -33,7 +33,7 @@ import { ShareSheet } from './ShareSheet';
 import { ReportModal } from './ReportModal';
 import { PostInsightsModal } from './PostInsightsModal';
 
-export const VideoPostCard = ({ post, isReel = false }) => {
+export const VideoPostCard = ({ post, isReel = true }) => {
   const navigate = useNavigate();
   const { 
     toggleLikePost, 
@@ -62,7 +62,6 @@ export const VideoPostCard = ({ post, isReel = false }) => {
     : (mediaLimits?.maxReelDuration || 30);
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
   const [showAudioBadge, setShowAudioBadge] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -75,27 +74,19 @@ export const VideoPostCard = ({ post, isReel = false }) => {
   const [showInsights, setShowInsights] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
 
-  // In Reels feed, all reels share the unified isReelsMuted audio state.
-  // In other views (e.g. Home feed), each post maintains its own muted state.
-  const effectiveMuted = isReel ? isReelsMuted : isMuted;
+  // All video reels in feed share the unified isReelsMuted state
+  const effectiveMuted = isReelsMuted;
 
   const toggleAudio = (e) => {
     e?.stopPropagation?.();
-    if (isReel) {
-      const nextMuted = !isReelsMuted;
-      setIsReelsMuted(nextMuted);
-      if (videoRef.current) {
-        videoRef.current.muted = nextMuted;
-      }
-      setShowAudioBadge(true);
-      setTimeout(() => setShowAudioBadge(false), 1200);
-    } else {
-      const nextMuted = !isMuted;
-      setIsMuted(nextMuted);
-      if (videoRef.current) {
-        videoRef.current.muted = nextMuted;
-      }
+    const nextMuted = !isReelsMuted;
+    setIsReelsMuted(nextMuted);
+    if (videoRef.current) {
+      videoRef.current.muted = nextMuted;
+      videoRef.current.volume = 1.0;
     }
+    setShowAudioBadge(true);
+    setTimeout(() => setShowAudioBadge(false), 1300);
   };
 
   const cardRef = useRef(null);
@@ -109,7 +100,7 @@ export const VideoPostCard = ({ post, isReel = false }) => {
 
   const isCardActive = activePlayingVideoId === post.id;
 
-  // Viewport Intersection Observer: activate reel ONLY when >=50% in view; pause immediately when scrolling away
+  // Viewport Intersection Observer: activate reel when >=25% in view (reliable across mobile & desktop)
   useEffect(() => {
     const el = cardRef.current;
     if (!el || post.mediaType !== 'video') return;
@@ -117,9 +108,9 @@ export const VideoPostCard = ({ post, isReel = false }) => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.25) {
             if (setActivePlayingVideoId) setActivePlayingVideoId(post.id);
-          } else if (entry.intersectionRatio < 0.25) {
+          } else if (entry.intersectionRatio < 0.15) {
             if (setActivePlayingVideoId) {
               setActivePlayingVideoId((prev) => (prev === post.id ? null : prev));
             }
@@ -127,7 +118,8 @@ export const VideoPostCard = ({ post, isReel = false }) => {
         });
       },
       {
-        threshold: [0.1, 0.3, 0.5, 0.75]
+        threshold: [0.15, 0.25, 0.45, 0.7],
+        rootMargin: '-5% 0px -5% 0px'
       }
     );
 
@@ -147,22 +139,36 @@ export const VideoPostCard = ({ post, isReel = false }) => {
     if (isCardActive && !isLocked) {
       setIsLoading(true);
       setHasError(false);
-      video.muted = effectiveMuted;
+      video.muted = isReelsMuted;
+      video.volume = 1.0;
       const playPromise = video.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
             setIsPlaying(true);
             setIsLoading(false);
+            if (!isReelsMuted && video.muted) {
+              video.muted = false;
+            }
           })
           .catch(() => {
-            // If browser blocks unmuted autoplay before interaction, fallback to muted
+            // If browser blocks unmuted autoplay without prior interaction, start muted then immediately unmute
             if (!video.muted) {
               video.muted = true;
-              video.play().then(() => setIsPlaying(true)).catch(() => {});
+              video.play().then(() => {
+                setIsPlaying(true);
+                setIsLoading(false);
+                if (!isReelsMuted) {
+                  video.muted = false;
+                }
+              }).catch(() => {
+                setIsPlaying(false);
+                setIsLoading(false);
+              });
+            } else {
+              setIsPlaying(false);
+              setIsLoading(false);
             }
-            setIsPlaying(false);
-            setIsLoading(false);
           });
       }
     } else {
@@ -172,14 +178,15 @@ export const VideoPostCard = ({ post, isReel = false }) => {
       setIsPlaying(false);
       setIsLoading(false);
     }
-  }, [isCardActive, isLocked, post.mediaType, post.mediaUrl, effectiveMuted]);
+  }, [isCardActive, isLocked, post.mediaType, post.mediaUrl, isReelsMuted]);
 
   // Synchronize mute state in real-time when isReelsMuted changes
   useEffect(() => {
-    if (isReel && videoRef.current) {
+    if (videoRef.current) {
       videoRef.current.muted = isReelsMuted;
+      videoRef.current.volume = 1.0;
     }
-  }, [isReelsMuted, isReel]);
+  }, [isReelsMuted]);
 
   // Clean pause & stop on unmount
   useEffect(() => {
@@ -229,20 +236,10 @@ export const VideoPostCard = ({ post, isReel = false }) => {
       setShowHeartBurst(true);
       setTimeout(() => setShowHeartBurst(false), 900);
     } else {
-      // Single tap: toggle play / pause
-      if (videoRef.current) {
-        if (isPlaying) {
-          videoRef.current.pause();
-          setIsPlaying(false);
-          if (setActivePlayingVideoId) setActivePlayingVideoId(null);
-        } else {
-          if (setActivePlayingVideoId) setActivePlayingVideoId(post.id);
-          videoRef.current.play()
-            .then(() => setIsPlaying(true))
-            .catch(() => {});
-        }
-      } else {
-        setIsPlaying(!isPlaying);
+      // Single tap: toggle audio (like Instagram) and guarantee playing
+      toggleAudio();
+      if (videoRef.current && videoRef.current.paused) {
+        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
       }
     }
     lastTapRef.current = now;
@@ -433,19 +430,19 @@ export const VideoPostCard = ({ post, isReel = false }) => {
         </AnimatePresence>
       </div>
 
-      {/* Top Controls Overlay (Mute toggle) */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+      {/* Top Controls Overlay (Mute toggle) - High visibility glass button */}
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-2 pointer-events-auto">
         {post.mediaType === 'video' && (
           <button
             onClick={toggleAudio}
-            aria-label={effectiveMuted ? "Unmute reel" : "Mute reel"}
-            title={effectiveMuted ? "Unmute reel" : "Mute reel"}
-            className="p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/20 hover:bg-black/80 active:scale-95 transition shadow-lg"
+            aria-label={isReelsMuted ? "Unmute reel" : "Mute reel"}
+            title={isReelsMuted ? "Unmute reel" : "Mute reel"}
+            className="w-10 h-10 rounded-full bg-black/75 backdrop-blur-xl border border-white/30 text-white flex items-center justify-center shadow-2xl hover:bg-black/90 active:scale-90 transition-transform cursor-pointer"
           >
-            {effectiveMuted ? (
-              <VolumeX className="w-4 h-4 text-white" />
+            {isReelsMuted ? (
+              <VolumeX className="w-5 h-5 text-white/95 stroke-[2.2]" />
             ) : (
-              <Volume2 className="w-4 h-4 text-pink-400" />
+              <Volume2 className="w-5 h-5 text-pink-400 stroke-[2.2]" />
             )}
           </button>
         )}

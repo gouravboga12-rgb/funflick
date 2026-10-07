@@ -317,7 +317,7 @@ export const AppProvider = ({ children }) => {
               },
               timeAgo: 'Just now',
               isLiked: Boolean(v.user_liked),
-              isFollowing: false,
+              isFollowing: Boolean(v.user_following),
               isSaved: false,
               comments: []
             };
@@ -942,35 +942,74 @@ export const AppProvider = ({ children }) => {
   };
 
   // Toggle follow creator (sync with followingList, backend MySQL & dynamic count)
+  // Fetch current user's real following list from AWS MySQL
+  const fetchMyFollowingList = async () => {
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (!token || !currentUser?.username) return;
+      const res = await fetch(`/api/follows/${currentUser.username}/following`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.following && Array.isArray(data.following)) {
+          setFollowingList(data.following);
+          const followedSet = new Set(data.following.map(u => u.username?.toLowerCase()));
+          setPosts(prev => prev.map(p => {
+            if (p.creator?.username && followedSet.has(p.creator.username.toLowerCase())) {
+              return { ...p, isFollowing: true };
+            }
+            return p;
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch following list from server:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.username) {
+      fetchMyFollowingList();
+    }
+  }, [currentUser?.username]);
+
+  // Toggle follow creator (sync with followingList, backend MySQL & dynamic count)
   const toggleFollowCreator = async (username) => {
     if (!username) return;
-    if (currentUser?.username === username) {
+    if (currentUser?.username?.toLowerCase() === username.toLowerCase()) {
       showToast('You cannot follow yourself', 'info');
       return;
     }
 
-    let targetCreator = creators.find(c => c.username === username);
-    const willFollow = targetCreator ? !targetCreator.isFollowing : true;
+    // Determine current follow state authoritatively:
+    // Check if any post by this creator is currently followed, or if followingList has them
+    const postByCreator = posts.find(p => p.creator?.username?.toLowerCase() === username.toLowerCase());
+    const isCurrentlyFollowing = postByCreator 
+      ? Boolean(postByCreator.isFollowing)
+      : followingList.some(u => u.username?.toLowerCase() === username.toLowerCase());
+
+    const willFollow = !isCurrentlyFollowing;
 
     // Optimistic UI updates
-    setCreators(prev => prev.map(c => {
-      if (c.username === username) {
-        return { ...c, isFollowing: willFollow };
-      }
-      return c;
-    }));
-
     setPosts(prev => prev.map(p => {
-      if (p.creator?.username === username) {
+      if (p.creator?.username?.toLowerCase() === username.toLowerCase()) {
         return { ...p, isFollowing: willFollow };
       }
       return p;
     }));
 
+    setCreators(prev => prev.map(c => {
+      if (c.username?.toLowerCase() === username.toLowerCase()) {
+        return { ...c, isFollowing: willFollow };
+      }
+      return c;
+    }));
+
     setFollowingList(prev => {
       if (willFollow) {
-        if (!prev.some(u => u.username === username)) {
-          const creatorObj = creators.find(c => c.username === username) || {
+        if (!prev.some(u => u.username?.toLowerCase() === username.toLowerCase())) {
+          const creatorObj = creators.find(c => c.username?.toLowerCase() === username.toLowerCase()) || {
             username,
             name: username,
             avatar: '/brand/default-avatar.svg'
@@ -979,17 +1018,17 @@ export const AppProvider = ({ children }) => {
         }
         return prev;
       } else {
-        return prev.filter(u => u.username !== username);
+        return prev.filter(u => u.username?.toLowerCase() !== username.toLowerCase());
       }
     });
 
-    setCurrentUser(prev => ({
+    setCurrentUser(prev => prev ? ({
       ...prev,
       stats: {
         ...prev.stats,
         following: willFollow ? (Number(prev.stats?.following) || 0) + 1 : Math.max(0, (Number(prev.stats?.following) || 1) - 1)
       }
-    }));
+    }) : prev);
 
     showToast(willFollow ? `Following @${username}` : `Unfollowed @${username}`, 'info');
 
@@ -998,10 +1037,21 @@ export const AppProvider = ({ children }) => {
     if (token) {
       try {
         const endpoint = willFollow ? `/api/follows/${username}/follow` : `/api/follows/${username}/unfollow`;
-        await fetch(endpoint, {
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` }
         });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.following !== undefined) {
+            setPosts(prev => prev.map(p => {
+              if (p.creator?.username?.toLowerCase() === username.toLowerCase()) {
+                return { ...p, isFollowing: Boolean(data.following) };
+              }
+              return p;
+            }));
+          }
+        }
       } catch (err) {
         console.error('Failed to sync follow state to backend:', err);
       }

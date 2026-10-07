@@ -12,12 +12,13 @@ export async function listVideos(req, res) {
         v.duration, v.views_count, v.likes_count, v.created_at, v.status,
         (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id) AS comments_count,
         (SELECT COUNT(*) FROM likes l WHERE l.video_id = v.id AND l.user_id = ?) AS user_liked,
+        (SELECT COUNT(*) FROM follows f WHERE f.follower_id = ? AND f.following_id = u.id) AS user_following,
         u.id AS creator_id, u.name AS creator_name, u.username AS creator_username, u.avatar_url AS creator_avatar
       FROM videos v
       JOIN users u ON v.user_id = u.id
       WHERE v.status = 'Approved' AND (u.status IS NULL OR u.status != 'Suspended')
     `;
-    const params = [currentUserId];
+    const params = [currentUserId, currentUserId];
 
     if (category && category !== 'All') {
       query += ' AND v.category = ?';
