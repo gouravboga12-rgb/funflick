@@ -25,12 +25,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export const WalletScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, showToast } = useApp();
+  const { currentUser, setCurrentUser, showToast } = useApp();
 
   const [activeFilter, setActiveFilter] = useState('All');
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
   const [payoutHistory, setPayoutHistory] = useState([]);
   const [registeredDetails, setRegisteredDetails] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(currentUser?.walletBalance ?? currentUser?.wallet_balance ?? 0);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
@@ -50,6 +51,12 @@ export const WalletScreen = () => {
       if (histRes.ok) {
         const d = await histRes.json();
         setPayoutHistory(d.payouts || []);
+        if (d.walletBalance !== undefined) {
+          setWalletBalance(d.walletBalance);
+          if (setCurrentUser) {
+            setCurrentUser(prev => prev ? ({ ...prev, walletBalance: d.walletBalance, wallet_balance: d.walletBalance }) : prev);
+          }
+        }
       }
       if (detRes.ok) {
         const d = await detRes.json();
@@ -101,12 +108,12 @@ export const WalletScreen = () => {
               <p className="text-[11px] leading-relaxed text-gray-200">
                 <strong>₹{Number(latestPaid.amount).toLocaleString()}</strong> has been marked as paid to your registered payout account. Please check your bank account or UPI account using the payment details you submitted.
               </p>
-              <div className="text-[10px] text-emerald-300 flex items-center gap-2 pt-0.5">
-                <span>Method: <strong>{latestPaid.payment_method}</strong></span>
+              <div className="text-[10px] text-emerald-300 flex items-center gap-2 pt-0.5 flex-wrap">
+                <span>Method: <strong>{latestPaid.payment_method || latestPaid.method || 'Bank Transfer'}</strong></span>
                 <span>•</span>
-                <span>Ref: <strong>{latestPaid.admin_reference || 'ADMIN_DISBURSED'}</strong></span>
+                <span>Ref: <strong className="font-mono">{latestPaid.payment_reference || latestPaid.reference || latestPaid.admin_reference || 'ADMIN_DISBURSED'}</strong></span>
                 <span>•</span>
-                <span>Date: {new Date(latestPaid.payment_date || latestPaid.created_at).toLocaleDateString('en-IN')}</span>
+                <span>Date: <strong>{latestPaid.date || (latestPaid.paidAt ? new Date(latestPaid.paidAt).toLocaleDateString('en-IN') : 'Recent')}</strong></span>
               </div>
             </div>
           </div>
@@ -125,7 +132,7 @@ export const WalletScreen = () => {
 
           <div className="mt-2 mb-4">
             <h2 className="text-3xl font-extrabold tracking-tight font-heading">
-              ₹{(currentUser.walletBalance || 0).toLocaleString()}
+              ₹{Number(walletBalance ?? currentUser?.walletBalance ?? 0).toLocaleString()}
             </h2>
           </div>
 

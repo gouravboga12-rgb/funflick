@@ -120,22 +120,37 @@ export async function getUserPayoutHistory(req, res) {
       [userId]
     );
 
+    // Fetch user's current live wallet balance from database
+    const [uRows] = await pool.query('SELECT wallet_balance FROM users WHERE id = ?', [userId]);
+    const walletBalance = Number(uRows[0]?.wallet_balance) || 0;
+
     const payouts = rows.map(r => ({
       id: r.id,
       amount: r.amount,
-      formattedAmount: `₹${Number(r.amount).toLocaleString()}`,
+      formattedAmount: `₹${Number(r.amount).toLocaleString('en-IN')}`,
       status: r.status,
       method: r.payment_method,
+      paymentMethod: r.payment_method,
+      payment_method: r.payment_method,
       reference: r.payment_reference,
+      paymentReference: r.payment_reference,
+      payment_reference: r.payment_reference,
+      admin_reference: r.payment_reference,
       date: new Date(r.paid_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
       paidAt: r.paid_at,
+      payment_date: r.paid_at,
+      created_at: r.created_at,
       settledViews: r.settled_views,
       notes: r.notes,
       videoId: r.video_id || null,
       videoTitle: r.video_title || 'Influencer Milestone'
     }));
 
-    return res.json({ payouts });
+    return res.json({ 
+      payouts, 
+      walletBalance,
+      totalPaid: payouts.filter(p => p.status === 'Paid').reduce((a, b) => a + Number(b.amount || 0), 0)
+    });
   } catch (err) {
     console.error('Get user payout history error:', err);
     return res.status(500).json({ error: 'Failed to fetch payout history' });
