@@ -511,11 +511,11 @@ export const AdminInfluencerMediaScreen = () => {
                         {item.isInfluencer ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-amber-400 to-pink-500 text-[#090514] shadow-sm">
                             <Crown className="w-3 h-3" />
-                            <span>{item.subscriptionPlan || 'Influencer Pro'}</span>
+                            <span>{item.subscriptionPlan || 'Weekly Influencer'}</span>
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-500/20 text-gray-400">
-                            Regular User
+                            Free User
                           </span>
                         )}
 

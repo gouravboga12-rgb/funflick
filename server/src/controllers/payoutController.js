@@ -179,12 +179,20 @@ export async function getAdminEligibleCreators(req, res) {
         phone: c.phone,
         avatar: c.avatar_url || '/brand/default-avatar.svg',
         isInfluencer: Boolean(c.is_influencer),
-        subscriptionPlan: c.subscription_plan || (c.is_influencer ? 'Monthly Influencer Pro' : 'Free User'),
+        subscriptionPlan: c.subscription_plan || (c.is_influencer ? 'Weekly Influencer' : 'Free User'),
+        planName: c.subscription_plan || (c.is_influencer ? 'Weekly Influencer' : 'Free User'),
         walletBalance: c.wallet_balance || 0,
         totalViews: Number(c.total_views) || 0,
         totalLikes: Number(c.total_likes) || 0,
         postsCount: Number(c.posts_count) || 0,
+        videosCount: Number(c.posts_count) || 0,
+        totalPaid: Number(c.total_paid_amount) || 0,
         totalPaidAmount: Number(c.total_paid_amount) || 0,
+        metrics: {
+          totalViews: Number(c.total_views) || 0,
+          totalLikes: Number(c.total_likes) || 0,
+          videosCount: Number(c.posts_count) || 0
+        },
         hasPayoutDetails: hasAnyDetails,
         payoutDetails: {
           payout_type: c.payout_type || 'bank',

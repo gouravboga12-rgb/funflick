@@ -805,8 +805,8 @@ export async function getAdminInfluencerMedia(req, res) {
         v.category,
         v.views_count,
         v.likes_count,
-        v.comments_count,
-        v.shares_count,
+        (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id) AS comments_count,
+        0 AS shares_count,
         v.created_at,
         u.id AS user_id,
         u.name AS user_name,
@@ -834,6 +834,13 @@ export async function getAdminInfluencerMedia(req, res) {
       const safeAvatar = r.avatar_url || '/brand/default-avatar.svg';
       const safeThumbnail = r.thumbnail_url || r.video_url;
 
+      const isInfluencer = Boolean(r.is_influencer) && (
+        !r.subscription_expires_at || new Date(r.subscription_expires_at) > new Date()
+      );
+      const subscriptionPlan = isInfluencer 
+        ? (r.subscription_plan || 'Weekly Influencer') 
+        : 'Free User';
+
       return {
         id: r.id,
         title: r.title || 'Creator Media',
@@ -843,13 +850,13 @@ export async function getAdminInfluencerMedia(req, res) {
         thumbnail: safeThumbnail,
         contentType: isVideo ? 'video' : 'post',
         category: r.category || 'Reel',
-        isInfluencer: Boolean(r.is_influencer),
+        isInfluencer: isInfluencer,
         influencerName: r.user_name || 'Creator',
         username: r.username || 'user',
         influencerAvatar: safeAvatar,
         avatar: safeAvatar,
         avatarUrl: safeAvatar,
-        subscriptionPlan: r.subscription_plan || (r.is_influencer ? 'Monthly Influencer Pro' : 'Free Member'),
+        subscriptionPlan: subscriptionPlan,
         viewsCount: views,
         views: views >= 1000 ? (views / 1000).toFixed(1) + 'K' : views,
         likesCount: likes,

@@ -463,7 +463,7 @@ export const AppProvider = ({ children }) => {
       if (!posts || posts.length === 0) return [];
       return posts.map(p => {
         const isSelf = p.creator?.username === currentUser?.username || p.isSelf;
-        const isUserInfluencer = isSelf ? Boolean(currentUser?.isInfluencer) : Boolean(p.creator?.isVerified || p.creator?.isInfluencer);
+        const isUserInfluencer = isSelf ? Boolean(currentUser?.isInfluencer) : Boolean(p.creator?.isInfluencer);
         const views = typeof p.viewsCount === 'number' ? p.viewsCount : parseInt(p.viewsCount) || parseInt(p.views) || 350;
         const likes = typeof p.likesCount === 'number' ? p.likesCount : parseInt(p.likesCount) || 28;
         const comments = typeof p.commentsCount === 'number' ? p.commentsCount : 7;
@@ -486,7 +486,7 @@ export const AppProvider = ({ children }) => {
           influencerAvatar: userAvatar,
           avatar: userAvatar,
           avatarUrl: userAvatar,
-          subscriptionPlan: isUserInfluencer ? (currentUser?.subscriptionPlan || 'Monthly Influencer Pro') : 'Free Member',
+          subscriptionPlan: isUserInfluencer ? (p.creator?.subscriptionPlan || currentUser?.subscriptionPlan || 'Weekly Influencer') : 'Free User',
           viewsCount: views,
           views: views >= 1000 ? (views / 1000).toFixed(1) + 'K' : views,
           likesCount: likes,
