@@ -139,10 +139,11 @@ const InfluencerMediaThumbnail = ({ item, onClick }) => {
 };
 
 export const AdminInfluencerMediaScreen = () => {
-  const { influencerMedia, sendInfluencerReward, showToast, theme, fetchInfluencerMedia } = useApp();
+  const { influencerMedia, showToast, theme, fetchInfluencerMedia } = useApp();
   const isLight = theme === 'light';
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [previewItem, setPreviewItem] = useState(null);
+  const [payoutTarget, setPayoutTarget] = useState(null);
 
   React.useEffect(() => {
     if (fetchInfluencerMedia) fetchInfluencerMedia();
@@ -155,45 +156,36 @@ export const AdminInfluencerMediaScreen = () => {
     showToast('✅ Influencer media refreshed from database!', 'success');
   };
 
+  const getRewardStatus = (item) => item.rewardStatus || (item.payoutCount > 0 ? 'Fully Rewarded' : 'Unrewarded');
+
+  const openDisbursal = (item) => {
+    if (!item?.creator?.id) {
+      showToast('Creator account details unavailable for this item. Please refresh.', 'error');
+      return;
+    }
+    setPayoutTarget(item);
+  };
+
+  const handlePaidSuccess = async (payout) => {
+    if (payout && previewItem && previewItem.id === payout.videoId) {
+      setPreviewItem(prev => ({
+        ...prev,
+        settledViews: payout.settledViews,
+        unsettledViews: Math.max(0, (prev.viewsCount || 0) - payout.settledViews),
+        totalPaidForVideo: (prev.totalPaidForVideo || 0) + payout.amount,
+        payoutCount: (prev.payoutCount || 0) + 1,
+        rewardStatus: (prev.viewsCount || 0) > payout.settledViews ? 'Partially Rewarded' : 'Fully Rewarded'
+      }));
+    }
+    if (fetchInfluencerMedia) await fetchInfluencerMedia();
+  };
+
   // Filters state (Default filter: Influencers / Subscription Members first!)
   const [userFilter, setUserFilter] = useState('influencers'); // 'all' | 'influencers' | 'users'
   const [mediaTypeFilter, setMediaTypeFilter] = useState('all'); // 'all' | 'video' | 'post' | 'story'
-  const [sortFilter, setSortFilter] = useState('views'); // 'views' | 'likes' | 'engagement'
-  const [paymentFilter, setPaymentFilter] = useState('all'); // 'all' | 'pending' | 'paid'
+  const [sortFilter, setSortFilter] = useState('views'); // 'views' | 'likes' | 'engagement' | 'newviews'
+  const [paymentFilter, setPaymentFilter] = useState('all'); // 'all' | 'unrewarded' | 'newviews' | 'full'
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Reward inputs state keyed by mediaId
-  const [rewardAmounts, setRewardAmounts] = useState({});
-  const [submittingId, setSubmittingId] = useState(null);
-
-  const handleAmountChange = (mediaId, value) => {
-    setRewardAmounts(prev => ({
-      ...prev,
-      [mediaId]: value.replace(/[^0-9]/g, '')
-    }));
-  };
-
-  const handleSendPayment = (item) => {
-    const amount = rewardAmounts[item.id] || (item.currentEarning ? item.currentEarning.replace(/[^0-9]/g, '') : '2500');
-    if (!amount || Number(amount) <= 0) {
-      showToast('⚠️ Please enter a reward amount in ₹', 'error');
-      return;
-    }
-
-    setSubmittingId(item.id);
-    setTimeout(() => {
-      sendInfluencerReward(item.id, Number(amount));
-      setSubmittingId(null);
-      if (previewItem && previewItem.id === item.id) {
-        setPreviewItem(prev => ({
-          ...prev,
-          paymentStatus: 'Paid',
-          paidAmount: Number(amount),
-          paidDate: 'Just now'
-        }));
-      }
-    }, 600);
-  };
 
   // Filter and sort items
   const filteredItems = (influencerMedia || []).filter(item => {
