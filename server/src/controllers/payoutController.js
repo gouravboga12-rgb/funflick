@@ -131,6 +131,7 @@ export async function getUserPayoutHistory(req, res) {
       paidAt: r.paid_at,
       settledViews: r.settled_views,
       notes: r.notes,
+      videoId: r.video_id || null,
       videoTitle: r.video_title || 'Influencer Milestone'
     }));
 
@@ -163,7 +164,10 @@ export async function getAdminEligibleCreators(req, res) {
     const creatorList = [];
     for (const c of creators) {
       const [payoutRows] = await pool.query(
-        'SELECT * FROM creator_payouts WHERE creator_id = ? ORDER BY paid_at DESC',
+        `SELECT cp.*, v.title AS video_title
+         FROM creator_payouts cp
+         LEFT JOIN videos v ON v.id = cp.video_id
+         WHERE cp.creator_id = ? ORDER BY cp.paid_at DESC`,
         [c.id]
       );
 
@@ -212,7 +216,9 @@ export async function getAdminEligibleCreators(req, res) {
           method: p.payment_method,
           reference: p.payment_reference,
           notes: p.notes,
-          settledViews: p.settled_views
+          settledViews: p.settled_views,
+          videoId: p.video_id || null,
+          videoTitle: p.video_title || null
         }))
       });
     }
@@ -225,94 +231,204 @@ export async function getAdminEligibleCreators(req, res) {
 }
 
 export async function markAsPaidAdmin(req, res) {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied. Administrator privileges required.' });
+  }
+
+  const creatorId = parseInt(req.body.creator_id, 10);
+  const numAmount = parseInt(req.body.amount, 10);
+  const videoId = req.body.video_id ? parseInt(req.body.video_id, 10) : null;
+  const paymentMethod = String(req.body.payment_method || 'Bank Transfer').slice(0, 50);
+  const rawReference = String(req.body.payment_reference || req.body.admin_reference || '').trim().slice(0, 100);
+  const notes = String(req.body.notes || '').trim().slice(0, 1000);
+  const requestedSettledViews = req.body.settled_views !== undefined && req.body.settled_views !== null && req.body.settled_views !== ''
+    ? parseInt(req.body.settled_views, 10)
+    : null;
+
+  if (!creatorId || !numAmount || numAmount <= 0) {
+    return res.status(400).json({ error: 'Valid creator ID and payout amount are required' });
+  }
+  if (req.body.video_id && !videoId) {
+    return res.status(400).json({ error: 'Invalid video ID' });
+  }
+
+  let conn;
   try {
-    const { 
-      creator_id, 
-      amount, 
-      payment_method = 'Bank Transfer', 
-      payment_reference = req.body.admin_reference || '', 
-      notes = '', 
-      settled_views = 0,
-      video_id = null 
-    } = req.body;
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
 
-    const numAmount = parseInt(amount, 10);
-    if (!creator_id || !numAmount || numAmount <= 0) {
-      return res.status(400).json({ error: 'Valid creator ID and payout amount are required' });
-    }
-
-    // Verify creator exists
-    const [cRows] = await pool.query('SELECT id, name, username, email, phone FROM users WHERE id = ?', [creator_id]);
+    // Lock ONLY this creator's row — other creators are never touched
+    const [cRows] = await conn.query(
+      'SELECT id, name, username, email, phone FROM users WHERE id = ? FOR UPDATE',
+      [creatorId]
+    );
     if (cRows.length === 0) {
+      await conn.rollback();
       return res.status(404).json({ error: 'Creator not found' });
     }
     const creator = cRows[0];
 
-    // Fetch their payout details snapshot
-    const [pdRows] = await pool.query('SELECT * FROM creator_payout_details WHERE user_id = ?', [creator_id]);
-    const detailsSnapshot = pdRows.length > 0 
-      ? pdRows[0] 
-      : { fallback: true, phone: creator.phone, email: creator.email, note: 'Registered contact on file' };
+    // Per-video milestone validation (incremental settlement)
+    let video = null;
+    let previousSettled = 0;
+    let settledViews = Number.isFinite(requestedSettledViews) ? requestedSettledViews : 0;
 
-    // Prevent duplicate payouts: check if same reference already recorded
-    if (payment_reference) {
-      const [existingRef] = await pool.query(
-        'SELECT id FROM creator_payouts WHERE payment_reference = ?',
-        [payment_reference]
+    if (videoId) {
+      const [vRows] = await conn.query(
+        'SELECT id, user_id, title, views_count FROM videos WHERE id = ? FOR UPDATE',
+        [videoId]
       );
-      if (existingRef.length > 0) {
-        return res.status(400).json({ error: 'A payout with this payment reference already exists' });
+      if (vRows.length === 0) {
+        await conn.rollback();
+        return res.status(404).json({ error: 'Video not found' });
+      }
+      video = vRows[0];
+      if (Number(video.user_id) !== creatorId) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'This video does not belong to the selected creator' });
+      }
+
+      const [sRows] = await conn.query(
+        `SELECT COALESCE(MAX(settled_views), 0) AS settled
+         FROM creator_payouts
+         WHERE video_id = ? AND status = 'Paid'
+         FOR UPDATE`,
+        [videoId]
+      );
+      previousSettled = Number(sRows[0]?.settled) || 0;
+      const currentViews = Number(video.views_count) || 0;
+
+      if (!Number.isFinite(requestedSettledViews)) settledViews = currentViews;
+
+      if (settledViews > currentViews) {
+        await conn.rollback();
+        return res.status(400).json({ error: `Cannot settle ${settledViews.toLocaleString()} views — video only has ${currentViews.toLocaleString()} views` });
+      }
+      if (settledViews <= previousSettled) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: `Views up to ${previousSettled.toLocaleString()} are already rewarded for this video. No new views to settle.`,
+          previousSettled
+        });
       }
     }
 
-    const ref = payment_reference || ('FFPAY' + Math.floor(100000 + Math.random() * 900000));
+    // Prevent duplicate payouts with the same bank reference
+    if (rawReference) {
+      const [existingRef] = await conn.query(
+        'SELECT id FROM creator_payouts WHERE payment_reference = ? LIMIT 1',
+        [rawReference]
+      );
+      if (existingRef.length > 0) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'A payout with this payment reference / UTR already exists' });
+      }
+    }
+    const ref = rawReference || ('FFPAY' + Date.now().toString().slice(-6) + Math.floor(100 + Math.random() * 900));
 
-    // Insert payout record
-    const [result] = await pool.query(
+    // Snapshot the destination account at time of payment (audit trail)
+    const [pdRows] = await conn.query('SELECT * FROM creator_payout_details WHERE user_id = ?', [creatorId]);
+    const detailsSnapshot = pdRows.length > 0
+      ? pdRows[0]
+      : { fallback: true, phone: creator.phone, email: creator.email, note: 'Registered contact on file' };
+
+    const [result] = await conn.query(
       `INSERT INTO creator_payouts (creator_id, video_id, amount, status, payment_method, payment_reference, payout_details, notes, settled_views)
        VALUES (?, ?, ?, 'Paid', ?, ?, ?, ?, ?)`,
-      [
-        creator_id,
-        video_id,
-        numAmount,
-        payment_method,
-        ref,
-        JSON.stringify(detailsSnapshot),
-        notes,
-        settled_views
-      ]
+      [creatorId, videoId, numAmount, paymentMethod, ref, JSON.stringify(detailsSnapshot), notes, settledViews]
     );
 
-    // Update creator's wallet balance
-    await pool.query(
-      'UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?',
-      [numAmount, creator_id]
+    await conn.query(
+      'UPDATE users SET wallet_balance = COALESCE(wallet_balance, 0) + ? WHERE id = ?',
+      [numAmount, creatorId]
     );
 
-    // Send mandatory user-side notification
-    const notificationMessage = `₹${numAmount.toLocaleString()} has been marked as paid to your registered payout account. Please check your bank account or UPI account using the payment details you submitted.`;
-    await pool.query(
+    const milestoneText = video
+      ? ` for "${video.title || 'your video'}" (views ${previousSettled.toLocaleString()} → ${settledViews.toLocaleString()})`
+      : '';
+    const notificationMessage = `₹${numAmount.toLocaleString()} has been paid to your registered payout account${milestoneText}. Ref: ${ref}. Please check your bank / UPI account.`;
+    await conn.query(
       `INSERT INTO notifications (user_id, actor_id, type, title, message, target_id)
        VALUES (?, NULL, 'payout', 'Payout Disbursed', ?, ?)`,
-      [creator_id, notificationMessage, result.insertId]
+      [creatorId, notificationMessage, result.insertId]
     );
+
+    await conn.commit();
+
+    const [wRows] = await pool.query('SELECT wallet_balance FROM users WHERE id = ?', [creatorId]);
 
     return res.status(201).json({
       success: true,
-      message: `Marked ₹${numAmount.toLocaleString()} as Paid to @${creator.username}`,
+      message: `Marked ₹${numAmount.toLocaleString()} as Paid to ${creator.username}`,
       payout: {
         id: result.insertId,
-        creatorId: creator_id,
+        creatorId,
+        creatorName: creator.name,
+        creatorUsername: creator.username,
+        videoId,
+        videoTitle: video?.title || null,
         amount: numAmount,
         status: 'Paid',
-        paymentMethod: payment_method,
+        paymentMethod,
         paymentReference: ref,
+        previousSettledViews: previousSettled,
+        settledViews,
+        newlySettledViews: video ? settledViews - previousSettled : 0,
+        walletBalance: Number(wRows[0]?.wallet_balance) || 0,
         date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        paidAt: new Date().toISOString(),
         notes
       }
     });
   } catch (err) {
+    if (conn) {
+      try { await conn.rollback(); } catch (_) {}
+    }
     console.error('Mark as paid error:', err);
     return res.status(500).json({ error: 'Failed to record payout' });
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
+// Admin: nudge a creator to add bank / UPI details before a reward can be sent
+export async function remindCreatorPayoutDetails(req, res) {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied. Administrator privileges required.' });
+  }
+  try {
+    const creatorId = parseInt(req.body.creator_id, 10);
+    const videoId = req.body.video_id ? parseInt(req.body.video_id, 10) : null;
+    if (!creatorId) return res.status(400).json({ error: 'Valid creator ID is required' });
+
+    const [cRows] = await pool.query('SELECT id, username FROM users WHERE id = ?', [creatorId]);
+    if (cRows.length === 0) return res.status(404).json({ error: 'Creator not found' });
+
+    // Throttle: at most one reminder per creator every 6 hours
+    const [recent] = await pool.query(
+      `SELECT id FROM notifications
+       WHERE user_id = ? AND type = 'payout' AND title = 'Add Payout Details'
+         AND created_at > (NOW() - INTERVAL 6 HOUR)
+       LIMIT 1`,
+      [creatorId]
+    );
+    if (recent.length > 0) {
+      return res.status(429).json({ error: 'A reminder was already sent to this creator in the last 6 hours' });
+    }
+
+    await pool.query(
+      `INSERT INTO notifications (user_id, actor_id, type, title, message, target_id)
+       VALUES (?, NULL, 'payout', 'Add Payout Details', ?, ?)`,
+      [
+        creatorId,
+        'FunFlick wants to send you a creator reward! Please add your Bank Account or UPI ID in Wallet → Payout Details so we can transfer it.',
+        videoId
+      ]
+    );
+
+    return res.json({ success: true, message: `Reminder sent to ${cRows[0].username}` });
+  } catch (err) {
+    console.error('Remind creator error:', err);
+    return res.status(500).json({ error: 'Failed to send reminder' });
   }
 }

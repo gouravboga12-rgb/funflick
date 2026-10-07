@@ -814,9 +814,29 @@ export async function getAdminInfluencerMedia(req, res) {
         u.avatar_url,
         u.is_influencer,
         u.subscription_plan,
-        u.subscription_expires_at
+        u.subscription_expires_at,
+        u.email AS user_email,
+        u.phone AS user_phone,
+        u.wallet_balance,
+        pd.payout_type, pd.bank_name, pd.account_number, pd.ifsc_code, pd.upi_id,
+        pd.phone_number AS payout_phone, pd.email_id AS payout_email,
+        COALESCE(ps.settled_views, 0) AS settled_views,
+        COALESCE(ps.total_paid, 0) AS total_paid_for_video,
+        COALESCE(ps.payout_count, 0) AS payout_count,
+        ps.last_paid_at
       FROM videos v
       JOIN users u ON v.user_id = u.id
+      LEFT JOIN creator_payout_details pd ON pd.user_id = u.id
+      LEFT JOIN (
+        SELECT video_id,
+               MAX(settled_views) AS settled_views,
+               SUM(amount) AS total_paid,
+               COUNT(*) AS payout_count,
+               MAX(paid_at) AS last_paid_at
+        FROM creator_payouts
+        WHERE status = 'Paid' AND video_id IS NOT NULL
+        GROUP BY video_id
+      ) ps ON ps.video_id = v.id
       ORDER BY v.views_count DESC, v.created_at DESC
       LIMIT 250
     `);
@@ -841,8 +861,21 @@ export async function getAdminInfluencerMedia(req, res) {
         ? (r.subscription_plan || 'Weekly Influencer') 
         : 'Free User';
 
+      const settledViews = Number(r.settled_views) || 0;
+      const unsettledViews = Math.max(0, views - settledViews);
+      const totalPaidForVideo = Number(r.total_paid_for_video) || 0;
+      const payoutCount = Number(r.payout_count) || 0;
+      // Admin discretion: nothing is ever "owed". Status only describes history.
+      let rewardStatus = 'Unrewarded';
+      if (payoutCount > 0) rewardStatus = unsettledViews > 0 ? 'Partially Rewarded' : 'Fully Rewarded';
+
+      const hasBank = Boolean(r.account_number && r.ifsc_code);
+      const hasUpi = Boolean(r.upi_id);
+      const payoutType = r.payout_type || (hasUpi && !hasBank ? 'upi' : 'bank');
+
       return {
         id: r.id,
+        userId: r.user_id,
         title: r.title || 'Creator Media',
         mediaUrl: r.video_url,
         videoUrl: r.video_url,
@@ -866,8 +899,39 @@ export async function getAdminInfluencerMedia(req, res) {
         sharesCount: shares,
         shares: shares >= 1000 ? (shares / 1000).toFixed(1) + 'K' : shares,
         engagementRate: engRate,
-        paymentStatus: 'Pending Reward',
-        paidAmount: 0,
+        // Milestone / reward history
+        settledViews,
+        unsettledViews,
+        rewardStatus,
+        payoutCount,
+        paymentStatus: rewardStatus,
+        paidAmount: totalPaidForVideo,
+        totalPaidForVideo,
+        lastPaidAt: r.last_paid_at || null,
+        paidDate: r.last_paid_at
+          ? new Date(r.last_paid_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+          : null,
+        // Creator object compatible with the shared PayoutModal
+        creator: {
+          id: r.user_id,
+          name: r.user_name || 'Creator',
+          username: r.username || 'user',
+          email: r.user_email || '',
+          phone: r.user_phone || '',
+          avatar: safeAvatar,
+          planName: subscriptionPlan,
+          walletBalance: Number(r.wallet_balance) || 0,
+          hasPayoutDetails: hasBank || hasUpi,
+          payoutDetails: (hasBank || hasUpi) ? {
+            payout_type: payoutType,
+            bank_name: r.bank_name || '',
+            account_number: r.account_number || '',
+            ifsc_code: r.ifsc_code || '',
+            upi_id: r.upi_id || '',
+            contact_phone: r.payout_phone || r.user_phone || '',
+            contact_email: r.payout_email || r.user_email || ''
+          } : null
+        },
         publishedDate: formattedDate,
         date: formattedDate
       };

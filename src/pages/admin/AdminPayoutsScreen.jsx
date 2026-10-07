@@ -29,6 +29,7 @@ export const AdminPayoutsScreen = () => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('VIP Paid Creators');
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedCreatorId, setExpandedCreatorId] = useState(null);
 
   const fetchEligibleCreators = async () => {
     setIsLoading(true);
@@ -175,7 +176,8 @@ export const AdminPayoutsScreen = () => {
                     : 'Free User';
 
                   return (
-                    <tr key={creator.id} className="hover:bg-white/5 transition">
+                    <React.Fragment key={creator.id}>
+                    <tr className="hover:bg-white/5 transition">
                       {/* Creator info */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2.5">
@@ -261,18 +263,61 @@ export const AdminPayoutsScreen = () => {
                         <span className="text-[10px] text-gray-400 block">
                           Wallet: ₹{(creator.walletBalance || 0).toLocaleString()}
                         </span>
+                        {creator.payoutHistory && creator.payoutHistory.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedCreatorId(expandedCreatorId === creator.id ? null : creator.id)}
+                            className="mt-1 text-[10px] text-pink-300 hover:text-pink-200 font-bold underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>{creator.payoutHistory.length} voucher{creator.payoutHistory.length === 1 ? '' : 's'}</span>
+                            <span>{expandedCreatorId === creator.id ? '▴' : '▾'}</span>
+                          </button>
+                        )}
                       </td>
 
                       {/* Action */}
                       <td className="py-3.5 px-4 text-right">
                         <button
                           onClick={() => setSelectedCreator(creator)}
-                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:brightness-110 text-white font-bold text-xs shadow-md shadow-pink-500/20 active:scale-95 transition"
+                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:brightness-110 text-white font-bold text-xs shadow-md shadow-pink-500/20 active:scale-95 transition cursor-pointer"
                         >
                           Review & Mark as Paid
                         </button>
                       </td>
                     </tr>
+                    {expandedCreatorId === creator.id && creator.payoutHistory && creator.payoutHistory.length > 0 && (
+                      <tr key={`history-${creator.id}`} className="bg-black/40 border-b border-white/10">
+                        <td colSpan={5} className="p-4">
+                          <div className="bg-[#0f0921] rounded-2xl p-3 border border-pink-500/20 space-y-2">
+                            <div className="flex items-center justify-between text-xs font-bold text-pink-300">
+                              <span>Historical Disbursal Audit Trail (@{creator.username})</span>
+                              <span className="text-gray-400 font-normal text-[11px]">{creator.payoutHistory.length} record(s)</span>
+                            </div>
+                            <div className="divide-y divide-white/5 text-[11px]">
+                              {creator.payoutHistory.map(h => (
+                                <div key={h.id} className="py-2 flex flex-wrap items-center justify-between gap-2">
+                                  <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-extrabold text-emerald-400 font-heading">₹{Number(h.amount).toLocaleString()}</span>
+                                      <span className="px-1.5 py-0.2 rounded bg-white/10 text-[9px] text-gray-300">{h.method}</span>
+                                      <span className="font-mono text-gray-400 text-[10px]">Ref: {h.reference}</span>
+                                    </div>
+                                    {h.videoTitle && (
+                                      <div className="text-[10px] text-cyan-300">
+                                        Video: "{h.videoTitle}" {h.settledViews ? `· Settled ${Number(h.settledViews).toLocaleString()} views` : ''}
+                                      </div>
+                                    )}
+                                    {h.notes && <div className="text-[10px] text-gray-400 italic">Note: {h.notes}</div>}
+                                  </div>
+                                  <span className="text-[10px] text-gray-400 font-mono">{h.date}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })
               )}

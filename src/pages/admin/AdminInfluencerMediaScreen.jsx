@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useApp } from '../../context/AppContext';
 import { AdminVideoPlayer } from '../../components/admin/AdminVideoPlayer';
+import { PayoutModal } from '../../components/admin/PayoutModal';
 import { 
   Sparkles, 
   Crown, 
@@ -203,9 +204,11 @@ export const AdminInfluencerMediaScreen = () => {
     // 2. Media type filter
     if (mediaTypeFilter !== 'all' && item.contentType !== mediaTypeFilter) return false;
 
-    // 3. Payment status filter
-    if (paymentFilter === 'pending' && item.paymentStatus !== 'Pending Reward') return false;
-    if (paymentFilter === 'paid' && item.paymentStatus !== 'Paid') return false;
+    // 3. Reward history filter
+    const status = getRewardStatus(item);
+    if (paymentFilter === 'unrewarded' && status !== 'Unrewarded') return false;
+    if (paymentFilter === 'newviews' && status !== 'Partially Rewarded') return false;
+    if (paymentFilter === 'full' && status !== 'Fully Rewarded') return false;
 
     // 4. Search query
     if (searchQuery.trim()) {
@@ -234,13 +237,16 @@ export const AdminInfluencerMediaScreen = () => {
       const engB = parseFloat(b.engagementRate) || 0;
       return engB - engA;
     }
+    if (sortFilter === 'newviews') {
+      return (b.unsettledViews || 0) - (a.unsettledViews || 0);
+    }
     return 0;
   });
 
   // Calculate high-level summary metrics
   const totalInfluencerPosts = (influencerMedia || []).filter(m => m.isInfluencer).length;
-  const pendingRewardsCount = (influencerMedia || []).filter(m => m.paymentStatus === 'Pending Reward').length;
-  const totalPaidSum = (influencerMedia || []).reduce((acc, curr) => acc + (curr.paidAmount || 0), 0);
+  const pendingRewardsCount = (influencerMedia || []).filter(m => getRewardStatus(m) === 'Unrewarded' && (m.viewsCount || 0) > 0).length;
+  const totalPaidSum = (influencerMedia || []).reduce((acc, curr) => acc + (Number(curr.totalPaidForVideo ?? curr.paidAmount) || 0), 0);
   const totalViewsCount = (influencerMedia || []).reduce((acc, curr) => acc + (typeof curr.viewsCount === 'number' ? curr.viewsCount : parseInt(curr.viewsCount) || parseInt(curr.views) || 0), 0);
 
   return (
@@ -308,13 +314,13 @@ export const AdminInfluencerMediaScreen = () => {
 
           <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
             <div className="flex items-center justify-between">
-              <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Pending Rewards</span>
+              <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'} font-medium`}>Not Yet Rewarded</span>
               <Clock className="w-4 h-4 text-amber-400" />
             </div>
             <div className="text-2xl font-black font-heading mt-2 text-amber-400">
               {pendingRewardsCount}
             </div>
-            <span className="text-[10px] text-amber-300 font-semibold mt-1 block">Awaiting admin compensation</span>
+            <span className="text-[10px] text-amber-300 font-semibold mt-1 block">Optional — at admin discretion</span>
           </div>
 
           <div className={`p-4 rounded-2xl ${isLight ? 'bg-white border-slate-200' : 'bg-[#120b24] border-white/5'} border shadow-sm`}>
@@ -422,6 +428,7 @@ export const AdminInfluencerMediaScreen = () => {
                   } border focus:outline-none cursor-pointer`}
                 >
                   <option value="views">Highest Views</option>
+                  <option value="newviews">Most New Views (since last reward)</option>
                   <option value="likes">Highest Likes</option>
                   <option value="engagement">Highest Engagement %</option>
                 </select>
@@ -437,9 +444,10 @@ export const AdminInfluencerMediaScreen = () => {
                     isLight ? 'bg-slate-100 text-slate-800 border-slate-300' : 'bg-[#1a1236] text-white border-white/10'
                   } border focus:outline-none cursor-pointer`}
                 >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending Reward</option>
-                  <option value="paid">Paid</option>
+                  <option value="all">All</option>
+                  <option value="unrewarded">Not yet rewarded</option>
+                  <option value="newviews">New views since last reward</option>
+                  <option value="full">Fully rewarded</option>
                 </select>
               </div>
             </div>
@@ -468,12 +476,12 @@ export const AdminInfluencerMediaScreen = () => {
             </div>
           ) : (
             filteredItems.map(item => {
-              const currentInputAmount = rewardAmounts[item.id] !== undefined
-                ? rewardAmounts[item.id]
-                : (item.currentEarning ? item.currentEarning.replace(/[^0-9]/g, '') : '2500');
-
-              const isPaid = item.paymentStatus === 'Paid';
-              const isSubmitting = submittingId === item.id;
+              const rewardStatus = getRewardStatus(item);
+              const settledViews = Number(item.settledViews) || 0;
+              const unsettledViews = Number(item.unsettledViews ?? Math.max(0, (item.viewsCount || 0) - settledViews)) || 0;
+              const totalPaidForVideo = Number(item.totalPaidForVideo ?? item.paidAmount) || 0;
+              const nothingNew = unsettledViews <= 0;
+              const hasDetails = Boolean(item.creator?.hasPayoutDetails);
               const displayViews = item.views !== undefined ? item.views : (item.viewsCount >= 1000 ? (item.viewsCount / 1000).toFixed(1) + 'K' : (item.viewsCount || 0));
               const displayLikes = item.likes !== undefined ? item.likes : (item.likesCount >= 1000 ? (item.likesCount / 1000).toFixed(1) + 'K' : (item.likesCount || 0));
               const displayComments = item.comments !== undefined ? item.comments : (item.commentsCount || 0);
@@ -559,77 +567,60 @@ export const AdminInfluencerMediaScreen = () => {
                     </div>
                   </div>
 
-                  {/* Right: Payment Status & Reward Dispatcher */}
+                  {/* Right: Milestone Payout Status & Disbursal */}
                   <div className={`w-full lg:w-72 p-3.5 rounded-2xl ${
                     isLight ? 'bg-slate-50 border-slate-200' : 'bg-[#181030] border-white/5'
-                  } border space-y-3 shrink-0`}>
+                  } border space-y-2.5 shrink-0`}>
                     
                     <div className="flex items-center justify-between">
                       <span className={`text-[11px] font-bold ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                        Payment Status:
+                        Reward Status:
                       </span>
-                      {isPaid ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Paid ₹{(item.paidAmount || 2500).toLocaleString()}</span>
+                      {rewardStatus === 'Fully Rewarded' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Fully Rewarded (₹{totalPaidForVideo.toLocaleString()})</span>
+                        </span>
+                      ) : rewardStatus === 'Partially Rewarded' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                          <TrendingUp className="w-3 h-3" />
+                          <span>Partially Paid (₹{totalPaidForVideo.toLocaleString()})</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>Pending Reward</span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          <Clock className="w-3 h-3" />
+                          <span>Not Yet Rewarded</span>
                         </span>
                       )}
                     </div>
 
-                    {/* Custom Reward Amount Field */}
-                    <div className="space-y-1">
-                      <label className={`text-[11px] font-semibold ${isLight ? 'text-slate-600' : 'text-gray-300'} block`}>
-                        Reward Amount:
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-emerald-400">
-                          ₹
+                    {/* Milestone Views Breakdown */}
+                    <div className="text-[11px] bg-black/25 p-2 rounded-xl border border-white/5 space-y-1">
+                      <div className="flex items-center justify-between text-gray-400">
+                        <span>Settled Views:</span>
+                        <strong className="text-white font-mono">{settledViews.toLocaleString()}</strong>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">New Eligible Views:</span>
+                        <strong className={`font-mono ${unsettledViews > 0 ? 'text-emerald-400 font-bold' : 'text-gray-400'}`}>
+                          {unsettledViews > 0 ? `+${unsettledViews.toLocaleString()}` : '0 (Up to date)'}
+                        </strong>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-white/5 text-[10px]">
+                        <span className="text-gray-400">Payout Account:</span>
+                        <span className={hasDetails ? 'text-emerald-400 font-semibold' : 'text-amber-300 font-semibold'}>
+                          {hasDetails ? '✓ Bank / UPI on file' : '⚠️ No details submitted'}
                         </span>
-                        <input
-                          type="text"
-                          disabled={isPaid}
-                          value={currentInputAmount}
-                          onChange={(e) => handleAmountChange(item.id, e.target.value)}
-                          placeholder="Enter reward ₹"
-                          className={`w-full pl-7 pr-3 py-2 rounded-xl text-sm font-bold ${
-                            isPaid
-                              ? 'bg-black/20 text-gray-400 cursor-not-allowed border-transparent'
-                              : isLight
-                                ? 'bg-white border-slate-300 text-slate-900 focus:border-pink-500'
-                                : 'bg-[#0f0921] border-white/10 text-white focus:border-pink-500'
-                          } border focus:outline-none transition`}
-                        />
                       </div>
                     </div>
 
-                    {/* Send Payment Button */}
+                    {/* Disburse Reward Action */}
                     <button
-                      onClick={() => handleSendPayment(item)}
-                      disabled={isPaid || isSubmitting}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs tracking-wide transition flex items-center justify-center gap-1.5 ${
-                        isPaid
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-default'
-                          : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/20 cursor-pointer active:scale-[0.98]'
-                      }`}
+                      onClick={() => openDisbursal(item)}
+                      className="w-full py-2.5 rounded-xl font-bold text-xs tracking-wide transition flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500 via-teal-600 to-indigo-600 hover:brightness-110 text-white shadow-lg shadow-emerald-500/20 cursor-pointer active:scale-[0.98]"
                     >
-                      {isSubmitting ? (
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : isPaid ? (
-                        <>
-                          <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
-                          <span>Reward Dispatched ({item.paidDate || 'Paid'})</span>
-                        </>
-                      ) : (
-                        <>
-                          <DollarSign className="w-4 h-4" />
-                          <span>Send Payment</span>
-                        </>
-                      )}
+                      <DollarSign className="w-4 h-4" />
+                      <span>{rewardStatus === 'Fully Rewarded' ? 'Send Additional Reward' : 'Disburse Reward'}</span>
                     </button>
                   </div>
 
@@ -717,12 +708,25 @@ export const AdminInfluencerMediaScreen = () => {
                   
                   <div className="flex items-center gap-2">
                     <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                      previewItem.paymentStatus === 'Paid'
+                      (previewItem.rewardStatus || previewItem.paymentStatus) === 'Fully Rewarded'
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        : (previewItem.rewardStatus || previewItem.paymentStatus) === 'Partially Rewarded'
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                     }`}>
-                      {previewItem.paymentStatus === 'Paid' ? `Paid ₹${(previewItem.paidAmount || 2500).toLocaleString()}` : 'Pending Reward'}
+                      {(previewItem.rewardStatus || previewItem.paymentStatus) === 'Fully Rewarded' 
+                        ? `Fully Rewarded (₹${(previewItem.totalPaidForVideo || 0).toLocaleString()})`
+                        : (previewItem.rewardStatus || previewItem.paymentStatus) === 'Partially Rewarded'
+                          ? `Partially Paid (₹${(previewItem.totalPaidForVideo || 0).toLocaleString()})`
+                          : 'Not Yet Rewarded'}
                     </span>
+                    <button
+                      onClick={() => openDisbursal(previewItem)}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-600 to-indigo-600 text-white font-bold text-xs shadow-md shadow-emerald-500/20 hover:brightness-110 flex items-center gap-1 cursor-pointer transition active:scale-95"
+                    >
+                      <DollarSign className="w-3.5 h-3.5" />
+                      <span>Disburse Reward</span>
+                    </button>
                   </div>
                 </div>
 
@@ -753,6 +757,17 @@ export const AdminInfluencerMediaScreen = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Real Payout Disbursal Modal */}
+      {payoutTarget && (
+        <PayoutModal
+          creator={payoutTarget.creator}
+          video={payoutTarget}
+          isOpen={Boolean(payoutTarget)}
+          onClose={() => setPayoutTarget(null)}
+          onPaidSuccess={handlePaidSuccess}
+        />
+      )}
     </AdminLayout>
   );
 };
