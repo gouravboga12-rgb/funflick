@@ -77,6 +77,66 @@ export const AdminRevenueScreen = () => {
     { label: 'Custom Range', key: 'Custom' }
   ];
 
+  // Helper to match a transaction to a specific plan
+  const matchesPlan = (tx, plan) => {
+    if (!tx || !plan) return false;
+    const txId = (tx.planId || '').toLowerCase().trim();
+    const txName = (tx.planName || '').toLowerCase().trim();
+    const pId = (plan.id || '').toLowerCase().trim();
+    const pName = (plan.name || '').toLowerCase().trim();
+
+    if (txId && pId && txId === pId) return true;
+    if (txName && pName && txName === pName) return true;
+
+    // Pattern matching heuristics for known intervals
+    if (pId === 'weekly' || pName.includes('weekly') || pName.includes('starter')) {
+      if (txId.includes('week') || txName.includes('week')) return true;
+    }
+    if (pId === 'monthly' || (pName.includes('monthly') && !pName.includes('3 month'))) {
+      if ((txId.includes('month') && !txId.includes('3 month') && !txId.includes('quarter')) || 
+          (txName.includes('month') && !txName.includes('3 month') && !txName.includes('quarter'))) return true;
+    }
+    if (pId === 'quarterly' || pName.includes('quarter') || pName.includes('3 month') || pName.includes('90 day')) {
+      if (txId.includes('quarter') || txName.includes('quarter') || txId.includes('3 month') || txName.includes('3 month') || txName.includes('90 day')) return true;
+    }
+    if (pId === 'annual' || pName.includes('annual') || pName.includes('yearly') || pName.includes('vip')) {
+      if (txId.includes('annual') || txId.includes('year') || txName.includes('annual') || txName.includes('year') || txName.includes('365')) return true;
+    }
+
+    return false;
+  };
+
+  // Available Plans (Dynamic from DB / publishingPlans + any transactions with custom plans)
+  const availablePlans = useMemo(() => {
+    const base = (publishingPlans && publishingPlans.length > 0)
+      ? [...publishingPlans]
+      : [...(INFLUENCER_SUBSCRIPTION_PLANS || [])];
+
+    const knownIds = new Set(base.map(p => (p.id || '').toLowerCase().trim()));
+    const knownNames = new Set(base.map(p => (p.name || '').toLowerCase().trim()));
+
+    (subscriptionTransactions || []).forEach(tx => {
+      const txPlanId = (tx.planId || '').toLowerCase().trim();
+      const txPlanName = (tx.planName || '').trim();
+      if (!txPlanId && !txPlanName) return;
+
+      const isKnown = (txPlanId && knownIds.has(txPlanId)) || (txPlanName && knownNames.has(txPlanName.toLowerCase()));
+      if (!isKnown) {
+        const newPlan = {
+          id: txPlanId || txPlanName.toLowerCase().replace(/\s+/g, '_'),
+          name: txPlanName || tx.planId || 'Influencer Pass',
+          price: Number(tx.amount) || 99,
+          formattedPrice: `₹${Number(tx.amount || 99).toLocaleString()}`
+        };
+        base.push(newPlan);
+        knownIds.add(newPlan.id.toLowerCase());
+        knownNames.add(newPlan.name.toLowerCase());
+      }
+    });
+
+    return base;
+  }, [publishingPlans, subscriptionTransactions]);
+
   // Filtered Transactions Calculation (Dynamic based on real current date)
   const filteredTransactions = useMemo(() => {
     let list = subscriptionTransactions || [];
@@ -171,66 +231,6 @@ export const AdminRevenueScreen = () => {
 
   const totalSubscriptionsCount = filteredTransactions.length;
   const averageOrderValue = totalSubscriptionsCount > 0 ? Math.round(grossRevenue / totalSubscriptionsCount) : 0;
-
-  // Available Plans (Dynamic from DB / publishingPlans + any transactions with custom plans)
-  const availablePlans = useMemo(() => {
-    const base = (publishingPlans && publishingPlans.length > 0)
-      ? [...publishingPlans]
-      : [...(INFLUENCER_SUBSCRIPTION_PLANS || [])];
-
-    const knownIds = new Set(base.map(p => (p.id || '').toLowerCase().trim()));
-    const knownNames = new Set(base.map(p => (p.name || '').toLowerCase().trim()));
-
-    (subscriptionTransactions || []).forEach(tx => {
-      const txPlanId = (tx.planId || '').toLowerCase().trim();
-      const txPlanName = (tx.planName || '').trim();
-      if (!txPlanId && !txPlanName) return;
-
-      const isKnown = (txPlanId && knownIds.has(txPlanId)) || (txPlanName && knownNames.has(txPlanName.toLowerCase()));
-      if (!isKnown) {
-        const newPlan = {
-          id: txPlanId || txPlanName.toLowerCase().replace(/\s+/g, '_'),
-          name: txPlanName || tx.planId || 'Influencer Pass',
-          price: Number(tx.amount) || 99,
-          formattedPrice: `₹${Number(tx.amount || 99).toLocaleString()}`
-        };
-        base.push(newPlan);
-        knownIds.add(newPlan.id.toLowerCase());
-        knownNames.add(newPlan.name.toLowerCase());
-      }
-    });
-
-    return base;
-  }, [publishingPlans, subscriptionTransactions]);
-
-  // Helper to match a transaction to a specific plan
-  const matchesPlan = (tx, plan) => {
-    if (!tx || !plan) return false;
-    const txId = (tx.planId || '').toLowerCase().trim();
-    const txName = (tx.planName || '').toLowerCase().trim();
-    const pId = (plan.id || '').toLowerCase().trim();
-    const pName = (plan.name || '').toLowerCase().trim();
-
-    if (txId && pId && txId === pId) return true;
-    if (txName && pName && txName === pName) return true;
-
-    // Pattern matching heuristics for known intervals
-    if (pId === 'weekly' || pName.includes('weekly') || pName.includes('starter')) {
-      if (txId.includes('week') || txName.includes('week')) return true;
-    }
-    if (pId === 'monthly' || (pName.includes('monthly') && !pName.includes('3 month'))) {
-      if ((txId.includes('month') && !txId.includes('3 month') && !txId.includes('quarter')) || 
-          (txName.includes('month') && !txName.includes('3 month') && !txName.includes('quarter'))) return true;
-    }
-    if (pId === 'quarterly' || pName.includes('quarter') || pName.includes('3 month') || pName.includes('90 day')) {
-      if (txId.includes('quarter') || txName.includes('quarter') || txId.includes('3 month') || txName.includes('3 month') || txName.includes('90 day')) return true;
-    }
-    if (pId === 'annual' || pName.includes('annual') || pName.includes('yearly') || pName.includes('vip')) {
-      if (txId.includes('annual') || txId.includes('year') || txName.includes('annual') || txName.includes('year') || txName.includes('365')) return true;
-    }
-
-    return false;
-  };
 
   const TIER_GRADIENTS = [
     'from-emerald-400 to-teal-500',
