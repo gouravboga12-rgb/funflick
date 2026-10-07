@@ -205,6 +205,10 @@ export const AppProvider = ({ children }) => {
   // Centralized single-video playback state (ensures only 1 reel plays at a time)
   const [activePlayingVideoId, setActivePlayingVideoId] = useState(null);
 
+  // Unified Instagram-style Reels feed audio state:
+  // Persistent across reels in the Reels feed so unmuting one Reel keeps audio ON for subsequent Reels
+  const [isReelsMuted, setIsReelsMuted] = useState(true);
+
   // Copyright & Plagiarism Dispute Reports (Live from AWS MySQL database)
   const [copyrightReports, setCopyrightReports] = useState([]);
 
@@ -2595,7 +2599,9 @@ export const AppProvider = ({ children }) => {
         fetchAdminStats,
         fetchAdminTransactions,
         activePlayingVideoId,
-        setActivePlayingVideoId
+        setActivePlayingVideoId,
+        isReelsMuted,
+        setIsReelsMuted
       }}
     >
       {children}

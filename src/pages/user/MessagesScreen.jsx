@@ -13,10 +13,14 @@ import {
   Paperclip,
   UserPlus,
   MessageCircle,
-  Loader2
+  Loader2,
+  Maximize2,
+  Download,
+  Play
 } from 'lucide-react';
 
 import { uploadFileToS3 } from '../../services/s3UploadService';
+import { ChatMediaViewerModal, downloadMediaFile } from '../../components/chat/ChatMediaViewerModal';
 
 const MAX_MEDIA_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB max limit
 
@@ -37,6 +41,7 @@ export const MessagesScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [inputText, setInputText] = useState('');
   const [attachedMedia, setAttachedMedia] = useState(null); // { file, type, url, name, size }
+  const [viewingMedia, setViewingMedia] = useState(null); // Active media opened in full-screen modal
   const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null); // auto-scroll anchor
@@ -114,8 +119,8 @@ export const MessagesScreen = () => {
         if (res.ok) {
           const data = await res.json();
           if (data.users && Array.isArray(data.users)) {
-            // Filter out current logged in user
-            setDbUsers(data.users.filter(u => u.username !== currentUser?.username));
+            // Keep matching users and allow self-chat (notes/saved messages)
+            setDbUsers(data.users);
           }
         }
       } catch (err) {
@@ -136,10 +141,11 @@ export const MessagesScreen = () => {
   );
 
   const handleStartChatWithDbUser = (user) => {
+    const isSelf = user.username === currentUser?.username;
     const convId = openOrCreateConversation({
       id: user.id,
       username: user.username,
-      name: user.name || user.username,
+      name: isSelf ? `${user.name || user.username} (You)` : (user.name || user.username),
       avatar: user.avatar || user.avatar_url || '/brand/default-avatar.svg'
     });
     if (convId) {
@@ -295,25 +301,79 @@ export const MessagesScreen = () => {
                       ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-br-none shadow-md'
                       : 'bg-[#1b1433] text-gray-200 border border-white/5 rounded-bl-none'
                   }`}>
-                    {/* Media Attachment if present (max 5MB) */}
+                    {/* Media Attachment with full-screen viewer and instant download (max 5MB) */}
                     {msg.media && (
-                      <div className="rounded-xl overflow-hidden max-w-[240px] bg-black/40">
-                        {msg.media.type === 'video' ? (
-                          <video
-                            src={msg.media.url}
-                            controls
-                            playsInline
-                            className="w-full max-h-56 object-cover rounded-xl"
-                          />
-                        ) : (
-                          <img
-                            src={msg.media.url}
-                            alt="Chat attachment"
-                            className="w-full max-h-56 object-cover rounded-xl"
-                          />
-                        )}
-                        <div className="px-2 py-1 text-[9px] opacity-75 truncate">
-                          {msg.media.name} {msg.media.size ? `(${msg.media.size}MB)` : ''}
+                      <div className="relative rounded-xl overflow-hidden max-w-[260px] bg-black/60 border border-white/10 group shadow-lg">
+                        {/* Clickable Media Preview - Opens Full-Screen Viewer for Sender, Recipient & Self */}
+                        <div 
+                          onClick={() => setViewingMedia(msg.media)}
+                          className="cursor-pointer relative overflow-hidden flex items-center justify-center bg-black/80"
+                        >
+                          {msg.media.type === 'video' ? (
+                            <div className="relative w-full">
+                              <video
+                                src={msg.media.url}
+                                playsInline
+                                preload="metadata"
+                                className="w-full max-h-60 object-cover rounded-t-xl group-hover:scale-[1.02] transition-transform duration-200"
+                              />
+                              <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/10 transition">
+                                <div className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/20 flex items-center justify-center shadow-lg group-hover:scale-110 transition">
+                                  <Play className="w-5 h-5 fill-current ml-0.5 text-pink-400" />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="relative w-full">
+                              <img
+                                src={msg.media.url}
+                                alt={msg.media.name || "Chat attachment"}
+                                className="w-full max-h-60 object-cover rounded-t-xl group-hover:scale-[1.02] transition-transform duration-200"
+                              />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold flex items-center gap-1 border border-white/20 shadow-md">
+                                  <Maximize2 className="w-3 h-3" /> View Photo
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Media Footer Bar: Title, Size, Direct Download & Fullscreen Controls */}
+                        <div className="px-2.5 py-1.5 bg-[#0f071d] flex items-center justify-between text-[10px] text-gray-300 border-t border-white/5">
+                          <span className="truncate max-w-[130px] font-medium" title={msg.media.name}>
+                            {msg.media.name} {msg.media.size ? `(${msg.media.size}MB)` : ''}
+                          </span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {/* 1-Click Working Download */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                downloadMediaFile(msg.media.url, msg.media.name, (status) => {
+                                  if (status === 'success') showToast('Downloaded successfully', 'success');
+                                });
+                              }}
+                              title="Download original uploaded file"
+                              aria-label="Download media"
+                              className="p-1 rounded-md bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white transition active:scale-95"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                            {/* Full-Screen Expand */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewingMedia(msg.media);
+                              }}
+                              title="Open in expanded viewer"
+                              aria-label="Open expanded viewer"
+                              className="p-1 rounded-md bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white transition active:scale-95"
+                            >
+                              <Maximize2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -526,6 +586,12 @@ export const MessagesScreen = () => {
           <BottomNavigation />
         </div>
       )}
+
+      {/* Full-Screen Chat Media Viewer Modal (Large Viewer, Custom Video Controls & Downloads) */}
+      <ChatMediaViewerModal 
+        media={viewingMedia} 
+        onClose={() => setViewingMedia(null)} 
+      />
     </div>
   );
 };

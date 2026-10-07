@@ -33,7 +33,7 @@ import { ShareSheet } from './ShareSheet';
 import { ReportModal } from './ReportModal';
 import { PostInsightsModal } from './PostInsightsModal';
 
-export const VideoPostCard = ({ post }) => {
+export const VideoPostCard = ({ post, isReel = false }) => {
   const navigate = useNavigate();
   const { 
     toggleLikePost, 
@@ -46,7 +46,9 @@ export const VideoPostCard = ({ post }) => {
     mediaLimits, 
     showToast,
     activePlayingVideoId,
-    setActivePlayingVideoId
+    setActivePlayingVideoId,
+    isReelsMuted,
+    setIsReelsMuted
   } = useApp();
 
   const isOwner = post.creator?.username === currentUser?.username;
@@ -61,6 +63,7 @@ export const VideoPostCard = ({ post }) => {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [showAudioBadge, setShowAudioBadge] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [showHeartBurst, setShowHeartBurst] = useState(false);
@@ -71,6 +74,29 @@ export const VideoPostCard = ({ post }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+
+  // In Reels feed, all reels share the unified isReelsMuted audio state.
+  // In other views (e.g. Home feed), each post maintains its own muted state.
+  const effectiveMuted = isReel ? isReelsMuted : isMuted;
+
+  const toggleAudio = (e) => {
+    e?.stopPropagation?.();
+    if (isReel) {
+      const nextMuted = !isReelsMuted;
+      setIsReelsMuted(nextMuted);
+      if (videoRef.current) {
+        videoRef.current.muted = nextMuted;
+      }
+      setShowAudioBadge(true);
+      setTimeout(() => setShowAudioBadge(false), 1200);
+    } else {
+      const nextMuted = !isMuted;
+      setIsMuted(nextMuted);
+      if (videoRef.current) {
+        videoRef.current.muted = nextMuted;
+      }
+    }
+  };
 
   const cardRef = useRef(null);
   const videoRef = useRef(null);
@@ -112,7 +138,8 @@ export const VideoPostCard = ({ post }) => {
     };
   }, [post.id, post.mediaType, setActivePlayingVideoId]);
 
-  // Centralized Playback state enforcement: guarantee only the active reel plays and produces sound
+  // Centralized Playback state enforcement: guarantee only the active reel plays and produces sound.
+  // When scrolling away, the previous Reel is completely paused and reset.
   useEffect(() => {
     const video = videoRef.current;
     if (!video || post.mediaType !== 'video') return;
@@ -120,6 +147,7 @@ export const VideoPostCard = ({ post }) => {
     if (isCardActive && !isLocked) {
       setIsLoading(true);
       setHasError(false);
+      video.muted = effectiveMuted;
       const playPromise = video.play();
       if (playPromise !== undefined) {
         playPromise
@@ -128,6 +156,11 @@ export const VideoPostCard = ({ post }) => {
             setIsLoading(false);
           })
           .catch(() => {
+            // If browser blocks unmuted autoplay before interaction, fallback to muted
+            if (!video.muted) {
+              video.muted = true;
+              video.play().then(() => setIsPlaying(true)).catch(() => {});
+            }
             setIsPlaying(false);
             setIsLoading(false);
           });
@@ -135,16 +168,25 @@ export const VideoPostCard = ({ post }) => {
     } else {
       // Immediately pause and stop audio completely
       video.pause();
+      video.currentTime = 0;
       setIsPlaying(false);
       setIsLoading(false);
     }
-  }, [isCardActive, isLocked, post.mediaType, post.mediaUrl]);
+  }, [isCardActive, isLocked, post.mediaType, post.mediaUrl, effectiveMuted]);
 
-  // Clean pause on unmount
+  // Synchronize mute state in real-time when isReelsMuted changes
+  useEffect(() => {
+    if (isReel && videoRef.current) {
+      videoRef.current.muted = isReelsMuted;
+    }
+  }, [isReelsMuted, isReel]);
+
+  // Clean pause & stop on unmount
   useEffect(() => {
     return () => {
       if (videoRef.current) {
         videoRef.current.pause();
+        videoRef.current.currentTime = 0;
       }
     };
   }, []);
@@ -270,7 +312,7 @@ export const VideoPostCard = ({ post }) => {
               loop
               preload="auto"
               crossOrigin="anonymous"
-              muted={isMuted}
+              muted={effectiveMuted}
               onTimeUpdate={handleTimeUpdate}
               onLoadedData={() => setIsLoading(false)}
               onCanPlay={() => setIsLoading(false)}
@@ -364,20 +406,47 @@ export const VideoPostCard = ({ post }) => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Floating Audio Feedback Pill on toggle (Instagram style) */}
+        <AnimatePresence>
+          {showAudioBadge && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+              className="absolute z-30 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none px-4 py-2 rounded-full bg-black/80 backdrop-blur-md border border-white/20 text-white flex items-center gap-2 shadow-2xl"
+            >
+              {effectiveMuted ? (
+                <>
+                  <VolumeX className="w-5 h-5 text-gray-300" />
+                  <span className="text-xs font-bold font-heading">Audio Muted</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-5 h-5 text-pink-400" />
+                  <span className="text-xs font-bold font-heading text-pink-300">Audio On</span>
+                </>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Top Controls Overlay (Mute toggle) */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
         {post.mediaType === 'video' && (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsMuted(!isMuted);
-              if (videoRef.current) videoRef.current.muted = !isMuted;
-            }}
-            className="p-2 rounded-full bg-black/50 backdrop-blur-md text-white border border-white/10 hover:bg-black/70 transition"
+            onClick={toggleAudio}
+            aria-label={effectiveMuted ? "Unmute reel" : "Mute reel"}
+            title={effectiveMuted ? "Unmute reel" : "Mute reel"}
+            className="p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/20 hover:bg-black/80 active:scale-95 transition shadow-lg"
           >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-pink-400" />}
+            {effectiveMuted ? (
+              <VolumeX className="w-4 h-4 text-white" />
+            ) : (
+              <Volume2 className="w-4 h-4 text-pink-400" />
+            )}
           </button>
         )}
       </div>

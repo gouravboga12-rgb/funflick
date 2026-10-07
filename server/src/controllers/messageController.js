@@ -157,15 +157,14 @@ export async function sendMessage(req, res) {
       recipientId = uRows[0].id;
     }
 
-    if (recipientId === senderId) {
-      return res.status(400).json({ error: 'Cannot send message to yourself' });
-    }
+    // Allow self-chat (saved messages / notes to self)
+    const isSelfChat = recipientId === senderId;
 
     // Insert into messages table
     const [result] = await pool.query(
       `
       INSERT INTO messages (sender_id, recipient_id, message_text, media_url, media_type, media_name, media_size, is_read)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         senderId,
@@ -174,7 +173,8 @@ export async function sendMessage(req, res) {
         media?.url || null,
         media?.type || null,
         media?.name || null,
-        media?.size ? String(media.size) : null
+        media?.size ? String(media.size) : null,
+        isSelfChat ? 1 : 0
       ]
     );
 
@@ -182,17 +182,19 @@ export async function sendMessage(req, res) {
     const [senderRows] = await pool.query('SELECT name, username FROM users WHERE id = ?', [senderId]);
     const senderName = senderRows[0]?.name || senderRows[0]?.username || 'Someone';
 
-    // Insert notification for recipient
-    try {
-      const notifSnippet = text?.trim() ? text.trim().slice(0, 50) : (media?.type === 'video' ? 'Sent a video' : 'Sent a photo');
-      await pool.query(
-        `
-        INSERT INTO notifications (user_id, actor_id, type, title, message)
-        VALUES (?, ?, 'system', 'New Message', ?)
-        `,
-        [recipientId, senderId, `${senderName}: ${notifSnippet}`]
-      );
-    } catch (e) {}
+    // Insert notification for recipient (if not self-chat)
+    if (!isSelfChat) {
+      try {
+        const notifSnippet = text?.trim() ? text.trim().slice(0, 50) : (media?.type === 'video' ? 'Sent a video' : 'Sent a photo');
+        await pool.query(
+          `
+          INSERT INTO notifications (user_id, actor_id, type, title, message)
+          VALUES (?, ?, 'system', 'New Message', ?)
+          `,
+          [recipientId, senderId, `${senderName}: ${notifSnippet}`]
+        );
+      } catch (e) {}
+    }
 
     const newMsg = {
       id: result.insertId,

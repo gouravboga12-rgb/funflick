@@ -59,8 +59,58 @@ export const ReelsScreen = () => {
     }
   };
 
+  // Wheel scroll with throttle so 1 scroll tick = 1 reel
+  const lastScrollTimeRef = React.useRef(0);
+  const handleWheel = (e) => {
+    const now = Date.now();
+    if (now - lastScrollTimeRef.current < 400) return;
+    if (e.deltaY > 25) {
+      lastScrollTimeRef.current = now;
+      handleNext();
+    } else if (e.deltaY < -25) {
+      lastScrollTimeRef.current = now;
+      handlePrev();
+    }
+  };
+
+  // Touch swipe gestures (swipe up for next, swipe down for prev)
+  const touchStartYRef = React.useRef(null);
+  const handleTouchStart = (e) => {
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+  const handleTouchEnd = (e) => {
+    if (touchStartYRef.current === null) return;
+    const diff = touchStartYRef.current - e.changedTouches[0].clientY;
+    if (diff > 45) {
+      handleNext(); // Swiped UP -> Next reel
+    } else if (diff < -45) {
+      handlePrev(); // Swiped DOWN -> Prev reel
+    }
+    touchStartYRef.current = null;
+  };
+
+  // Keyboard ArrowUp / ArrowDown navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+        e.preventDefault();
+        handleNext();
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault();
+        handlePrev();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentIdx, visiblePosts.length]);
+
   return (
-    <div className="relative w-full flex-1 flex flex-col bg-black min-h-screen sm:min-h-full overflow-hidden select-none">
+    <div 
+      onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      className="relative w-full flex-1 flex flex-col bg-black min-h-screen sm:min-h-full overflow-hidden select-none"
+    >
       {/* Top Header Floating Title */}
       <div className="absolute top-3 left-4 z-30 flex items-center gap-2 pointer-events-none">
         <span className="font-extrabold text-base text-white drop-shadow font-heading">
@@ -71,19 +121,21 @@ export const ReelsScreen = () => {
         </span>
       </div>
 
-      {/* Vertical Navigation Arrow Controls (for desktop/touch convenience) */}
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 z-30 hidden sm:flex flex-col gap-2">
+      {/* Vertical Navigation Arrow Controls (for convenient 1-tap navigation on both mobile and desktop) */}
+      <div className="absolute right-3 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-2">
         <button
           onClick={handlePrev}
           disabled={currentIdx === 0}
-          className="p-2 rounded-full bg-black/50 backdrop-blur-md text-white border border-white/10 hover:bg-black/80 disabled:opacity-30 transition"
+          aria-label="Previous Reel"
+          className="p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/10 hover:bg-black/80 disabled:opacity-20 active:scale-95 transition shadow-lg"
         >
           <ChevronUp className="w-5 h-5" />
         </button>
         <button
           onClick={handleNext}
           disabled={currentIdx === visiblePosts.length - 1}
-          className="p-2 rounded-full bg-black/50 backdrop-blur-md text-white border border-white/10 hover:bg-black/80 disabled:opacity-30 transition"
+          aria-label="Next Reel"
+          className="p-2.5 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/10 hover:bg-black/80 disabled:opacity-20 active:scale-95 transition shadow-lg"
         >
           <ChevronDown className="w-5 h-5" />
         </button>
@@ -119,10 +171,10 @@ export const ReelsScreen = () => {
               initial={{ opacity: 0.8, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0.8, y: -20 }}
-              transition={{ duration: 0.25 }}
+              transition={{ duration: 0.2 }}
               className="w-full h-full flex items-center justify-center"
             >
-              <VideoPostCard post={currentPost} />
+              <VideoPostCard post={currentPost} isReel={true} />
             </motion.div>
           </AnimatePresence>
         )}
