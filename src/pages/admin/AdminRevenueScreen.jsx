@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
+import { INFLUENCER_SUBSCRIPTION_PLANS } from '../../data/mockData';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -12,8 +13,6 @@ import {
   Search, 
   Filter, 
   CheckCircle2, 
-  ShieldCheck, 
-  CreditCard, 
   Copy, 
   Check, 
   ExternalLink, 
@@ -27,14 +26,22 @@ import {
 } from 'lucide-react';
 
 export const AdminRevenueScreen = () => {
-  const { subscriptionTransactions, theme, showToast, publishingPlans, fetchAdminTransactions } = useApp();
+  const { 
+    subscriptionTransactions, 
+    theme, 
+    showToast, 
+    publishingPlans, 
+    fetchAdminTransactions,
+    fetchSubscriptionPlans
+  } = useApp();
   const isLight = theme === 'light';
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch real subscription transactions from MySQL on mount
+  // Fetch real subscription transactions & current plans from MySQL on mount
   useEffect(() => {
     const load = async () => {
       setIsRefreshing(true);
+      if (fetchSubscriptionPlans) await fetchSubscriptionPlans();
       if (fetchAdminTransactions) await fetchAdminTransactions();
       setIsRefreshing(false);
     };
@@ -43,6 +50,7 @@ export const AdminRevenueScreen = () => {
 
   const handleRefreshTransactions = async () => {
     setIsRefreshing(true);
+    if (fetchSubscriptionPlans) await fetchSubscriptionPlans();
     if (fetchAdminTransactions) await fetchAdminTransactions();
     setIsRefreshing(false);
     showToast('✅ Revenue data refreshed from database!', 'success');
@@ -130,13 +138,14 @@ export const AdminRevenueScreen = () => {
 
     // Filter by Plan
     if (selectedPlanFilter !== 'ALL') {
+      const targetPlan = availablePlans.find(p => p.id === selectedPlanFilter);
       list = list.filter(item => {
+        if (targetPlan) {
+          return matchesPlan(item, targetPlan);
+        }
         const pId = (item.planId || '').toLowerCase();
         const pName = (item.planName || '').toLowerCase();
-        if (selectedPlanFilter === 'monthly') return pId.includes('month') || pName.includes('month');
-        if (selectedPlanFilter === 'quarterly') return pId.includes('quarter') || pName.includes('quarter');
-        if (selectedPlanFilter === 'annual') return pId.includes('annual') || pId.includes('year') || pName.includes('annual') || pName.includes('year');
-        return true;
+        return pId === selectedPlanFilter.toLowerCase() || pName.includes(selectedPlanFilter.toLowerCase());
       });
     }
 
@@ -153,7 +162,7 @@ export const AdminRevenueScreen = () => {
     }
 
     return list;
-  }, [subscriptionTransactions, dateFilter, customStartDate, customEndDate, selectedPlanFilter, searchQuery]);
+  }, [subscriptionTransactions, dateFilter, customStartDate, customEndDate, selectedPlanFilter, searchQuery, availablePlans]);
 
   // Aggregate Metrics
   const grossRevenue = useMemo(() => {
@@ -162,61 +171,128 @@ export const AdminRevenueScreen = () => {
 
   const totalSubscriptionsCount = filteredTransactions.length;
   const averageOrderValue = totalSubscriptionsCount > 0 ? Math.round(grossRevenue / totalSubscriptionsCount) : 0;
-  
-  // Razorpay Gateway Fee estimation (2.0% + 18% GST on fee = 2.36%)
-  const gatewayProcessingFees = Math.round(grossRevenue * 0.0236);
-  const netSettledRevenue = grossRevenue - gatewayProcessingFees;
 
-  // Breakdown by Tier
-  const tierBreakdown = useMemo(() => {
-    const counts = {
-      monthly: { count: 0, revenue: 0, label: 'Monthly Influencer Pro (₹199)' },
-      quarterly: { count: 0, revenue: 0, label: 'Quarterly Influencer Star (₹499)' },
-      annual: { count: 0, revenue: 0, label: 'Annual Influencer VIP (₹1,499)' }
-    };
+  // Available Plans (Dynamic from DB / publishingPlans + any transactions with custom plans)
+  const availablePlans = useMemo(() => {
+    const base = (publishingPlans && publishingPlans.length > 0)
+      ? [...publishingPlans]
+      : [...(INFLUENCER_SUBSCRIPTION_PLANS || [])];
 
-    filteredTransactions.forEach(item => {
-      const pId = (item.planId || '').toLowerCase();
-      const pName = (item.planName || '').toLowerCase();
-      const amt = Number(item.amount) || 0;
+    const knownIds = new Set(base.map(p => (p.id || '').toLowerCase().trim()));
+    const knownNames = new Set(base.map(p => (p.name || '').toLowerCase().trim()));
 
-      if (pId.includes('month') || pName.includes('month')) {
-        counts.monthly.count += 1;
-        counts.monthly.revenue += amt;
-      } else if (pId.includes('quarter') || pName.includes('quarter')) {
-        counts.quarterly.count += 1;
-        counts.quarterly.revenue += amt;
-      } else {
-        counts.annual.count += 1;
-        counts.annual.revenue += amt;
+    (subscriptionTransactions || []).forEach(tx => {
+      const txPlanId = (tx.planId || '').toLowerCase().trim();
+      const txPlanName = (tx.planName || '').trim();
+      if (!txPlanId && !txPlanName) return;
+
+      const isKnown = (txPlanId && knownIds.has(txPlanId)) || (txPlanName && knownNames.has(txPlanName.toLowerCase()));
+      if (!isKnown) {
+        const newPlan = {
+          id: txPlanId || txPlanName.toLowerCase().replace(/\s+/g, '_'),
+          name: txPlanName || tx.planId || 'Influencer Pass',
+          price: Number(tx.amount) || 99,
+          formattedPrice: `₹${Number(tx.amount || 99).toLocaleString()}`
+        };
+        base.push(newPlan);
+        knownIds.add(newPlan.id.toLowerCase());
+        knownNames.add(newPlan.name.toLowerCase());
       }
     });
 
+    return base;
+  }, [publishingPlans, subscriptionTransactions]);
+
+  // Helper to match a transaction to a specific plan
+  const matchesPlan = (tx, plan) => {
+    if (!tx || !plan) return false;
+    const txId = (tx.planId || '').toLowerCase().trim();
+    const txName = (tx.planName || '').toLowerCase().trim();
+    const pId = (plan.id || '').toLowerCase().trim();
+    const pName = (plan.name || '').toLowerCase().trim();
+
+    if (txId && pId && txId === pId) return true;
+    if (txName && pName && txName === pName) return true;
+
+    // Pattern matching heuristics for known intervals
+    if (pId === 'weekly' || pName.includes('weekly') || pName.includes('starter')) {
+      if (txId.includes('week') || txName.includes('week')) return true;
+    }
+    if (pId === 'monthly' || (pName.includes('monthly') && !pName.includes('3 month'))) {
+      if ((txId.includes('month') && !txId.includes('3 month') && !txId.includes('quarter')) || 
+          (txName.includes('month') && !txName.includes('3 month') && !txName.includes('quarter'))) return true;
+    }
+    if (pId === 'quarterly' || pName.includes('quarter') || pName.includes('3 month') || pName.includes('90 day')) {
+      if (txId.includes('quarter') || txName.includes('quarter') || txId.includes('3 month') || txName.includes('3 month') || txName.includes('90 day')) return true;
+    }
+    if (pId === 'annual' || pName.includes('annual') || pName.includes('yearly') || pName.includes('vip')) {
+      if (txId.includes('annual') || txId.includes('year') || txName.includes('annual') || txName.includes('year') || txName.includes('365')) return true;
+    }
+
+    return false;
+  };
+
+  const TIER_GRADIENTS = [
+    'from-emerald-400 to-teal-500',
+    'from-pink-500 to-rose-500',
+    'from-purple-500 to-indigo-500',
+    'from-amber-400 to-orange-500',
+    'from-cyan-400 to-blue-500',
+    'from-fuchsia-500 to-pink-500',
+    'from-violet-500 to-purple-600'
+  ];
+
+  // Dynamic Breakdown by Tier across all active categories
+  const tierBreakdown = useMemo(() => {
     const total = grossRevenue || 1;
-    return [
-      { 
-        name: counts.monthly.label, 
-        count: counts.monthly.count, 
-        revenue: counts.monthly.revenue, 
-        percentage: Math.round((counts.monthly.revenue / total) * 100) || 0,
-        color: 'from-pink-500 to-rose-500'
-      },
-      { 
-        name: counts.quarterly.label, 
-        count: counts.quarterly.count, 
-        revenue: counts.quarterly.revenue, 
-        percentage: Math.round((counts.quarterly.revenue / total) * 100) || 0,
-        color: 'from-purple-500 to-indigo-500'
-      },
-      { 
-        name: counts.annual.label, 
-        count: counts.annual.count, 
-        revenue: counts.annual.revenue, 
-        percentage: Math.round((counts.annual.revenue / total) * 100) || 0,
-        color: 'from-amber-400 to-orange-500'
+    const handledTxIds = new Set();
+
+    const items = availablePlans.map((plan, idx) => {
+      let count = 0;
+      let revenue = 0;
+
+      filteredTransactions.forEach(tx => {
+        if (matchesPlan(tx, plan)) {
+          count += 1;
+          revenue += (Number(tx.amount) || 0);
+          handledTxIds.add(tx.id || tx.razorpayPaymentId);
+        }
+      });
+
+      return {
+        id: plan.id,
+        name: `${plan.name} (₹${plan.price})`,
+        count,
+        revenue,
+        percentage: grossRevenue > 0 ? Math.round((revenue / total) * 100) : 0,
+        color: TIER_GRADIENTS[idx % TIER_GRADIENTS.length]
+      };
+    });
+
+    // Handle any unclassified transactions if present
+    let unclassifiedCount = 0;
+    let unclassifiedRevenue = 0;
+    filteredTransactions.forEach(tx => {
+      const key = tx.id || tx.razorpayPaymentId;
+      if (!handledTxIds.has(key)) {
+        unclassifiedCount += 1;
+        unclassifiedRevenue += (Number(tx.amount) || 0);
       }
-    ];
-  }, [filteredTransactions, grossRevenue]);
+    });
+
+    if (unclassifiedCount > 0) {
+      items.push({
+        id: 'other',
+        name: 'Other Custom Plans',
+        count: unclassifiedCount,
+        revenue: unclassifiedRevenue,
+        percentage: grossRevenue > 0 ? Math.round((unclassifiedRevenue / total) * 100) : 0,
+        color: 'from-blue-400 to-indigo-500'
+      });
+    }
+
+    return items;
+  }, [availablePlans, filteredTransactions, grossRevenue]);
 
   // Copy to clipboard helper
   const handleCopy = (text, id) => {
@@ -414,16 +490,18 @@ export const AdminRevenueScreen = () => {
               } focus:outline-none focus:border-pink-500`}
             >
               <option value="ALL">All Influencer Plans</option>
-              <option value="monthly">Monthly Pro (₹199)</option>
-              <option value="quarterly">Quarterly Star (₹499)</option>
-              <option value="annual">Annual VIP (₹1,499)</option>
+              {availablePlans.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name} (₹{p.price})
+                </option>
+              ))}
             </select>
           </div>
         </div>
       </div>
 
-      {/* 5 Financial Summary KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* 3 Financial Summary KPI Cards (Gross, Count, AOV) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Total Gross Revenue */}
         <div className={`p-4 rounded-3xl ${
           isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#130b26] border-emerald-500/25'
@@ -478,42 +556,6 @@ export const AdminRevenueScreen = () => {
             Per registration transaction
           </span>
         </div>
-
-        {/* Razorpay Gateway Fees */}
-        <div className={`p-4 rounded-3xl ${
-          isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#130b26] border-amber-500/25'
-        } border space-y-1`}>
-          <div className="flex items-center justify-between">
-            <span className={`text-[11px] font-bold ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>Razorpay Processing</span>
-            <div className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
-              <CreditCard className="w-4 h-4" />
-            </div>
-          </div>
-          <div className={`text-xl md:text-2xl font-extrabold ${isLight ? 'text-slate-900' : 'text-amber-400'} font-heading`}>
-            ₹{gatewayProcessingFees.toLocaleString()}
-          </div>
-          <span className="text-[10px] text-amber-500/80 font-semibold">
-            2% + 18% GST (Standard Rate)
-          </span>
-        </div>
-
-        {/* Net Settled Amount */}
-        <div className={`p-4 rounded-3xl ${
-          isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#130b26] border-pink-500/25'
-        } border space-y-1 col-span-2 lg:col-span-1`}>
-          <div className="flex items-center justify-between">
-            <span className={`text-[11px] font-bold ${isLight ? 'text-slate-600' : 'text-gray-400'}`}>Net Platform Settled</span>
-            <div className="w-7 h-7 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-xl md:text-2xl font-extrabold text-[#ff007a] font-heading">
-            ₹{netSettledRevenue.toLocaleString()}
-          </div>
-          <span className="text-[10px] text-pink-400 font-bold">
-            97.6% Net Realization
-          </span>
-        </div>
       </div>
 
       {/* Plan Breakdown Progress Cards */}
@@ -526,7 +568,7 @@ export const AdminRevenueScreen = () => {
               Revenue Inflow by Subscription Tier
             </h3>
             <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-              Distribution across Monthly (₹199), Quarterly (₹499), and Annual (₹1,499) tiers
+              Real-time revenue distribution across all active influencer subscription categories and passes
             </p>
           </div>
           <span className="text-xs font-bold text-pink-400">
@@ -548,7 +590,7 @@ export const AdminRevenueScreen = () => {
               <div className={`w-full h-2.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/10'}`}>
                 <div 
                   className={`h-full bg-gradient-to-r ${item.color} rounded-full transition-all duration-500`}
-                  style={{ width: `${Math.max(item.percentage, 4)}%` }}
+                  style={{ width: `${item.percentage > 0 ? Math.max(item.percentage, 3) : 0}%` }}
                 />
               </div>
             </div>
