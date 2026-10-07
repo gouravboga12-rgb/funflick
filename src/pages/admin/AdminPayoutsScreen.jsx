@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
-import { PayoutModal } from '../../components/admin/PayoutModal';
 import { 
   DollarSign, 
   Send, 
@@ -19,13 +18,16 @@ import {
   Sparkles,
   Building2,
   Smartphone,
-  Loader2
+  Loader2,
+  Receipt,
+  Printer,
+  ArrowRight,
+  ExternalLink
 } from 'lucide-react';
 
 export const AdminPayoutsScreen = () => {
   const { showToast } = useApp();
   const [creators, setCreators] = useState([]);
-  const [selectedCreator, setSelectedCreator] = useState(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('VIP Paid Creators');
   const [isLoading, setIsLoading] = useState(true);
@@ -47,6 +49,38 @@ export const AdminPayoutsScreen = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePrintHistoricalVoucher = (creator, voucher) => {
+    const w = window.open('', '_blank', 'width=640,height=760');
+    if (!w) return;
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const d = creator.payoutDetails;
+    const dest = d ? (d.account_number ? `${d.bank_name} • ${d.account_number} • ${d.ifsc_code}` : d.upi_id) : 'Registered contact';
+    const rows = [
+      ['Voucher ID', `#${voucher.id}`],
+      ['Date', voucher.date],
+      ['Creator', `${creator.name} (@${creator.username})`],
+      ['Disbursed Amount', `₹${Number(voucher.amount).toLocaleString('en-IN')}`],
+      ['Method', voucher.method],
+      ['UTR / Reference', voucher.reference],
+      ...(voucher.videoTitle ? [
+        ['Associated Video', voucher.videoTitle],
+        ['Milestone Settled', voucher.settledViews ? `${Number(voucher.settledViews).toLocaleString('en-IN')} views` : 'General']
+      ] : []),
+      ['Account Destination', dest],
+      ['Audit Note', voucher.notes || '—']
+    ];
+    w.document.write(`<!doctype html><html><head><title>FunFlick Voucher #${esc(voucher.id)}</title>
+      <style>body{font-family:Arial,sans-serif;padding:32px;color:#111}h1{font-size:20px;margin:0 0 4px}
+      p{color:#666;font-size:12px;margin:0 0 20px}table{width:100%;border-collapse:collapse;font-size:13px}
+      td{padding:10px;border-bottom:1px solid #eee}td:first-child{color:#666;width:38%}
+      .f{margin-top:28px;font-size:11px;color:#888}</style></head><body>
+      <h1>FunFlick — Official Payout Voucher</h1><p>Platform Accounting Record. Funds disbursed externally.</p>
+      <table>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td><strong>${esc(v)}</strong></td></tr>`).join('')}</table>
+      <div class="f">Generated: ${esc(new Date().toLocaleString('en-IN'))}</div>
+      <script>window.onload=()=>window.print()</script></body></html>`);
+    w.document.close();
   };
 
   useEffect(() => {
@@ -71,21 +105,21 @@ export const AdminPayoutsScreen = () => {
   const eligibleVipCount = creators.filter(c => Boolean(c.isInfluencer)).length;
 
   return (
-    <AdminLayout title="Influencer Payouts & Disbursal Engine">
+    <AdminLayout title="Creator Disbursal Ledger & Audit Trail">
       {/* Intro banner */}
       <div className="p-4 rounded-3xl bg-gradient-to-r from-pink-950/40 via-purple-950/40 to-[#1b1236] border border-pink-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-bold text-white font-heading">
-              Influencer View & Like Milestone Payouts
+              Creator Disbursal Ledger & Audit History
             </h2>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-pink-500/20 text-pink-300 border border-pink-500/30 flex items-center gap-1">
-              <Crown className="w-3 h-3 text-amber-400" />
-              <span>VIP Paid Creators</span>
+              <Receipt className="w-3 h-3 text-pink-400" />
+              <span>Official Accounting Ledger</span>
             </span>
           </div>
           <p className="text-xs text-gray-300 mt-1 max-w-xl leading-relaxed">
-            Review creator views & likes performance. Transfer payouts outside FunFlick using the creator's submitted Bank or UPI details, then click <strong>Mark as Paid</strong> to record the audit trail and send notification.
+            Read-only financial audit trail of all disbursed platform funds, UTR bank references, and creator accounts. To disburse rewards for specific videos, go to <a href="/admin/influencer-media" className="text-pink-300 font-bold underline hover:text-pink-200">Influencer Media & Rewards</a>.
           </p>
         </div>
 
@@ -146,7 +180,7 @@ export const AdminPayoutsScreen = () => {
                 <th className="py-3.5 px-4">Performance (Views / Likes)</th>
                 <th className="py-3.5 px-4">Payout Account Details</th>
                 <th className="py-3.5 px-4">Total Disbursed</th>
-                <th className="py-3.5 px-4 text-right">Admin Action</th>
+                <th className="py-3.5 px-4 text-right">Audit Slips</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-gray-200">
@@ -275,14 +309,27 @@ export const AdminPayoutsScreen = () => {
                         )}
                       </td>
 
-                      {/* Action */}
+                      {/* Audit Slips Action */}
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          onClick={() => setSelectedCreator(creator)}
-                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:brightness-110 text-white font-bold text-xs shadow-md shadow-pink-500/20 active:scale-95 transition cursor-pointer"
-                        >
-                          Review & Mark as Paid
-                        </button>
+                        {creator.payoutHistory && creator.payoutHistory.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedCreatorId(expandedCreatorId === creator.id ? null : creator.id)}
+                            className="px-3.5 py-1.5 rounded-xl bg-pink-500/15 hover:bg-pink-500/25 text-pink-300 font-bold text-xs border border-pink-500/30 transition cursor-pointer inline-flex items-center gap-1.5 shadow-sm active:scale-95"
+                          >
+                            <Receipt className="w-3.5 h-3.5 text-pink-400" />
+                            <span>{expandedCreatorId === creator.id ? 'Hide Vouchers ▴' : `View Vouchers (${creator.payoutHistory.length}) ▾`}</span>
+                          </button>
+                        ) : (
+                          <a
+                            href="/admin/influencer-media"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-pink-300 text-xs font-semibold border border-white/10 transition cursor-pointer"
+                            title="Reward this creator's videos on the Influencer Media page"
+                          >
+                            <span>Reward Videos</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </a>
+                        )}
                       </td>
                     </tr>
                     {expandedCreatorId === creator.id && creator.payoutHistory && creator.payoutHistory.length > 0 && (
@@ -309,7 +356,18 @@ export const AdminPayoutsScreen = () => {
                                     )}
                                     {h.notes && <div className="text-[10px] text-gray-400 italic">Note: {h.notes}</div>}
                                   </div>
-                                  <span className="text-[10px] text-gray-400 font-mono">{h.date}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-gray-400 font-mono">{h.date}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handlePrintHistoricalVoucher(creator, h)}
+                                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                                      title="Print voucher slip"
+                                    >
+                                      <Printer className="w-3 h-3 text-pink-400" />
+                                      <span>Print Slip</span>
+                                    </button>
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -325,16 +383,6 @@ export const AdminPayoutsScreen = () => {
           </table>
         </div>
       </div>
-
-      {/* Mark As Paid Modal */}
-      {selectedCreator && (
-        <PayoutModal
-          creator={selectedCreator}
-          isOpen={Boolean(selectedCreator)}
-          onClose={() => setSelectedCreator(null)}
-          onPaidSuccess={fetchEligibleCreators}
-        />
-      )}
     </AdminLayout>
   );
 };
