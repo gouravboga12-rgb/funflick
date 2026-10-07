@@ -829,7 +829,7 @@ export async function adminLogin(req, res) {
       const token = jwt.sign(
         { id: adminUser.id, username: adminUser.username, email: adminUser.email, role: 'admin', isAdminSession: true },
         process.env.JWT_SECRET || 'funflick_secret',
-        { expiresIn: '1d' }
+        { expiresIn: '30d' }
       );
 
       return res.json({

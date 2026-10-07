@@ -1,17 +1,26 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Lock, Mail, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, Eye, EyeOff, ArrowRight, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const AdminLoginScreen = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const isSessionExpired = location.state?.expired || searchParams.get('expired') === '1';
   const { showToast } = useApp();
 
-  const [identifier, setIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState('funflick0308@gmail.com');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isSessionExpired) {
+      showToast('⚠️ Admin session expired. Please sign in again.', 'info');
+    }
+  }, [isSessionExpired]);
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
@@ -30,32 +39,15 @@ export const AdminLoginScreen = () => {
 
       const data = await res.json();
       if (res.ok && data.success && data.token) {
-        // Dedicated admin-only session token (isolated from user app)
+        // Dedicated admin-only session bearer token for AWS API communication
         localStorage.setItem('funflick_admin_token', data.token);
-        localStorage.setItem('funflick_admin_user', JSON.stringify(data.adminUser));
-        showToast('🛡️ Administrator identity verified. Welcome to Admin Center.', 'success');
+        showToast('🛡️ Administrator identity verified on AWS. Welcome to Admin Center.', 'success');
         navigate('/admin');
       } else {
         showToast(data.error || 'Invalid administrator credentials', 'error');
       }
     } catch (err) {
-      // Offline fallback for testing
-      if ((identifier.toLowerCase().trim() === 'funflick0308@gmail.com' || identifier.toLowerCase().trim() === 'admin') && password === 'FunFlicks@12') {
-        const adminUser = {
-          id: 999999,
-          name: 'FunFlick Super Administrator',
-          username: 'super_admin',
-          email: 'funflick0308@gmail.com',
-          role: 'admin',
-          avatar_url: '/brand/funflick-logo.png'
-        };
-        localStorage.setItem('funflick_admin_token', 'local_admin_token_active');
-        localStorage.setItem('funflick_admin_user', JSON.stringify(adminUser));
-        showToast('🛡️ Welcome Super Administrator!', 'success');
-        navigate('/admin');
-      } else {
-        showToast('Authentication failed: Invalid credentials', 'error');
-      }
+      showToast('Could not reach AWS backend. Please check your network connection.', 'error');
     } finally {
       setLoading(false);
     }
@@ -89,6 +81,17 @@ export const AdminLoginScreen = () => {
             </p>
           </div>
         </div>
+
+        {/* Session Expired Banner */}
+        {isSessionExpired && (
+          <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-xs text-amber-300 flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-400" />
+            <div className="min-w-0">
+              <p className="font-bold text-amber-200">Admin Session Expired</p>
+              <p className="text-[11px] text-amber-300/80">Your security token has expired. Sign in to restore full administrative controls.</p>
+            </div>
+          </div>
+        )}
 
         {/* Security Alert Badge */}
         <div className="p-3 rounded-2xl bg-pink-500/10 border border-pink-500/20 text-xs text-pink-300 flex items-center gap-2">

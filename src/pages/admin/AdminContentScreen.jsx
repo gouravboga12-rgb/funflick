@@ -87,6 +87,13 @@ export const AdminContentScreen = () => {
         if (data.content && Array.isArray(data.content)) {
           setContentList(data.content);
         }
+      } else if (res.status === 401 || res.status === 403) {
+        if (localStorage.getItem('funflick_admin_token')) {
+          localStorage.removeItem('funflick_admin_token');
+          localStorage.removeItem('funflick_admin_user');
+          window.location.href = '/admin/login?expired=1';
+          return;
+        }
       } else {
         // Fallback for pending
         if (selectedTab === 'Pending') {

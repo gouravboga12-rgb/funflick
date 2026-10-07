@@ -82,12 +82,10 @@ export const AdminSubscriptionsScreen = () => {
   const [subscriberFilter, setSubscriberFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Real Database-driven & LocalStorage-persisted subscribers list
+  // Real Database-driven subscribers list from AWS
   const subscribers = useMemo(() => {
     if (!subscriptionTransactions || subscriptionTransactions.length === 0) {
-      return [
-        { id: 'sub_1', user: 'Srilatha Reddy', username: 'srilatha_16', plan: 'Weekly Influencer', price: '₹99', start: '06 Oct 2026', expiry: '13 Oct 2026', status: 'Active', paymentId: 'pay_rzp_starter1' }
-      ];
+      return [];
     }
 
     const now = new Date();

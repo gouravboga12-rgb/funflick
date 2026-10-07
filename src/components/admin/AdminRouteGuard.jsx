@@ -14,5 +14,25 @@ export const AdminRouteGuard = ({ children }) => {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
+  // Validate JWT expiration strictly against AWS token
+  if (adminToken) {
+    try {
+      const parts = adminToken.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          localStorage.removeItem('funflick_admin_token');
+          return <Navigate to="/admin/login" state={{ from: location, expired: true }} replace />;
+        }
+      } else {
+        localStorage.removeItem('funflick_admin_token');
+        return <Navigate to="/admin/login" state={{ from: location }} replace />;
+      }
+    } catch (e) {
+      localStorage.removeItem('funflick_admin_token');
+      return <Navigate to="/admin/login" state={{ from: location }} replace />;
+    }
+  }
+
   return children;
 };

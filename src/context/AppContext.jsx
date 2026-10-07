@@ -1,28 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
-  CURRENT_USER,
   DEFAULT_AVATAR,
-  INITIAL_POSTS,
-  INITIAL_STORIES,
-  CREATORS,
-  INITIAL_TRANSACTIONS,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_CONVERSATIONS,
-  CREATOR_VIDEOS,
-  INITIAL_PAYOUTS,
-  ADMIN_PENDING_APPROVALS,
-  PUBLISHING_PLANS,
-  INFLUENCER_SUBSCRIPTION_PLANS,
-  INITIAL_INFLUENCER_MEDIA,
-  INITIAL_ADS,
-  INITIAL_USER_SUBMISSIONS,
-  INITIAL_COPYRIGHT_REPORTS,
-  INITIAL_SUBSCRIPTION_TRANSACTIONS
+  INFLUENCER_SUBSCRIPTION_PLANS
 } from '../data/mockData';
 
 const AppContext = createContext(null);
 
-// Clean up all local storage data - all application state uses AWS MySQL database
+// Clean up all local storage data - all application state uses AWS MySQL database exclusively
 if (typeof window !== 'undefined') {
   try {
     const keysToClean = [
@@ -34,45 +18,31 @@ if (typeof window !== 'undefined') {
       'funflick_user_likes', 'funflick_following_list',
       'funflick_followers_list', 'funflick_follow_requests',
       'funflick_txs', 'funflick_blocked', 'funflick_publishing_plans',
-      'funflick_media_limits'
+      'funflick_media_limits', 'funflick_user', 'funflick_admin_user',
+      'funflick_admin_transactions', 'funflick_subscription_status'
     ];
     keysToClean.forEach(k => localStorage.removeItem(k));
   } catch (e) {}
 }
 
 export const AppProvider = ({ children }) => {
-  // Current user state (Unified Viewer + Influencer)
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('funflick_user');
-    let userObj = CURRENT_USER;
-    if (saved) {
-      try {
-        userObj = { ...JSON.parse(saved) };
-      } catch (e) {}
-    }
-
-    // Clean any broken/expired blob URLs that cannot survive page refresh
-    let safeAvatar = userObj.avatar;
-    if (!safeAvatar || safeAvatar.startsWith('blob:')) {
-      safeAvatar = (userObj.avatar_url && !userObj.avatar_url.startsWith('blob:'))
-        ? userObj.avatar_url
-        : DEFAULT_AVATAR;
-    }
-
-    const freshState = {
-      ...userObj,
-      avatar: safeAvatar,
-      avatar_url: safeAvatar,
-      hasPublishingSubscription: true, // Free upload for everyone!
-      isInfluencer: !!userObj.isInfluencer,
-      accountStatus: userObj.isInfluencer ? 'Influencer' : 'User',
-      subscriptionPlan: userObj.subscriptionPlan || null
-    };
-    try {
-      localStorage.setItem('funflick_user', JSON.stringify(freshState));
-    } catch (e) {}
-    return freshState;
-  });
+  // Current user state (Unified Viewer + Influencer - populated strictly from AWS /api/auth/me)
+  const [currentUser, setCurrentUser] = useState(() => ({
+    id: null,
+    name: 'FunFlick Member',
+    username: 'member',
+    email: '',
+    avatar: DEFAULT_AVATAR,
+    avatar_url: DEFAULT_AVATAR,
+    bio: '',
+    role: 'user',
+    isInfluencer: false,
+    hasPublishingSubscription: true,
+    accountStatus: 'User',
+    subscriptionPlan: null,
+    stats: { posts: 0, following: 0, followers: '0' },
+    walletBalance: 0
+  }));
 
   // Track session authentication (ensure new visitors get Get Started / Splash first)
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -103,6 +73,7 @@ export const AppProvider = ({ children }) => {
       fetchAdminStats();
     }
 
+    // Load authentic user profile strictly from AWS MySQL
     fetch('/api/auth/me', {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -114,16 +85,13 @@ export const AppProvider = ({ children }) => {
           setCurrentUser(prev => {
             const rawAvatar = data.user.avatar_url || data.user.avatar || prev.avatar;
             const validAvatar = (rawAvatar && !rawAvatar.startsWith('blob:')) ? rawAvatar : DEFAULT_AVATAR;
-            const merged = {
+            return {
               ...prev,
               ...data.user,
               avatar: validAvatar,
               avatar_url: validAvatar,
+              hasPublishingSubscription: true
             };
-            try {
-              localStorage.setItem('funflick_user', JSON.stringify(merged));
-            } catch (e) {}
-            return merged;
           });
           if (data.user.role === 'admin') {
             fetchAdminPendingContent();
@@ -148,9 +116,6 @@ export const AppProvider = ({ children }) => {
           email: customUser.email || prev.email,
           phone: customUser.phone !== undefined ? customUser.phone : prev.phone
         };
-        try {
-          localStorage.setItem('funflick_user', JSON.stringify(next));
-        } catch (e) {}
         return next;
       });
     }
@@ -167,85 +132,86 @@ export const AppProvider = ({ children }) => {
     sessionStorage.removeItem('funflick_authenticated');
     localStorage.removeItem('funflick_token');
     sessionStorage.removeItem('funflick_token');
-    localStorage.removeItem('funflick_user');
     setMyMedia([]);
+    setCurrentUser({
+      id: null,
+      name: 'FunFlick Member',
+      username: 'member',
+      email: '',
+      avatar: DEFAULT_AVATAR,
+      avatar_url: DEFAULT_AVATAR,
+      bio: '',
+      role: 'user',
+      isInfluencer: false,
+      hasPublishingSubscription: true,
+      accountStatus: 'User',
+      subscriptionPlan: null,
+      stats: { posts: 0, following: 0, followers: '0' },
+      walletBalance: 0
+    });
   };
 
   // User video submissions (in-memory session state)
   const [userSubmissions, setUserSubmissions] = useState([]);
 
-  // Posts feed state (Live from AWS MySQL database)
+  // Posts feed state (Live exclusively from AWS MySQL database)
   const [posts, setPosts] = useState([]);
 
-  // Stories state
-  const [stories, setStories] = useState(INITIAL_STORIES);
+  // Stories state (Live exclusively from AWS MySQL database)
+  const [stories, setStories] = useState([]);
 
-  // Creators state
-  const [creators, setCreators] = useState(CREATORS);
+  // Creators state (Live exclusively from AWS MySQL database)
+  const [creators, setCreators] = useState([]);
 
-  // Wallet & transactions
+  // Wallet & transactions (Live exclusively from AWS MySQL database)
   const [transactions, setTransactions] = useState([]);
 
-  // Notifications
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  // Notifications (Live exclusively from AWS MySQL database)
+  const [notifications, setNotifications] = useState([]);
 
-  // Inbox & Chat
-  const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
+  // Inbox & Chat (Live exclusively from AWS MySQL database)
+  const [conversations, setConversations] = useState([]);
 
-  // Creator studio videos
+  // Creator studio videos (Live exclusively from AWS MySQL database)
   const [creatorVideos, setCreatorVideos] = useState([]);
 
-  // Admin payouts
-  const [adminPayouts, setAdminPayouts] = useState(INITIAL_PAYOUTS);
+  // Admin payouts (Live exclusively from AWS MySQL database)
+  const [adminPayouts, setAdminPayouts] = useState([]);
 
   // Global Influencer Subscription Plans
   const [publishingPlans, setPublishingPlans] = useState(INFLUENCER_SUBSCRIPTION_PLANS || PUBLISHING_PLANS);
 
-  // User Registration & Influencer Subscription Transactions
-  const [subscriptionTransactions, setSubscriptionTransactions] = useState(() => {
-    try {
-      const saved = localStorage.getItem('funflick_admin_transactions');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  // User Registration & Influencer Subscription Transactions (Live from AWS MySQL)
+  const [subscriptionTransactions, setSubscriptionTransactions] = useState([]);
 
-  // Influencer Media Items (For Admin Review & Rewards)
+  // Influencer Media Items (Live from AWS MySQL)
   const [influencerMedia, setInfluencerMedia] = useState([]);
 
-  // Ads & Promotions (For Admin Management & In-App Popups)
-  const [adsList, setAdsList] = useState(() => {
-    try {
-      const saved = localStorage.getItem('funflick_ads');
-      return saved ? JSON.parse(saved) : (INITIAL_ADS || []);
-    } catch (e) {
-      return INITIAL_ADS || [];
-    }
-  });
+  // Ads & Promotions (Live exclusively from AWS MySQL database)
+  const [adsList, setAdsList] = useState([]);
 
   // Active Mobile Popup Ad
   const [activePopupAd, setActivePopupAd] = useState(null);
 
-  // Admin pending video approvals
+  // Admin pending video approvals (Live exclusively from AWS MySQL database)
   const [pendingApprovals, setPendingApprovals] = useState([]);
 
-  // Authenticated user's private media library (database-enforced isolation)
+  // Authenticated user's private media library (Live exclusively from AWS MySQL database)
   const [myMedia, setMyMedia] = useState([]);
 
-  // Live Admin overview metrics from database
+  // Live Admin overview metrics from AWS MySQL database
   const [adminStats, setAdminStats] = useState(null);
 
   // Centralized single-video playback state (ensures only 1 reel plays at a time)
   const [activePlayingVideoId, setActivePlayingVideoId] = useState(null);
 
-  // Copyright & Plagiarism Dispute Reports
+  // Copyright & Plagiarism Dispute Reports (Live from AWS MySQL database)
   const [copyrightReports, setCopyrightReports] = useState([]);
 
-  // Blocked users list (Instagram-style block feature)
+  // Blocked users list
   const [blockedUsers, setBlockedUsers] = useState([]);
 
-  // Followers, Following, and Follow Requests (Instagram Style)
+  // Followers, Following, and Follow Requests (Live from AWS MySQL database)
   const [followingList, setFollowingList] = useState([]);
   const [followersList, setFollowersList] = useState([]);
   const [followRequests, setFollowRequests] = useState([]);
@@ -259,30 +225,15 @@ export const AppProvider = ({ children }) => {
   // Active Story Viewer Modal
   const [activeStoryGroup, setActiveStoryGroup] = useState(null);
 
-  // Real database-backed user subscription status & history
-  const [subscriptionStatus, setSubscriptionStatus] = useState(() => {
-    try {
-      const saved = localStorage.getItem('funflick_subscription_status');
-      return saved ? JSON.parse(saved) : {
-        isActive: false,
-        isExpired: false,
-        planName: null,
-        startDate: null,
-        expiresAt: null,
-        daysRemaining: 0,
-        history: []
-      };
-    } catch (e) {
-      return {
-        isActive: false,
-        isExpired: false,
-        planName: null,
-        startDate: null,
-        expiresAt: null,
-        daysRemaining: 0,
-        history: []
-      };
-    }
+  // Real database-backed user subscription status & history (strictly from AWS)
+  const [subscriptionStatus, setSubscriptionStatus] = useState({
+    isActive: false,
+    isExpired: false,
+    planName: null,
+    startDate: null,
+    expiresAt: null,
+    daysRemaining: 0,
+    history: []
   });
 
   // App Theme state ('dark' | 'light')
@@ -388,6 +339,15 @@ export const AppProvider = ({ children }) => {
         if (data.pending && Array.isArray(data.pending)) {
           setPendingApprovals(data.pending);
         }
+      } else if (res.status === 401 || res.status === 403) {
+        // Token expired or invalid
+        if (localStorage.getItem('funflick_admin_token')) {
+          localStorage.removeItem('funflick_admin_token');
+          localStorage.removeItem('funflick_admin_user');
+          if (window.location.pathname.startsWith('/admin') && window.location.pathname !== '/admin/login') {
+            window.location.href = '/admin/login?expired=1';
+          }
+        }
       }
     } catch (err) {
       console.warn('Could not fetch live pending approvals:', err);
@@ -407,13 +367,21 @@ export const AppProvider = ({ children }) => {
         if (data.stats) {
           setAdminStats(data.stats);
         }
+      } else if (res.status === 401 || res.status === 403) {
+        if (localStorage.getItem('funflick_admin_token')) {
+          localStorage.removeItem('funflick_admin_token');
+          localStorage.removeItem('funflick_admin_user');
+          if (window.location.pathname.startsWith('/admin') && window.location.pathname !== '/admin/login') {
+            window.location.href = '/admin/login?expired=1';
+          }
+        }
       }
     } catch (err) {
       console.warn('Could not fetch admin platform stats:', err);
     }
   };
 
-  // Admin Revenue — fetch real subscription payment transactions from MySQL
+  // Admin Revenue — fetch real subscription payment transactions from AWS MySQL
   const fetchAdminTransactions = async () => {
     try {
       const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
@@ -423,9 +391,8 @@ export const AppProvider = ({ children }) => {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.transactions && Array.isArray(data.transactions) && data.transactions.length > 0) {
+          if (data.transactions && Array.isArray(data.transactions)) {
             setSubscriptionTransactions(data.transactions);
-            try { localStorage.setItem('funflick_admin_transactions', JSON.stringify(data.transactions)); } catch (e) {}
             return;
           }
         }
@@ -433,41 +400,22 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.warn('Could not fetch admin subscription transactions:', err);
     }
-
-    try {
-      const cached = localStorage.getItem('funflick_admin_transactions');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSubscriptionTransactions(parsed);
-        }
-      }
-    } catch (e) {}
   };
 
-  // Admin Ads & In-App Promotions — fetch and sync with MySQL & localStorage
+  // Admin Ads & In-App Promotions — fetch and sync with AWS MySQL exclusively
   const fetchAdminAds = async () => {
     try {
       const res = await fetch('/api/admin/ads');
       if (res.ok) {
         const data = await res.json();
-        if (data.ads && Array.isArray(data.ads) && data.ads.length > 0) {
+        if (data.ads && Array.isArray(data.ads)) {
           setAdsList(data.ads);
-          try { localStorage.setItem('funflick_ads', JSON.stringify(data.ads)); } catch (e) {}
           return;
         }
       }
     } catch (err) {
       console.warn('Could not fetch platform ads from server:', err);
     }
-
-    try {
-      const cached = localStorage.getItem('funflick_ads');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) setAdsList(parsed);
-      }
-    } catch (e) {}
   };
 
   // Admin Influencer Media Items — fetch and sync with MySQL & live posts
@@ -1177,20 +1125,15 @@ export const AppProvider = ({ children }) => {
           history: data.history || []
         };
         setSubscriptionStatus(updatedStatus);
-        try { localStorage.setItem('funflick_subscription_status', JSON.stringify(updatedStatus)); } catch (e) {}
 
-        setCurrentUser(prev => {
-          const updated = {
-            ...prev,
-            isInfluencer: Boolean(data.isActive),
-            subscriptionPlan: data.isActive ? data.planName : (prev.subscriptionPlan || null),
-            subscriptionStart: data.startDate,
-            subscriptionExpiresAt: data.expiresAt,
-            subscriptionDaysRemaining: Number(data.daysRemaining) || 0
-          };
-          try { localStorage.setItem('funflick_user', JSON.stringify(updated)); } catch (e) {}
-          return updated;
-        });
+        setCurrentUser(prev => ({
+          ...prev,
+          isInfluencer: Boolean(data.isActive),
+          subscriptionPlan: data.isActive ? data.planName : (prev.subscriptionPlan || null),
+          subscriptionStart: data.startDate,
+          subscriptionExpiresAt: data.expiresAt,
+          subscriptionDaysRemaining: Number(data.daysRemaining) || 0
+        }));
       }
     } catch (err) {
       console.warn('Failed to fetch user subscription status:', err);
@@ -1285,31 +1228,22 @@ export const AppProvider = ({ children }) => {
       history: [newTransaction, ...(subscriptionStatus.history || [])]
     };
     setSubscriptionStatus(newStatus);
-    try { localStorage.setItem('funflick_subscription_status', JSON.stringify(newStatus)); } catch (e) {}
 
     // 4. Update Current User
-    setCurrentUser(prev => {
-      const updatedUser = {
-        ...prev,
-        isInfluencer: true,
-        hasInfluencerSubscription: true,
-        hasPublishingSubscription: true,
-        accountStatus: 'Influencer',
-        subscriptionPlan: plan.name,
-        subscriptionStart: baseStart,
-        subscriptionExpiresAt: newExpiryDate.toISOString(),
-        subscriptionDaysRemaining: totalRemainingDays
-      };
-      try { localStorage.setItem('funflick_user', JSON.stringify(updatedUser)); } catch (e) {}
-      return updatedUser;
-    });
+    setCurrentUser(prev => ({
+      ...prev,
+      isInfluencer: true,
+      hasInfluencerSubscription: true,
+      hasPublishingSubscription: true,
+      accountStatus: 'Influencer',
+      subscriptionPlan: plan.name,
+      subscriptionStart: baseStart,
+      subscriptionExpiresAt: newExpiryDate.toISOString(),
+      subscriptionDaysRemaining: totalRemainingDays
+    }));
 
     // 5. Update subscription transactions ledger (for admin revenue & subscriber list)
-    setSubscriptionTransactions(prev => {
-      const updated = [newTransaction, ...prev.filter(t => t.razorpayPaymentId !== newTransaction.razorpayPaymentId)];
-      try { localStorage.setItem('funflick_admin_transactions', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
+    setSubscriptionTransactions(prev => [newTransaction, ...prev.filter(t => t.razorpayPaymentId !== newTransaction.razorpayPaymentId)]);
 
     // 6. Send real subscription event to backend MySQL
     const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
@@ -1605,11 +1539,7 @@ export const AppProvider = ({ children }) => {
       actionText: adData.actionText || 'Learn More'
     };
 
-    setAdsList(prev => {
-      const updated = [newAd, ...prev.filter(a => a.id !== newAd.id)];
-      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
+    setAdsList(prev => [newAd, ...prev.filter(a => a.id !== newAd.id)]);
 
     const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     try {
@@ -1626,11 +1556,7 @@ export const AppProvider = ({ children }) => {
 
   // Admin: Update Ad
   const updateAd = async (id, adData) => {
-    setAdsList(prev => {
-      const updated = prev.map(ad => ad.id === id ? { ...ad, ...adData } : ad);
-      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
+    setAdsList(prev => prev.map(ad => ad.id === id ? { ...ad, ...adData } : ad));
 
     const target = adsList.find(a => a.id === id);
     if (target) {
@@ -1649,11 +1575,7 @@ export const AppProvider = ({ children }) => {
 
   // Admin: Delete Ad
   const deleteAd = async (id) => {
-    setAdsList(prev => {
-      const updated = prev.filter(ad => ad.id !== id);
-      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
+    setAdsList(prev => prev.filter(ad => ad.id !== id));
 
     const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     try {
@@ -1668,27 +1590,19 @@ export const AppProvider = ({ children }) => {
 
   // Admin: Toggle Ad Active / Inactive
   const toggleAdStatus = (id) => {
-    setAdsList(prev => {
-      const updated = prev.map(ad => {
-        if (ad.id === id) {
-          const nextStatus = !ad.active;
-          showToast(`Ad "${ad.title}" is now ${nextStatus ? 'ACTIVE' : 'INACTIVE'}`, 'info');
-          return { ...ad, active: nextStatus };
-        }
-        return ad;
-      });
-      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
+    setAdsList(prev => prev.map(ad => {
+      if (ad.id === id) {
+        const nextStatus = !ad.active;
+        showToast(`Ad "${ad.title}" is now ${nextStatus ? 'ACTIVE' : 'INACTIVE'}`, 'info');
+        return { ...ad, active: nextStatus };
+      }
+      return ad;
+    }));
   };
 
   // Track Real Ad Impression
   const recordAdImpression = (adId) => {
-    setAdsList(prev => {
-      const updated = prev.map(a => a.id === adId ? { ...a, impressions: (a.impressions || 0) + 1 } : a);
-      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
+    setAdsList(prev => prev.map(a => a.id === adId ? { ...a, impressions: (a.impressions || 0) + 1 } : a));
     try {
       fetch(`/api/admin/ads/${adId}/metric`, {
         method: 'POST',
@@ -1700,11 +1614,7 @@ export const AppProvider = ({ children }) => {
 
   // Track Real Ad Click
   const recordAdClick = (adId) => {
-    setAdsList(prev => {
-      const updated = prev.map(a => a.id === adId ? { ...a, clicks: (a.clicks || 0) + 1 } : a);
-      try { localStorage.setItem('funflick_ads', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
+    setAdsList(prev => prev.map(a => a.id === adId ? { ...a, clicks: (a.clicks || 0) + 1 } : a));
     try {
       fetch(`/api/admin/ads/${adId}/metric`, {
         method: 'POST',
@@ -2554,20 +2464,16 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
   };
 
-  // Reset demo data
-  const resetDemoData = () => {
-    localStorage.clear();
-    setCurrentUser(CURRENT_USER);
-    setUserSubmissions(INITIAL_USER_SUBMISSIONS);
-    setPosts(INITIAL_POSTS);
-    setStories(INITIAL_STORIES);
-    setCreators(CREATORS);
-    setTransactions(INITIAL_TRANSACTIONS);
-    setNotifications(INITIAL_NOTIFICATIONS);
-    setConversations(INITIAL_CONVERSATIONS);
-    setAdminPayouts(INITIAL_PAYOUTS);
-    setPendingApprovals(ADMIN_PENDING_APPROVALS);
-    showToast('Demo data reset to factory state!', 'info');
+  // Reset state directly from live AWS database
+  const resetDemoData = async () => {
+    await Promise.all([
+      fetchLiveVideos(),
+      fetchLiveStories(),
+      fetchLiveCreators(),
+      fetchAdminStats(),
+      fetchAdminPendingContent()
+    ]);
+    showToast('Platform data synchronized fresh from AWS backend!', 'info');
   };
 
   return (

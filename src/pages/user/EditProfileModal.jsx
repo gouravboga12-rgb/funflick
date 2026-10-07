@@ -88,10 +88,6 @@ export const EditProfileModal = ({ isOpen, onClose }) => {
       };
 
       setCurrentUser(updatedUser);
-      try {
-        localStorage.setItem('funflick_user', JSON.stringify(updatedUser));
-      } catch (e) {}
-
       showToast('Profile updated & saved to AWS! ✨', 'success');
       onClose();
     } catch (err) {

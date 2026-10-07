@@ -89,17 +89,13 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
       }
     }
 
-    setCurrentUser(prev => {
-      const next = {
-        ...prev,
-        email: savedUser?.email ?? cleanEmail,
-        phone: savedUser?.phone ?? cleanPhone,
-        isPrivate,
-        allowDMs
-      };
-      try { localStorage.setItem('funflick_user', JSON.stringify(next)); } catch (err) {}
-      return next;
-    });
+    setCurrentUser(prev => ({
+      ...prev,
+      email: savedUser?.email ?? cleanEmail,
+      phone: savedUser?.phone ?? cleanPhone,
+      isPrivate,
+      allowDMs
+    }));
 
     setSaving(false);
     showToast('⚙️ Account settings saved successfully!', 'success');
