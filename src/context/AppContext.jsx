@@ -1750,6 +1750,45 @@ export const AppProvider = ({ children }) => {
     setActivePopupAd(null);
   };
 
+  // Automatic Global Ad Frequency Engine (Handles "On App Open" and "Once per session")
+  useEffect(() => {
+    if (!adsList || adsList.length === 0) return;
+
+    // Do not trigger popups on admin center or auth flow
+    const pathname = window.location.pathname;
+    if (
+      pathname.startsWith('/admin') ||
+      pathname === '/login' ||
+      pathname === '/signup' ||
+      pathname === '/verify' ||
+      pathname === '/forgot-password'
+    ) {
+      return;
+    }
+
+    // 1. Check for "On App Open" active ads
+    const onOpenAd = adsList.find(a => a.active && a.frequency === 'On App Open');
+    if (onOpenAd) {
+      const timer = setTimeout(() => {
+        showMobileAd(onOpenAd.id);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+
+    // 2. Check for "Once per session" active ads
+    const sessionAd = adsList.find(a => a.active && a.frequency === 'Once per session');
+    if (sessionAd) {
+      const sessionKey = `funflick_session_seen_${sessionAd.id}`;
+      if (!sessionStorage.getItem(sessionKey)) {
+        sessionStorage.setItem(sessionKey, 'true');
+        const timer = setTimeout(() => {
+          showMobileAd(sessionAd.id);
+        }, 1200);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [adsList]);
+
   // Publish a new Post
   const publishNewPost = (newPostData) => {
     const newPost = {

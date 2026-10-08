@@ -29,21 +29,11 @@ export const MobileAdPopup = () => {
       return;
     }
 
-    const isVideoMedia = (
-      activePopupAd.type === 'video' ||
-      /\.(mp4|webm|mov|m4v)($|\?)/i.test(activePopupAd.mediaUrl || '') ||
-      (typeof activePopupAd.mediaUrl === 'string' && activePopupAd.mediaUrl.startsWith('data:video/'))
-    );
+    // Determine countdown seconds before close option can be shown for this video or image
+    const rawCloseAfter = Number(activePopupAd.allowCloseAfter);
+    const rawDuration = Number(activePopupAd.duration);
+    const closeAfter = rawCloseAfter > 0 ? rawCloseAfter : (rawDuration > 0 ? rawDuration : 5);
 
-    // For Image Ads or allowCloseAfter === 0, can close immediately!
-    if (!isVideoMedia || !activePopupAd.allowCloseAfter || Number(activePopupAd.allowCloseAfter) <= 0) {
-      setCanClose(true);
-      setSecondsRemaining(0);
-      return;
-    }
-
-    // For Video Ads: countdown until allowCloseAfter seconds reach 0
-    const closeAfter = Number(activePopupAd.allowCloseAfter);
     setSecondsRemaining(closeAfter);
     setCanClose(false);
 

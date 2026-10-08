@@ -196,7 +196,7 @@ export const AdminAdsScreen = () => {
       name: 'Delicious Food Deal (Image)',
       type: 'image',
       duration: 10,
-      closeAfter: 0,
+      closeAfter: 5,
       url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80',
       thumb: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80'
     }
@@ -507,7 +507,7 @@ export const AdminAdsScreen = () => {
                         setCurrentAd(prev => ({
                           ...prev,
                           type: 'image',
-                          allowCloseAfter: 0,
+                          allowCloseAfter: prev.allowCloseAfter || 8,
                           mediaUrl: isCurrentlyVideo ? 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80' : prev.mediaUrl,
                           thumbnailUrl: isCurrentlyVideo ? 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80' : prev.thumbnailUrl
                         }));
@@ -519,7 +519,7 @@ export const AdminAdsScreen = () => {
                       }`}
                     >
                       <ImageIcon className="w-4 h-4" />
-                      <span>Image Ad (Instant Close X)</span>
+                      <span>Image Ad (With Countdown)</span>
                     </button>
                   </div>
                 </div>
@@ -745,7 +745,7 @@ export const AdminAdsScreen = () => {
                       {currentAd.allowCloseAfter === 0 
                         ? '0 = Can close immediately' 
                         : currentAd.allowCloseAfter >= currentAd.duration
-                          ? 'Must watch entire video'
+                          ? 'Must watch entire media duration'
                           : `Shows countdown "Close in ${currentAd.allowCloseAfter}s"`}
                     </span>
                   </div>
@@ -765,8 +765,12 @@ export const AdminAdsScreen = () => {
                       <option value="Every 3 Reels">Every 3 Reels</option>
                       <option value="On App Open">On App Open</option>
                       <option value="Once per session">Once per session</option>
-                      <option value="Manual Demo Only">Manual Demo Only</option>
                     </select>
+                    <span className="text-[10px] text-gray-400 block mt-0.5">
+                      {currentAd.frequency === 'On App Open' && '⚡ Triggers popup overlay whenever users open the app'}
+                      {currentAd.frequency === 'Once per session' && '🎯 Shows popup once per browser session'}
+                      {currentAd.frequency === 'Every 3 Reels' && '🎬 Triggers every 3 reels while scrolling'}
+                    </span>
                   </div>
 
                   <div className="space-y-1">
