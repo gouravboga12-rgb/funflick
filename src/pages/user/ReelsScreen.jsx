@@ -42,12 +42,32 @@ export const ReelsScreen = () => {
     };
   }, [currentPost?.id, setActivePlayingVideoId]);
 
+  // Check if an ad has "On App Open" frequency
+  useEffect(() => {
+    const onOpenAd = adsList?.find(a => a.active && a.frequency === 'On App Open');
+    if (onOpenAd) {
+      const timer = setTimeout(() => {
+        showMobileAd(onOpenAd.id);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [adsList]);
+
   const handleNext = () => {
+    const hasActiveAds = adsList?.some(a => a.active);
     if (currentIdx < visiblePosts.length - 1) {
       const nextIdx = currentIdx + 1;
       setCurrentIdx(nextIdx);
-      // Automatically trigger Admin In-App Advertisement every 3 reels!
-      if (nextIdx > 0 && nextIdx % 3 === 0 && adsList?.some(a => a.active)) {
+      // Trigger sponsor ad every 3 reels, or on reaching the end if fewer than 3 reels exist
+      if (hasActiveAds) {
+        if (nextIdx > 0 && (nextIdx % 3 === 0 || (visiblePosts.length <= 2 && nextIdx === visiblePosts.length - 1))) {
+          showMobileAd();
+        }
+      }
+    } else if (visiblePosts.length > 0) {
+      // Loop back to first reel smoothly and trigger ad
+      setCurrentIdx(0);
+      if (hasActiveAds) {
         showMobileAd();
       }
     }
@@ -56,6 +76,8 @@ export const ReelsScreen = () => {
   const handlePrev = () => {
     if (currentIdx > 0) {
       setCurrentIdx(prev => prev - 1);
+    } else if (visiblePosts.length > 0) {
+      setCurrentIdx(visiblePosts.length - 1);
     }
   };
 

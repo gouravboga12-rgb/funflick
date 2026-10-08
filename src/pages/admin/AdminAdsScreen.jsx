@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useApp } from '../../context/AppContext';
 import api from '../../services/api';
@@ -29,6 +30,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const AdminAdsScreen = () => {
+  const navigate = useNavigate();
   const { adsList, createAd, updateAd, deleteAd, toggleAdStatus, showMobileAd, showToast, theme, fetchAdminAds } = useApp();
   const isLight = theme === 'light';
 
@@ -79,8 +81,7 @@ export const AdminAdsScreen = () => {
 
   const processUploadedFile = async (file) => {
     setIsUploading(true);
-    const isVideo = file.type.startsWith('video');
-    const isImage = file.type.startsWith('image');
+    const isVideo = file.type.startsWith('video') || /\.(mp4|webm|mov|m4v)($|\?)/i.test(file.name);
     const targetType = isVideo ? 'video' : 'image';
     const fileSizeFormatted = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
 
@@ -109,9 +110,9 @@ export const AdminAdsScreen = () => {
         ...prev,
         type: targetType,
         mediaUrl: fileUrl,
-        thumbnailUrl: isImage ? fileUrl : (prev.thumbnailUrl || fileUrl),
-        duration: isVideo ? prev.duration : 10,
-        allowCloseAfter: isVideo ? prev.allowCloseAfter : 0
+        thumbnailUrl: !isVideo ? fileUrl : (prev.thumbnailUrl && !prev.thumbnailUrl.endsWith('.mp4') ? prev.thumbnailUrl : ''),
+        duration: isVideo ? (prev.duration || 20) : 10,
+        allowCloseAfter: isVideo ? (prev.allowCloseAfter !== undefined ? prev.allowCloseAfter : 8) : 0
       }));
 
       setUploadedFileName(file.name);
@@ -157,17 +158,19 @@ export const AdminAdsScreen = () => {
     setModalOpen(true);
   };
 
-  const handleSaveAd = (e) => {
+  const handleSaveAd = async (e) => {
     e.preventDefault();
     if (!currentAd.title || !currentAd.mediaUrl) {
-      showToast('⚠️ Please provide an ad title and media URL', 'error');
+      showToast('⚠️ Please provide an ad title and media file', 'error');
       return;
     }
 
     if (modalMode === 'create') {
-      createAd(currentAd);
+      await createAd(currentAd);
+      showToast(`🚀 Ad "${currentAd.title}" published! It is now directly live on the user side.`, 'success');
     } else {
-      updateAd(currentAd.id, currentAd);
+      await updateAd(currentAd.id, currentAd);
+      showToast(`✅ Ad "${currentAd.title}" updated and synced to the user side.`, 'success');
     }
     setModalOpen(false);
   };
@@ -288,12 +291,32 @@ export const AdminAdsScreen = () => {
               {/* Media preview and details */}
               <div className="flex items-start gap-4 flex-1">
                 <div className="relative w-24 h-28 rounded-2xl overflow-hidden bg-black/40 shrink-0 border border-white/10 group">
-                  <img
-                    src={ad.thumbnailUrl || ad.mediaUrl}
-                    alt={ad.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                  <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-black/70 text-white backdrop-blur-sm flex items-center gap-1">
+                  {ad.type === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.mediaUrl) ? (
+                    ad.thumbnailUrl && !/\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.thumbnailUrl) ? (
+                      <img
+                        src={ad.thumbnailUrl}
+                        alt={ad.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    ) : (
+                      <video
+                        src={ad.mediaUrl}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        muted
+                        playsInline
+                        loop
+                        onMouseEnter={(e) => e.target.play().catch(() => {})}
+                        onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0; }}
+                      />
+                    )
+                  ) : (
+                    <img
+                      src={ad.mediaUrl || ad.thumbnailUrl}
+                      alt={ad.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    />
+                  )}
+                  <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-black/70 text-white backdrop-blur-sm flex items-center gap-1 z-10">
                     {ad.type === 'video' ? <Video className="w-3 h-3 text-pink-400" /> : <ImageIcon className="w-3 h-3 text-blue-400" />}
                     <span>{ad.type} Ad</span>
                   </span>
@@ -356,18 +379,21 @@ export const AdminAdsScreen = () => {
 
               {/* Action buttons */}
               <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
-                {/* Test in Mobile Screen */}
-                <button
-                  onClick={() => {
-                    showMobileAd(ad.id);
-                    showToast(`📱 Triggered Ad "${ad.title}" on Mobile Frame!`, 'success');
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-pink-500/20 to-purple-500/20 hover:from-pink-500/30 hover:to-purple-500/30 text-pink-300 border border-pink-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                  title="Test how this Ad appears as an overlay inside the phone screen"
-                >
-                  <Smartphone className="w-4 h-4 text-pink-400" />
-                  <span>Test on Mobile</span>
-                </button>
+                {/* Direct User Side Status / View in Feed */}
+                {ad.active ? (
+                  <button
+                    onClick={() => navigate('/feed')}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    title="This ad is live on the user side! Click to view in Home Feed"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Live on User Side (View Feed ↗)</span>
+                  </button>
+                ) : (
+                  <span className="px-3 py-1.5 rounded-xl bg-gray-500/10 text-gray-400 text-xs font-semibold border border-white/5 flex items-center gap-1.5">
+                    <span>Draft / Paused</span>
+                  </span>
+                )}
 
                 {/* Toggle status */}
                 <button
@@ -455,10 +481,19 @@ export const AdminAdsScreen = () => {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => setCurrentAd({ ...currentAd, type: 'video', allowCloseAfter: 8 })}
-                      className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
+                      onClick={() => {
+                        const isCurrentlyImage = /\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i.test(currentAd.mediaUrl);
+                        setCurrentAd(prev => ({
+                          ...prev,
+                          type: 'video',
+                          allowCloseAfter: prev.allowCloseAfter || 8,
+                          mediaUrl: isCurrentlyImage ? 'https://assets.mixkit.co/videos/preview/mixkit-young-man-wearing-headphones-enjoying-music-40955-large.mp4' : prev.mediaUrl,
+                          thumbnailUrl: isCurrentlyImage ? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80' : prev.thumbnailUrl
+                        }));
+                      }}
+                      className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
                         currentAd.type === 'video'
-                          ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border-transparent'
+                          ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border-transparent shadow-md shadow-pink-500/20'
                           : isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#0a0618] border-white/10 text-gray-400'
                       }`}
                     >
@@ -467,10 +502,19 @@ export const AdminAdsScreen = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setCurrentAd({ ...currentAd, type: 'image', allowCloseAfter: 0 })}
-                      className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
+                      onClick={() => {
+                        const isCurrentlyVideo = /\.(mp4|webm|mov|m4v)($|\?)/i.test(currentAd.mediaUrl);
+                        setCurrentAd(prev => ({
+                          ...prev,
+                          type: 'image',
+                          allowCloseAfter: 0,
+                          mediaUrl: isCurrentlyVideo ? 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80' : prev.mediaUrl,
+                          thumbnailUrl: isCurrentlyVideo ? 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80' : prev.thumbnailUrl
+                        }));
+                      }}
+                      className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
                         currentAd.type === 'image'
-                          ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border-transparent'
+                          ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border-transparent shadow-md shadow-pink-500/20'
                           : isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#0a0618] border-white/10 text-gray-400'
                       }`}
                     >
@@ -559,11 +603,14 @@ export const AdminAdsScreen = () => {
                       <div className="w-full flex items-center gap-3 text-left">
                         {/* Preview Media Container */}
                         <div className="w-20 h-20 rounded-xl overflow-hidden bg-black border border-white/10 shrink-0 relative flex items-center justify-center">
-                          {currentAd.type === 'video' ? (
+                          {currentAd.type === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(currentAd.mediaUrl) ? (
                             <video
                               src={currentAd.mediaUrl}
                               className="w-full h-full object-cover"
                               muted
+                              playsInline
+                              autoPlay
+                              loop
                             />
                           ) : (
                             <img
@@ -576,7 +623,7 @@ export const AdminAdsScreen = () => {
                               className="w-full h-full object-cover"
                             />
                           )}
-                          <span className="absolute bottom-1 right-1 px-1 py-0.2 rounded bg-black/80 text-[8px] font-extrabold text-white uppercase">
+                          <span className="absolute bottom-1 right-1 px-1 py-0.2 rounded bg-black/80 text-[8px] font-extrabold text-white uppercase z-10">
                             {currentAd.type}
                           </span>
                         </div>
@@ -767,20 +814,26 @@ export const AdminAdsScreen = () => {
                 </div>
 
                 {/* Form Buttons */}
-                <div className="pt-3 flex items-center justify-end gap-3 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => setModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold text-xs shadow-lg shadow-pink-500/20 hover:opacity-95 transition cursor-pointer"
-                  >
-                    {modalMode === 'create' ? 'Publish Advertisement' : 'Save Changes'}
-                  </button>
+                <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-white/10">
+                  <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Direct Update: Will appear live in user Home Feed & Reels immediately.</span>
+                  </span>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setModalOpen(false)}
+                      className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 via-[#ff007a] to-purple-600 text-white font-bold text-xs shadow-lg shadow-pink-500/20 hover:opacity-95 transition cursor-pointer"
+                    >
+                      {modalMode === 'create' ? '🚀 Publish Directly to Users' : '💾 Update & Sync to Users'}
+                    </button>
+                  </div>
                 </div>
 
               </form>

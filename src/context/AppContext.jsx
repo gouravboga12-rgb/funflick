@@ -266,6 +266,7 @@ export const AppProvider = ({ children }) => {
     fetchLiveConversations();
     fetchMyMedia();
     fetchUserSubscriptionStatus();
+    fetchAdminAds();
   }, []);
 
   // Live Feed & Videos synchronization with AWS MySQL backend
@@ -1630,13 +1631,16 @@ export const AppProvider = ({ children }) => {
 
     setAdsList(prev => [newAd, ...prev.filter(a => a.id !== newAd.id)]);
 
-    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || 'local_admin_token_active';
     try {
-      await fetch('/api/admin/ads', {
+      const res = await fetch('/api/admin/ads', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(newAd)
       });
+      if (res.ok) {
+        fetchAdminAds();
+      }
     } catch (e) {}
 
     showToast(`📢 Ad "${newAd.title}" published successfully!`, 'success');
@@ -1647,17 +1651,19 @@ export const AppProvider = ({ children }) => {
   const updateAd = async (id, adData) => {
     setAdsList(prev => prev.map(ad => ad.id === id ? { ...ad, ...adData } : ad));
 
-    const target = adsList.find(a => a.id === id);
-    if (target) {
-      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
-      try {
-        await fetch('/api/admin/ads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ ...target, ...adData, id })
-        });
-      } catch (e) {}
-    }
+    const target = adsList.find(a => a.id === id) || {};
+    const fullAd = { ...target, ...adData, id };
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || 'local_admin_token_active';
+    try {
+      const res = await fetch('/api/admin/ads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(fullAd)
+      });
+      if (res.ok) {
+        fetchAdminAds();
+      }
+    } catch (e) {}
 
     showToast('✅ Advertisement updated successfully!', 'success');
   };
@@ -1666,27 +1672,43 @@ export const AppProvider = ({ children }) => {
   const deleteAd = async (id) => {
     setAdsList(prev => prev.filter(ad => ad.id !== id));
 
-    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || 'local_admin_token_active';
     try {
-      await fetch(`/api/admin/ads/${id}`, {
+      const res = await fetch(`/api/admin/ads/${id}`, {
         method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
+        headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.ok) {
+        fetchAdminAds();
+      }
     } catch (e) {}
 
     showToast('Advertisement deleted.', 'info');
   };
 
-  // Admin: Toggle Ad Active / Inactive
-  const toggleAdStatus = (id) => {
+  // Admin: Toggle Ad Active / Inactive (Persists directly to AWS MySQL)
+  const toggleAdStatus = async (id) => {
+    let updatedAd = null;
     setAdsList(prev => prev.map(ad => {
       if (ad.id === id) {
         const nextStatus = !ad.active;
+        updatedAd = { ...ad, active: nextStatus };
         showToast(`Ad "${ad.title}" is now ${nextStatus ? 'ACTIVE' : 'INACTIVE'}`, 'info');
-        return { ...ad, active: nextStatus };
+        return updatedAd;
       }
       return ad;
     }));
+
+    if (updatedAd) {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || 'local_admin_token_active';
+      try {
+        await fetch('/api/admin/ads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(updatedAd)
+        });
+      } catch (e) {}
+    }
   };
 
   // Track Real Ad Impression

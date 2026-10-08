@@ -29,8 +29,14 @@ export const MobileAdPopup = () => {
       return;
     }
 
+    const isVideoMedia = (
+      activePopupAd.type === 'video' ||
+      /\.(mp4|webm|mov|m4v)($|\?)/i.test(activePopupAd.mediaUrl || '') ||
+      (typeof activePopupAd.mediaUrl === 'string' && activePopupAd.mediaUrl.startsWith('data:video/'))
+    );
+
     // For Image Ads or allowCloseAfter === 0, can close immediately!
-    if (activePopupAd.type === 'image' || !activePopupAd.allowCloseAfter || activePopupAd.allowCloseAfter <= 0) {
+    if (!isVideoMedia || !activePopupAd.allowCloseAfter || Number(activePopupAd.allowCloseAfter) <= 0) {
       setCanClose(true);
       setSecondsRemaining(0);
       return;
@@ -57,7 +63,11 @@ export const MobileAdPopup = () => {
 
   if (!activePopupAd) return null;
 
-  const isVideo = activePopupAd.type === 'video';
+  const isVideo = (
+    activePopupAd.type === 'video' ||
+    /\.(mp4|webm|mov|m4v)($|\?)/i.test(activePopupAd.mediaUrl || '') ||
+    (typeof activePopupAd.mediaUrl === 'string' && activePopupAd.mediaUrl.startsWith('data:video/'))
+  );
 
   const handleTogglePlay = () => {
     if (!videoRef.current) return;
@@ -86,7 +96,12 @@ export const MobileAdPopup = () => {
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center p-3 bg-black/90 backdrop-blur-md">
+    <div 
+      onClick={(e) => {
+        if (e.target === e.currentTarget && canClose) dismissMobileAd();
+      }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 bg-black/90 backdrop-blur-md"
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}

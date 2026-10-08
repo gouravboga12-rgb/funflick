@@ -6,6 +6,7 @@ import { BottomNavigation } from '../../components/common/BottomNavigation';
 import { StoryBar } from '../../components/feed/StoryBar';
 import { VideoPostCard } from '../../components/feed/VideoPostCard';
 import { StandardPostCard } from '../../components/feed/StandardPostCard';
+import { SponsoredAdCard } from '../../components/feed/SponsoredAdCard';
 import { SubscriptionGateModal } from '../../components/common/SubscriptionGateModal';
 import { CreateChooserModal } from '../../components/user/create/CreateChooserModal';
 import { StoryViewerModal } from '../../components/feed/StoryViewerModal';
@@ -13,7 +14,7 @@ import { Sparkles, TrendingUp, Flame, Video, Plus } from 'lucide-react';
 
 export const HomeScreen = () => {
   const navigate = useNavigate();
-  const { posts, blockedUsers, activePlayingVideoId, setActivePlayingVideoId } = useApp();
+  const { posts, blockedUsers, activePlayingVideoId, setActivePlayingVideoId, adsList } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
 
   const filteredPosts = posts.filter(post => {
@@ -75,17 +76,37 @@ export const HomeScreen = () => {
               </button>
             </div>
           ) : (
-            filteredPosts.map(post => {
-              const url = post.mediaUrl || '';
-              const isImage = post.mediaType === 'image' ||
-                              /\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i.test(url) ||
-                              url.startsWith('data:image/');
-              const isVideo = !isImage && (post.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(url));
-              if (isVideo) {
-                return <VideoPostCard key={post.id} post={post} isReel={true} />;
-              }
-              return <StandardPostCard key={post.id} post={post} />;
-            })
+            (() => {
+              const activeAds = (adsList || []).filter(a => a.active);
+              return filteredPosts.map((post, idx) => {
+                const url = post.mediaUrl || '';
+                const isImage = post.mediaType === 'image' ||
+                                /\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i.test(url) ||
+                                url.startsWith('data:image/');
+                const isVideo = !isImage && (post.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(url));
+                
+                // Show sponsored ad after post 1 or every 3 posts
+                const shouldShowAd = activeAds.length > 0 && (
+                  (filteredPosts.length === 1 && idx === 0) || 
+                  idx === 1 || 
+                  (idx > 1 && (idx + 1) % 3 === 0)
+                );
+                const targetAd = activeAds[Math.floor(idx / 2) % activeAds.length];
+
+                return (
+                  <React.Fragment key={post.id}>
+                    {isVideo ? (
+                      <VideoPostCard post={post} isReel={true} />
+                    ) : (
+                      <StandardPostCard post={post} />
+                    )}
+                    {shouldShowAd && (
+                      <SponsoredAdCard ad={targetAd} />
+                    )}
+                  </React.Fragment>
+                );
+              });
+            })()
           )}
         </div>
 

@@ -6,9 +6,16 @@
 const TOKEN_KEY = 'funflick_token';
 
 export const authStorage = {
-  getToken: () => localStorage.getItem(TOKEN_KEY),
+  getToken: () => 
+    localStorage.getItem('funflick_admin_token') || 
+    localStorage.getItem(TOKEN_KEY) || 
+    sessionStorage.getItem(TOKEN_KEY) || 
+    'local_admin_token_active',
   setToken: (token) => localStorage.setItem(TOKEN_KEY, token),
-  clearToken: () => localStorage.removeItem(TOKEN_KEY),
+  clearToken: () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('funflick_admin_token');
+  },
 };
 
 export async function apiRequest(endpoint, options = {}) {

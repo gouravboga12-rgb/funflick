@@ -23,6 +23,7 @@ import {
   Sparkles,
   Megaphone
 } from 'lucide-react';
+import { MobileAdPopup } from '../common/MobileAdPopup';
 
 export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   const navigate = useNavigate();
@@ -254,6 +255,9 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
           {children}
         </main>
       </div>
+
+      {/* Live In-App Ad Popup Tester Engine */}
+      <MobileAdPopup />
     </div>
   );
 };
