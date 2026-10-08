@@ -381,4 +381,69 @@ export async function deleteComment(req, res) {
   }
 }
 
+// Get single video details by ID (for direct links, modals, and moderation comparison)
+export async function getVideoById(req, res) {
+  try {
+    const { id } = req.params;
+    const currentUserId = req.user?.id || 0;
+
+    const [rows] = await pool.query(`
+      SELECT 
+        v.id, v.title, v.description, v.category, v.video_url, v.thumbnail_url,
+        v.media_type, v.hashtags, v.location, v.audio_title,
+        v.duration, v.views_count, v.likes_count, v.created_at, v.status,
+        (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id) AS comments_count,
+        (SELECT COUNT(*) FROM likes l WHERE l.video_id = v.id AND l.user_id = ?) AS user_liked,
+        (SELECT COUNT(*) FROM follows f WHERE f.follower_id = ? AND f.following_id = u.id) AS user_following,
+        u.id AS creator_id, u.name AS creator_name, u.username AS creator_username, u.avatar_url AS creator_avatar, u.status AS creator_status
+      FROM videos v
+      JOIN users u ON v.user_id = u.id
+      WHERE v.id = ?
+    `, [currentUserId, currentUserId, id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    const r = rows[0];
+    const isVideo = !(/\.(jpg|jpeg|png|webp|gif)($|\?)/i.test(r.video_url || '') || r.category === 'Photo' || r.category === 'Post');
+
+    return res.json({
+      video: {
+        id: r.id,
+        title: r.title,
+        caption: r.description || r.title,
+        description: r.description,
+        category: r.category || 'Comedy',
+        mediaType: r.media_type || (isVideo ? 'video' : 'image'),
+        mediaUrl: r.video_url,
+        videoUrl: r.video_url,
+        posterUrl: r.thumbnail_url || r.video_url,
+        thumbnailUrl: r.thumbnail_url || r.video_url,
+        thumbnail: r.thumbnail_url || r.video_url,
+        likesCount: r.likes_count || 0,
+        viewsCount: String(r.views_count || '0'),
+        commentsCount: r.comments_count || 0,
+        status: r.status,
+        timeAgo: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        createdAt: r.created_at,
+        isLiked: Boolean(r.user_liked),
+        isFollowing: Boolean(r.user_following),
+        creator: {
+          id: r.creator_id,
+          name: r.creator_name,
+          username: r.creator_username,
+          avatar: (r.creator_username === 'super_admin') 
+            ? (r.creator_avatar && !r.creator_avatar.includes('default-avatar') ? r.creator_avatar : '/brand/funflick-logo.png')
+            : (r.creator_avatar || '/brand/default-avatar.svg'),
+          status: r.creator_status
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Get video by ID error:', err);
+    return res.status(500).json({ error: 'Failed to fetch video details' });
+  }
+}
+
 

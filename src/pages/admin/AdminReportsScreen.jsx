@@ -27,6 +27,63 @@ export const AdminReportsScreen = () => {
   const [previewMedia, setPreviewMedia] = useState(null);
   const [confirmSuspendReport, setConfirmSuspendReport] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [compareModalData, setCompareModalData] = useState(null);
+  const [originalVideoData, setOriginalVideoData] = useState(null);
+  const [isLoadingOriginalVideo, setIsLoadingOriginalVideo] = useState(false);
+
+  // Helper to parse URLs or FunFlick video IDs from report description
+  const parseOriginalLink = (text) => {
+    if (!text || typeof text !== 'string') return null;
+    const urlRegex = /(https?:\/\/[^\s"'>]+|\/video\/[0-9]+)/i;
+    const match = text.match(urlRegex);
+    if (!match) return null;
+
+    let rawUrl = match[0].replace(/["'>.,)]+$/, '');
+    let videoId = null;
+    const videoMatch = rawUrl.match(/\/video\/([0-9]+)/i);
+    if (videoMatch) {
+      videoId = videoMatch[1];
+    }
+
+    return {
+      rawUrl,
+      videoId,
+      isInternalVideo: Boolean(videoId)
+    };
+  };
+
+  const handleOpenOriginalExternal = (url) => {
+    if (!url) return;
+    const fullUrl = url.startsWith('http') 
+      ? url 
+      : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+    window.open(fullUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleOpenCompare = async (rep, origLink) => {
+    setCompareModalData({ report: rep, origLink });
+    setOriginalVideoData(null);
+
+    if (origLink?.videoId) {
+      setIsLoadingOriginalVideo(true);
+      try {
+        const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+        const res = await fetch(`/api/videos/${origLink.videoId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.video) {
+            setOriginalVideoData(data.video);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch original video for comparison:', err);
+      } finally {
+        setIsLoadingOriginalVideo(false);
+      }
+    }
+  };
 
   const fetchReports = async () => {
     setIsLoading(true);
@@ -205,18 +262,64 @@ export const AdminReportsScreen = () => {
                     </div>
 
                     {/* Reason Highlight */}
-                    <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/20 text-xs">
-                      <span className="text-[10px] uppercase font-bold text-rose-400 block tracking-wider">
-                        Reported Reason
-                      </span>
-                      <p className="text-white font-semibold mt-0.5">
-                        {rep.reason}
-                      </p>
-                      {rep.details && (
-                        <p className="text-[11px] text-gray-300 mt-1 italic">
-                          "{rep.details}"
+                    <div className="p-3 rounded-2xl bg-rose-950/40 border border-rose-500/20 text-xs space-y-2">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-rose-400 block tracking-wider">
+                          Reported Reason
+                        </span>
+                        <p className="text-white font-semibold mt-0.5">
+                          {rep.reason}
                         </p>
-                      )}
+                        {rep.details && (
+                          <p className="text-[11px] text-gray-300 mt-1 italic leading-relaxed">
+                            "{rep.details}"
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Claimed Original Reference Link & Actions */}
+                      {(() => {
+                        const origLink = parseOriginalLink(rep.details);
+                        if (!origLink) return null;
+                        return (
+                          <div className="p-2.5 rounded-xl bg-[#170e30] border border-pink-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-2 shadow-inner">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="px-2 py-0.5 rounded-md bg-pink-500/20 text-pink-300 text-[10px] font-bold border border-pink-500/30 shrink-0">
+                                Original Claim
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenOriginalExternal(origLink.rawUrl)}
+                                className="text-[11px] text-pink-400 hover:text-pink-300 font-mono underline truncate text-left cursor-pointer"
+                                title="Click to open link in user app"
+                              >
+                                {origLink.rawUrl}
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenCompare(rep, origLink)}
+                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white text-[11px] font-bold transition flex items-center gap-1.5 shadow-sm shadow-pink-500/20 active:scale-95 cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Compare Media</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleOpenOriginalExternal(origLink.rawUrl)}
+                                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-gray-200 text-[11px] font-semibold transition flex items-center gap-1.5 border border-white/10 active:scale-95 cursor-pointer"
+                                title="Open original video page in new tab"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 text-pink-400" />
+                                <span>Open Link ↗</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Reporter & Offending Creator Info */}
@@ -480,6 +583,240 @@ export const AdminReportsScreen = () => {
                     Confirm &amp; Suspend ({suspendDuration === '7d' ? '1 Week' : suspendDuration === '30d' ? '1 Month' : suspendDuration === '1y' ? '1 Year' : suspendDuration === 'permanent' ? 'Permanent' : 'Custom'})
                   </span>
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Side-by-Side Media Comparison Modal for Copyright & Plagiarism */}
+      <AnimatePresence>
+        {compareModalData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/90 backdrop-blur-md overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="w-full max-w-4xl bg-[#140e2b] border border-pink-500/30 rounded-3xl p-5 shadow-2xl text-white space-y-4 my-auto max-h-[92vh] overflow-y-auto"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center border border-pink-500/30">
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold font-heading text-white">
+                      Content Theft &amp; Plagiarism Comparison
+                    </h3>
+                    <p className="text-[10px] text-gray-400">
+                      Comparing Report #{compareModalData.report.id} side-by-side with claimed original work
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCompareModalData(null)}
+                  className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Side-by-Side Columns */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Left Column: Reported Video (Accused) */}
+                <div className="p-3.5 rounded-2xl bg-[#170e30] border-2 border-rose-500/40 space-y-2.5 flex flex-col">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-extrabold border border-rose-500/40 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 text-rose-400" />
+                      <span>1. Reported Video (Accused)</span>
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      By @{compareModalData.report.creatorUsername}
+                    </span>
+                  </div>
+
+                  {/* Video Player */}
+                  <div className="w-full aspect-[4/5] sm:aspect-video rounded-xl overflow-hidden bg-black flex items-center justify-center border border-white/10 relative">
+                    {compareModalData.report.mediaUrl ? (
+                      <video
+                        src={compareModalData.report.mediaUrl}
+                        controls
+                        playsInline
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="text-center p-4 text-gray-500 text-xs">
+                        No video media stream available
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1 text-xs">
+                    <h4 className="font-bold text-white truncate font-heading">
+                      {compareModalData.report.targetTitle}
+                    </h4>
+                    <p className="text-[11px] text-gray-400">
+                      Creator: <strong className="text-pink-300">@{compareModalData.report.creatorUsername}</strong>
+                    </p>
+                    <p className="text-[10px] text-gray-500">
+                      Report Date: {compareModalData.report.date}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right Column: Claimed Original Video */}
+                <div className="p-3.5 rounded-2xl bg-[#170e30] border-2 border-emerald-500/40 space-y-2.5 flex flex-col">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold border border-emerald-500/40 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <span>2. Claimed Original Work</span>
+                    </span>
+                    {originalVideoData && (
+                      <span className="text-[10px] text-emerald-300 font-mono font-semibold">
+                        Found in FunFlick DB
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Original Video Player / Status */}
+                  <div className="w-full aspect-[4/5] sm:aspect-video rounded-xl overflow-hidden bg-black flex items-center justify-center border border-white/10 relative">
+                    {isLoadingOriginalVideo ? (
+                      <div className="flex flex-col items-center justify-center text-gray-400 p-6 text-center">
+                        <Loader2 className="w-7 h-7 animate-spin text-pink-500 mb-2" />
+                        <span className="text-xs">Loading original video #{compareModalData.origLink?.videoId}...</span>
+                      </div>
+                    ) : originalVideoData?.mediaUrl || originalVideoData?.videoUrl ? (
+                      <video
+                        src={originalVideoData.mediaUrl || originalVideoData.videoUrl}
+                        controls
+                        playsInline
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="p-6 text-center text-gray-400 space-y-2">
+                        <Film className="w-8 h-8 text-gray-600 mx-auto" />
+                        <p className="text-xs">External or custom video source link provided:</p>
+                        <p className="text-[11px] text-pink-400 font-mono truncate max-w-[280px]">
+                          {compareModalData.origLink?.rawUrl}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenOriginalExternal(compareModalData.origLink?.rawUrl)}
+                          className="px-3 py-1.5 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/30 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Open External Link</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1 text-xs">
+                    {originalVideoData ? (
+                      <>
+                        <h4 className="font-bold text-white truncate font-heading">
+                          {originalVideoData.title}
+                        </h4>
+                        <p className="text-[11px] text-gray-300">
+                          Original Creator: <strong className="text-emerald-300">@{originalVideoData.creator?.username || originalVideoData.creator_username || 'creator'}</strong>
+                        </p>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] text-gray-500">
+                            {originalVideoData.timeAgo} • {originalVideoData.viewsCount} views
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenOriginalExternal(compareModalData.origLink?.rawUrl)}
+                            className="text-[10px] text-pink-400 hover:text-pink-300 underline flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <span>Open in User App</span>
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenOriginalExternal(compareModalData.origLink?.rawUrl)}
+                          className="text-xs text-pink-400 hover:text-pink-300 underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Open Original Reference Link</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Reported Reason Details Banner */}
+              <div className="p-3 rounded-2xl bg-black/40 border border-white/10 text-xs space-y-1">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                  Report Claim Reason:
+                </span>
+                <p className="text-rose-300 font-semibold">{compareModalData.report.reason}</p>
+                {compareModalData.report.details && (
+                  <p className="text-gray-300 italic text-[11px]">{compareModalData.report.details}</p>
+                )}
+              </div>
+
+              {/* Decision Action Buttons inside Compare Modal */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setCompareModalData(null)}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-gray-300 text-xs font-semibold cursor-pointer"
+                >
+                  Close Inspection
+                </button>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => {
+                      const id = compareModalData.report.id;
+                      setCompareModalData(null);
+                      handleResolve(id, 'dismiss');
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-gray-200 text-xs font-semibold transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Keep Content (Dismiss)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => {
+                      const id = compareModalData.report.id;
+                      setCompareModalData(null);
+                      handleResolve(id, 'remove');
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-rose-600/30 hover:bg-rose-600/50 text-rose-200 border border-rose-500/30 text-xs font-semibold transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Delete Content</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => {
+                      const rep = compareModalData.report;
+                      setCompareModalData(null);
+                      setConfirmSuspendReport(rep);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 hover:opacity-90 text-white text-xs font-bold shadow-lg shadow-rose-900/40 transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <UserX className="w-3.5 h-3.5" />
+                    <span>Delete &amp; Suspend User</span>
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

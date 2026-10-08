@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { VideoPostCard } from '../../components/feed/VideoPostCard';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
-import { ChevronLeft, Share2 } from 'lucide-react';
+import { ChevronLeft, Share2, Loader2 } from 'lucide-react';
 
 export const VideoDetailScreen = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { posts, myMedia, currentUser, showToast } = useApp();
+  const [fetchedPost, setFetchedPost] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   let post = posts.find(p => String(p.id) === String(id));
   if (!post && myMedia && Array.isArray(myMedia)) {
@@ -41,6 +43,37 @@ export const VideoDetailScreen = () => {
       };
     }
   }
+  if (!post && fetchedPost) {
+    post = fetchedPost;
+  }
+
+  useEffect(() => {
+    if (!posts.some(p => String(p.id) === String(id)) && id) {
+      setLoading(true);
+      const token = localStorage.getItem('funflick_token') || localStorage.getItem('funflick_admin_token');
+      fetch(`/api/videos/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && data.video) {
+            setFetchedPost(data.video);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, [id]);
+
+  if (!post && loading) {
+    return (
+      <div className="w-full flex-1 flex flex-col items-center justify-center bg-[#090514] min-h-screen text-gray-400">
+        <Loader2 className="w-8 h-8 animate-spin text-pink-500 mb-2" />
+        <span className="text-xs">Loading video #{id}...</span>
+      </div>
+    );
+  }
+
   if (!post) post = posts[0];
 
   return (

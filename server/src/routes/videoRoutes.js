@@ -10,7 +10,8 @@ import {
   deleteComment, 
   recordView, 
   updateVideo, 
-  deleteVideo 
+  deleteVideo,
+  getVideoById
 } from '../controllers/videoController.js';
 import { authenticateToken, optionalAuth } from '../middlewares/authMiddleware.js';
 
@@ -24,6 +25,9 @@ router.get('/my-media', authenticateToken, getMyMedia);
 
 // Protected: Get authenticated user's private liked videos
 router.get('/liked', authenticateToken, getLikedVideos);
+
+// Public / Protected: Get single video details by ID (for links, direct preview & moderation)
+router.get('/:id', optionalAuth, getVideoById);
 
 // Protected: Publish video to feed
 router.post('/', authenticateToken, createVideo);
