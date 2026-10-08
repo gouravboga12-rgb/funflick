@@ -36,6 +36,22 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   const pendingPayoutCount = adminPayouts.filter(p => p.status === 'Partially Paid').length;
   const pendingCopyrightCount = (copyrightReports || []).filter(r => r.status === 'Pending').length;
   const pendingAdRequestsCount = (adminAdRequests || []).filter(r => r.status === 'Pending').length;
+  const [pendingReportsCount, setPendingReportsCount] = useState(0);
+
+  useEffect(() => {
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    if (!token) return;
+    fetch('/api/admin/reports', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.reports && Array.isArray(d.reports)) {
+          setPendingReportsCount(d.reports.filter(r => r.status === 'Pending').length);
+        }
+      })
+      .catch(() => {});
+  }, [location.pathname]);
 
   const navLinks = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
@@ -50,7 +66,7 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
     { label: 'Manage Subscriptions', icon: Crown, path: '/admin/manage-subscriptions' },
     { label: 'Creator Payouts', icon: DollarSign, path: '/admin/payouts', badge: pendingPayoutCount },
     { label: 'Revenue Analytics', icon: BarChart3, path: '/admin/revenue' },
-    { label: 'Reports', icon: Flag, path: '/admin/reports' },
+    { label: 'Reports', icon: Flag, path: '/admin/reports', badge: pendingReportsCount },
     { label: 'Categories', icon: Tag, path: '/admin/categories' },
     { label: 'Platform Settings', icon: Settings, path: '/admin/settings' },
   ];

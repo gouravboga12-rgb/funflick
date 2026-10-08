@@ -524,6 +524,18 @@ export async function initDatabase() {
       ) ENGINE=InnoDB;
     `);
 
+    // Blocked Users Table (Persistent User Blocks & Management)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS blocked_users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        blocker_id INT NOT NULL,
+        blocked_username VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_user_block (blocker_id, blocked_username),
+        FOREIGN KEY (blocker_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+    `);
+
     // Seed default advertiser contact settings if not present
     const defaultAdSettings = [
       ['ad_contact_email', 'ads@funflick.in'],

@@ -98,3 +98,73 @@ export async function getUserProfile(req, res) {
     return res.status(500).json({ error: 'Failed to get user profile' });
   }
 }
+
+// Get all users blocked by the authenticated user
+export async function getBlockedUsers(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const [rows] = await pool.query(
+      `SELECT b.id, b.blocked_username, b.created_at,
+              u.name AS user_name, u.avatar_url AS user_avatar
+       FROM blocked_users b
+       LEFT JOIN users u ON u.username = b.blocked_username
+       WHERE b.blocker_id = ?
+       ORDER BY b.created_at DESC`,
+      [userId]
+    );
+
+    return res.json({ blockedUsers: rows });
+  } catch (err) {
+    console.error('Get blocked users error:', err);
+    return res.status(500).json({ error: 'Failed to fetch blocked users' });
+  }
+}
+
+// Block a user by username
+export async function blockUser(req, res) {
+  try {
+    const blockerId = req.user?.id;
+    const { username } = req.body;
+    if (!blockerId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!username) return res.status(400).json({ error: 'Username is required' });
+
+    // Also remove follow relationship both ways
+    const [targetUser] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+    if (targetUser.length > 0) {
+      const targetId = targetUser[0].id;
+      await pool.query('DELETE FROM follows WHERE (follower_id = ? AND following_id = ?) OR (follower_id = ? AND following_id = ?)', [blockerId, targetId, targetId, blockerId]);
+    }
+
+    await pool.query(
+      `INSERT IGNORE INTO blocked_users (blocker_id, blocked_username) VALUES (?, ?)`,
+      [blockerId, username]
+    );
+
+    return res.json({ success: true, message: `Blocked @${username}` });
+  } catch (err) {
+    console.error('Block user error:', err);
+    return res.status(500).json({ error: 'Failed to block user' });
+  }
+}
+
+// Unblock a user by username
+export async function unblockUser(req, res) {
+  try {
+    const blockerId = req.user?.id;
+    const { username } = req.body;
+    if (!blockerId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!username) return res.status(400).json({ error: 'Username is required' });
+
+    await pool.query(
+      `DELETE FROM blocked_users WHERE blocker_id = ? AND blocked_username = ?`,
+      [blockerId, username]
+    );
+
+    return res.json({ success: true, message: `Unblocked @${username}` });
+  } catch (err) {
+    console.error('Unblock user error:', err);
+    return res.status(500).json({ error: 'Failed to unblock user' });
+  }
+}

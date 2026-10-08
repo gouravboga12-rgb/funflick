@@ -212,8 +212,15 @@ export const AppProvider = ({ children }) => {
   // Copyright & Plagiarism Dispute Reports (Live from AWS MySQL database)
   const [copyrightReports, setCopyrightReports] = useState([]);
 
-  // Blocked users list
-  const [blockedUsers, setBlockedUsers] = useState([]);
+  // Blocked users list (persisted in localStorage & synced with MySQL)
+  const [blockedUsers, setBlockedUsers] = useState(() => {
+    try {
+      const saved = localStorage.getItem('funflick_blocked');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // Followers, Following, and Follow Requests (Live from AWS MySQL database)
   const [followingList, setFollowingList] = useState([]);
@@ -283,6 +290,7 @@ export const AppProvider = ({ children }) => {
     fetchAdminAds();
     fetchAdContactSettings();
     fetchMyAdRequests();
+    fetchBlockedUsers();
   }, []);
 
   // Live Feed & Videos synchronization with AWS MySQL backend
@@ -1167,7 +1175,31 @@ export const AppProvider = ({ children }) => {
 
 
   // Block User (Instagram Style)
-  const blockUser = (username) => {
+  // Fetch blocked users from backend MySQL
+  const fetchBlockedUsers = async () => {
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/users/blocked', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.blockedUsers && Array.isArray(data.blockedUsers)) {
+          const list = data.blockedUsers.map(b => b.blocked_username);
+          setBlockedUsers(list);
+          try {
+            localStorage.setItem('funflick_blocked', JSON.stringify(list));
+          } catch (e) {}
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch blocked users:', e);
+    }
+  };
+
+  // Block User (Instagram Style with API synchronization)
+  const blockUser = async (username) => {
     if (!username || username === currentUser.username) return;
     setBlockedUsers(prev => {
       const updated = prev.includes(username) ? prev : [...prev, username];
@@ -1179,10 +1211,19 @@ export const AppProvider = ({ children }) => {
     // Automatically unfollow if followed
     setCreators(prev => prev.map(c => c.username === username ? { ...c, isFollowing: false } : c));
     showToast(`🚫 Blocked @${username}. Content & comments hidden.`, 'info');
+
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (token) {
+      fetch('/api/users/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ username })
+      }).catch(() => {});
+    }
   };
 
-  // Unblock User
-  const unblockUser = (username) => {
+  // Unblock User (with API synchronization)
+  const unblockUser = async (username) => {
     setBlockedUsers(prev => {
       const updated = prev.filter(u => u !== username);
       try {
@@ -1190,7 +1231,16 @@ export const AppProvider = ({ children }) => {
       } catch (e) {}
       return updated;
     });
-    showToast(`Unblocked @${username}`, 'success');
+    showToast(`✅ Unblocked @${username}. Content is now visible.`, 'success');
+
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (token) {
+      fetch('/api/users/unblock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ username })
+      }).catch(() => {});
+    }
   };
 
   // Influencer Subscription Purchase (Connects to full verification & persistence engine)
@@ -2892,6 +2942,7 @@ export const AppProvider = ({ children }) => {
         blockedUsers,
         blockUser,
         unblockUser,
+        fetchBlockedUsers,
         purchasePublishingSubscription,
         recordSubscriptionPayment,
         subscriptionStatus,

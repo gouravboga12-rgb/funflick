@@ -9,6 +9,7 @@ import { AccountSettingsModal } from './AccountSettingsModal';
 import { HelpSupportModal } from './HelpSupportModal';
 import { FollowListModal } from '../../components/user/FollowListModal';
 import { SubmitAdRequestModal } from '../../components/user/SubmitAdRequestModal';
+import { BlockedUsersModal } from '../../components/user/BlockedUsersModal';
 import { 
   ChevronLeft, 
   Settings, 
@@ -39,7 +40,8 @@ import {
   Megaphone,
   Phone,
   MessageCircle,
-  Mail
+  Mail,
+  Ban
 } from 'lucide-react';
 
 export const UserProfileScreen = () => {
@@ -65,10 +67,12 @@ export const UserProfileScreen = () => {
     transactions,
     subscriptionStatus,
     fetchUserSubscriptionStatus,
-    adContactSettings
+    adContactSettings,
+    blockedUsers
   } = useApp();
 
   const [isAdRequestModalOpen, setIsAdRequestModalOpen] = useState(false);
+  const [isBlockedUsersModalOpen, setIsBlockedUsersModalOpen] = useState(false);
 
   // Dynamic live follower counts from backend
   const [liveFollowCounts, setLiveFollowCounts] = useState({
@@ -830,6 +834,42 @@ export const UserProfileScreen = () => {
         )}
 
         {/* ======================================================== */}
+        {/* 🚫 BLOCKED ACCOUNTS & PRIVACY MANAGEMENT                */}
+        {/* ======================================================== */}
+        <div className="p-4 rounded-3xl bg-gradient-to-br from-[#1b0c2a] via-[#120a22] to-[#160b2b] border border-white/10 shadow-xl space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center shadow-md shadow-rose-500/10">
+                <Ban className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-white font-heading">
+                    Blocked Accounts
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                    {blockedUsers?.length || 0}
+                  </span>
+                </div>
+                <span className="text-[10px] text-gray-400">
+                  {blockedUsers?.length > 0 
+                    ? `${blockedUsers.length} account${blockedUsers.length === 1 ? '' : 's'} restricted` 
+                    : 'Check and unblock accounts'}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsBlockedUsersModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-extrabold text-[11px] border border-white/10 flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+            >
+              <span>Manage</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+          </div>
+        </div>
+
+        {/* ======================================================== */}
         {/* 📢 ADVERTISE & PROMOTE WITH FUNFLICK (SPONSOR & BRAND HUB)*/}
         {/* ======================================================== */}
         <div className="p-4 rounded-3xl bg-gradient-to-br from-[#1c0b38] via-[#120a24] to-[#1a0e33] border border-pink-500/25 shadow-xl space-y-3.5 relative overflow-hidden group">
@@ -998,6 +1038,12 @@ export const UserProfileScreen = () => {
       <SubmitAdRequestModal
         isOpen={isAdRequestModalOpen}
         onClose={() => setIsAdRequestModalOpen(false)}
+      />
+
+      {/* Blocked Accounts Management Modal */}
+      <BlockedUsersModal
+        isOpen={isBlockedUsersModalOpen}
+        onClose={() => setIsBlockedUsersModalOpen(false)}
       />
     </div>
   );

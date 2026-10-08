@@ -33,23 +33,30 @@ export async function createReport(req, res) {
       return res.status(400).json({ error: 'You cannot report your own content' });
     }
 
-    // Prevent duplicate spam reporting by the same user within 24 hours
-    const [existingReport] = await pool.query(
+    // Check if an existing 'Pending' report already exists by this user for this content
+    const [existingPending] = await pool.query(
       `SELECT id FROM content_reports 
-       WHERE reporter_id = ? AND target_video_id = ? AND created_at > (NOW() - INTERVAL 24 HOUR)
+       WHERE reporter_id = ? AND target_video_id = ? AND status = 'Pending'
        LIMIT 1`,
       [reporterId, targetVideoId]
     );
 
-    if (existingReport.length > 0) {
-      return res.json({
+    if (existingPending.length > 0) {
+      // Update existing pending report with newest reason/details and refresh timestamp
+      await pool.query(
+        `UPDATE content_reports 
+         SET reason = ?, details = ?, created_at = CURRENT_TIMESTAMP 
+         WHERE id = ?`,
+        [reason, details, existingPending[0].id]
+      );
+      return res.status(200).json({
         success: true,
-        alreadyReported: true,
-        message: 'You have already reported this content. Our moderation team is currently reviewing it.'
+        message: 'Report received and updated for FunFlick Admin Moderation.',
+        reportId: existingPending[0].id
       });
     }
 
-    // Insert into content_reports
+    // Insert a new report into content_reports with status 'Pending'
     const [result] = await pool.query(
       `INSERT INTO content_reports (reporter_id, target_video_id, reason, details, status)
        VALUES (?, ?, ?, ?, 'Pending')`,

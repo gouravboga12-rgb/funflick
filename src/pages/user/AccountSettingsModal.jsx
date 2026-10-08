@@ -18,12 +18,14 @@ import {
   Sparkles,
   Moon,
   Sun,
-  Building2
+  Building2,
+  Ban
 } from 'lucide-react';
 import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDetailsModal';
+import { BlockedUsersModal } from '../../components/user/BlockedUsersModal';
 
 export const AccountSettingsModal = ({ isOpen, onClose }) => {
-  const { currentUser, setCurrentUser, showToast, theme, setTheme } = useApp();
+  const { currentUser, setCurrentUser, showToast, theme, setTheme, blockedUsers } = useApp();
 
   const [email, setEmail] = useState(currentUser?.email || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
@@ -36,6 +38,7 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
   const [language, setLanguage] = useState('Telugu & Hindi');
   const [saving, setSaving] = useState(false);
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+  const [blockedModalOpen, setBlockedModalOpen] = useState(false);
 
   // Re-sync fields with the logged-in account every time the modal opens
   useEffect(() => {
@@ -347,6 +350,26 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
                     <span className="w-5 h-5 rounded-full bg-white shadow-md" />
                   </button>
                 </div>
+
+                <div className={`flex items-center justify-between pt-2 border-t ${theme === 'light' ? 'border-slate-200' : 'border-white/5'}`}>
+                  <div>
+                    <span className={`text-xs font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'} block`}>
+                      Blocked Accounts ({blockedUsers?.length || 0})
+                    </span>
+                    <span className={`text-[10px] ${theme === 'light' ? 'text-slate-500' : 'text-gray-400'}`}>
+                      Check and unblock restricted profiles
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBlockedModalOpen(true)}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      theme === 'light' ? 'bg-slate-200 hover:bg-slate-300 text-slate-800' : 'bg-white/10 hover:bg-white/15 text-white'
+                    }`}
+                  >
+                    Manage
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -498,6 +521,12 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
       <CreatorPayoutDetailsModal
         isOpen={payoutModalOpen}
         onClose={() => setPayoutModalOpen(false)}
+      />
+
+      {/* Blocked Accounts Management Modal */}
+      <BlockedUsersModal
+        isOpen={blockedModalOpen}
+        onClose={() => setBlockedModalOpen(false)}
       />
     </div>
   );

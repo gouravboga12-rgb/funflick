@@ -44,7 +44,7 @@ export const ReportModal = ({ post, isOpen, onClose }) => {
     e?.preventDefault();
     if (!selectedReason) return;
 
-    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    const token = localStorage.getItem('funflick_token') || localStorage.getItem('funflick_admin_token') || sessionStorage.getItem('funflick_token');
     if (!token) {
       showToast('Please log in to report content', 'error');
       return;
@@ -63,7 +63,7 @@ export const ReportModal = ({ post, isOpen, onClose }) => {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          targetVideoId: post.id,
+          targetVideoId: post.id || post.videoId,
           reason: selectedReason,
           details: detailsText
         })
