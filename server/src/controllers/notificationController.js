@@ -71,9 +71,20 @@ export async function markAllRead(req, res) {
   try {
     const currentUserId = req.user.id;
     await pool.query('UPDATE notifications SET is_read = 1 WHERE user_id = ?', [currentUserId]);
-    return res.json({ success: true, message: 'All notifications marked as read' });
+    return res.json({ success: true, message: 'All notifications marked as read', unreadCount: 0 });
   } catch (err) {
     console.error('Mark read error:', err);
     return res.status(500).json({ error: 'Failed to mark notifications read' });
+  }
+}
+
+export async function clearAllNotifications(req, res) {
+  try {
+    const currentUserId = req.user.id;
+    await pool.query('DELETE FROM notifications WHERE user_id = ?', [currentUserId]);
+    return res.json({ success: true, message: 'All notifications cleared successfully', unreadCount: 0 });
+  } catch (err) {
+    console.error('Clear notifications error:', err);
+    return res.status(500).json({ error: 'Failed to clear notifications' });
   }
 }

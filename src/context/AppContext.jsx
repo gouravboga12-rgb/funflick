@@ -105,6 +105,14 @@ export const AppProvider = ({ children }) => {
   const loginUser = (customUser) => {
     setIsAuthenticated(true);
     sessionStorage.setItem('funflick_authenticated', 'true');
+    try {
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith('funflick_session_seen_')) {
+          sessionStorage.removeItem(k);
+        }
+      }
+    } catch (e) {}
     if (customUser) {
       setCurrentUser(prev => {
         const rawAvatar = customUser.avatar || customUser.avatar_url || prev.avatar || prev.avatar_url;
@@ -1158,9 +1166,39 @@ export const AppProvider = ({ children }) => {
   };
 
   // Mark all notifications as read
-  const markAllNotificationsAsRead = () => {
+  const markAllNotificationsAsRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
     showToast('All notifications marked as read! ✔️', 'info');
+
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (token) {
+      try {
+        await fetch('/api/notifications/mark-all-read', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (e) {
+        console.warn('Could not mark all notifications as read on server:', e);
+      }
+    }
+  };
+
+  // Clear all notifications completely (Purge user notifications)
+  const clearAllNotifications = async () => {
+    setNotifications([]);
+    showToast('All notifications cleared! 🗑️', 'info');
+
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (token) {
+      try {
+        await fetch('/api/notifications', {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (e) {
+        console.warn('Could not clear notifications on server:', e);
+      }
+    }
   };
 
   // Subscribe to a specific creator (Screen 7 flow)
@@ -1833,11 +1871,39 @@ export const AppProvider = ({ children }) => {
   };
 
   const dismissMobileAd = () => {
+    const dismissedAd = activePopupAdRef.current;
     activePopupAdRef.current = null;
     setActivePopupAd(null);
+
+    // Sequential Pop-up Ads Queue:
+    // If the dismissed ad was an active Pop-up Ad and not in admin center,
+    // immediately check if another active Pop-up Ad is in queue for this session!
+    const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
+    const isAdmin = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+
+    if (
+      isUserAuth &&
+      !isAdmin &&
+      dismissedAd &&
+      (dismissedAd.frequency === 'Pop-up Ads' || dismissedAd.frequency === 'On App Open' || dismissedAd.frequency === 'Once per session')
+    ) {
+      const nextPopupAd = (adsList || []).find(a => 
+        a.active && 
+        (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
+        a.id !== dismissedAd.id &&
+        !sessionStorage.getItem(`funflick_session_seen_${a.id}`)
+      );
+
+      if (nextPopupAd) {
+        sessionStorage.setItem(`funflick_session_seen_${nextPopupAd.id}`, 'true');
+        setTimeout(() => {
+          showMobileAd(nextPopupAd.id);
+        }, 250);
+      }
+    }
   };
 
-  // Automatic Global Ad Frequency Engine (Handles "Pop-up Ads" strictly after login)
+  // Automatic Global Ad Frequency Engine (Handles "Pop-up Ads" strictly after login in sequence)
   useEffect(() => {
     // Strictly require user to be logged in before automatic popup ads can appear
     const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
@@ -1857,24 +1923,22 @@ export const AppProvider = ({ children }) => {
       return;
     }
 
-    // Check for "Pop-up Ads" (or legacy "On App Open" / "Once per session") active ads
-    const popupAd = adsList.find(a => 
+    // Check for unshown "Pop-up Ads" (or legacy "On App Open" / "Once per session")
+    const unshownPopupAd = (adsList || []).find(a => 
       a.active && (
         a.frequency === 'Pop-up Ads' || 
         a.frequency === 'On App Open' || 
         a.frequency === 'Once per session'
-      )
+      ) &&
+      !sessionStorage.getItem(`funflick_session_seen_${a.id}`)
     );
-    if (popupAd && !hasTriggeredAppOpenRef.current) {
-      const sessionKey = `funflick_session_seen_${popupAd.id}`;
-      if (!sessionStorage.getItem(sessionKey)) {
-        sessionStorage.setItem(sessionKey, 'true');
-        hasTriggeredAppOpenRef.current = true;
-        const timer = setTimeout(() => {
-          showMobileAd(popupAd.id);
-        }, 1200);
-        return () => clearTimeout(timer);
-      }
+
+    if (unshownPopupAd && !activePopupAdRef.current) {
+      sessionStorage.setItem(`funflick_session_seen_${unshownPopupAd.id}`, 'true');
+      const timer = setTimeout(() => {
+        showMobileAd(unshownPopupAd.id);
+      }, 1200);
+      return () => clearTimeout(timer);
     }
   }, [adsList, isAuthenticated]);
 
@@ -2941,6 +3005,7 @@ export const AppProvider = ({ children }) => {
         declineFollowRequest,
         removeFollower,
         markAllNotificationsAsRead,
+        clearAllNotifications,
         subscribeToCreator,
         addComment,
         deleteComment,

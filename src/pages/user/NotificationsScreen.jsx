@@ -13,7 +13,8 @@ import {
   Bell,
   UserCheck,
   X,
-  Users
+  Users,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -26,28 +27,33 @@ export const NotificationsScreen = () => {
     acceptFollowRequest,
     declineFollowRequest,
     markAllNotificationsAsRead,
+    clearAllNotifications,
     fetchLiveNotifications,
     toggleFollowCreator,
     followingList
   } = useApp();
   const [filter, setFilter] = useState('All');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   React.useEffect(() => {
     if (fetchLiveNotifications) fetchLiveNotifications();
   }, []);
 
   const handleMarkAllRead = async () => {
-    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
-    if (token) {
-      try {
-        await fetch('/api/notifications/read-all', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } catch (e) {}
+    await markAllNotificationsAsRead();
+  };
+
+  const handleClearAll = () => {
+    if (notifications.length === 0) {
+      showToast('No notifications to clear', 'info');
+      return;
     }
-    markAllNotificationsAsRead();
-    showToast('All notifications marked as read', 'info');
+    setShowClearConfirm(true);
+  };
+
+  const confirmClearAll = async () => {
+    await clearAllNotifications();
+    setShowClearConfirm(false);
   };
 
   const categories = ['All', 'Requests', 'Likes', 'Comments', 'Follows', 'System'];
@@ -84,13 +90,37 @@ export const NotificationsScreen = () => {
         <span className="text-sm font-bold text-white font-heading">
           Activity
         </span>
-        <button
-          onClick={handleMarkAllRead}
-          className="text-xs font-semibold text-pink-400 hover:text-pink-300 flex items-center gap-1"
-        >
-          <CheckCheck className="w-3.5 h-3.5" />
-          <span>Read All</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleMarkAllRead}
+            disabled={notifications.every(n => !n.unread)}
+            className={`text-xs font-semibold flex items-center gap-1 transition ${
+              notifications.some(n => n.unread)
+                ? 'text-pink-400 hover:text-pink-300'
+                : 'text-gray-500'
+            }`}
+            title="Mark all notifications as read"
+          >
+            <CheckCheck className="w-3.5 h-3.5" />
+            <span>Read All</span>
+          </button>
+
+          <span className="text-white/20">|</span>
+
+          <button
+            onClick={handleClearAll}
+            disabled={notifications.length === 0}
+            className={`text-xs font-semibold flex items-center gap-1 transition ${
+              notifications.length > 0
+                ? 'text-red-400 hover:text-red-300'
+                : 'text-gray-500'
+            }`}
+            title="Clear all notifications to optimize storage"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Clear All</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Chips */}
@@ -265,6 +295,35 @@ export const NotificationsScreen = () => {
         {/* Bottom spacer */}
         <div className="h-4" />
       </div>
+
+      {/* Clear All Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#140e2b] border border-white/10 rounded-2xl p-5 max-w-xs w-full text-center space-y-4 shadow-2xl">
+            <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto border border-red-500/30">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">Clear All Notifications?</h3>
+              <p className="text-xs text-gray-400 mt-1">This will permanently delete all activity notifications from your account.</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-gray-300 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmClearAll}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white transition shadow-lg shadow-red-600/30"
+              >
+                Yes, Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <BottomNavigation />

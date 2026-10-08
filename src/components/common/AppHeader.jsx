@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Heart, MessageCircle, ChevronLeft, Search } from 'lucide-react';
+import { Bell, MessageCircle, ChevronLeft, Search } from 'lucide-react';
 
 export const AppHeader = ({ 
   title, 
@@ -129,7 +129,7 @@ export const AppHeader = ({
             rightAction
           ) : (
             <div className="flex items-center gap-0.5">
-              {/* Activity / Notifications Heart Icon (Instagram Style) */}
+              {/* Activity / Notifications Bell Icon */}
               <button
                 onClick={() => navigate('/notifications')}
                 className={`relative p-1.5 rounded-full ${
@@ -139,7 +139,7 @@ export const AppHeader = ({
                 } transition`}
                 aria-label="Activity & Notifications"
               >
-                <Heart className={`w-5 h-5 ${unreadNotifs > 0 ? 'text-pink-400' : ''}`} />
+                <Bell className={`w-5 h-5 ${unreadNotifs > 0 ? 'text-amber-400' : ''}`} />
                 {unreadNotifs > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#ff007a] text-[9px] font-bold text-white flex items-center justify-center leading-none">
                     {unreadNotifs > 9 ? '9+' : unreadNotifs}
