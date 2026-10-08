@@ -9,7 +9,7 @@ export const AdminLoginScreen = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const isSessionExpired = location.state?.expired || searchParams.get('expired') === '1';
-  const { showToast } = useApp();
+  const { showToast, loginUser } = useApp();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -41,6 +41,11 @@ export const AdminLoginScreen = () => {
       if (res.ok && data.success && data.token) {
         // Dedicated admin-only session bearer token for AWS API communication
         localStorage.setItem('funflick_admin_token', data.token);
+        localStorage.setItem('funflick_token', data.token);
+        sessionStorage.setItem('funflick_authenticated', 'true');
+        if (loginUser && data.adminUser) {
+          loginUser(data.adminUser);
+        }
         showToast('🛡️ Administrator identity verified on AWS. Welcome to Admin Center.', 'success');
         navigate('/admin');
       } else {

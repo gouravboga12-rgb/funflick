@@ -47,7 +47,7 @@ export const AppProvider = ({ children }) => {
 
   // Track session authentication (ensure new visitors get Get Started / Splash first)
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem('funflick_authenticated') === 'true';
+    return sessionStorage.getItem('funflick_authenticated') === 'true' || Boolean(localStorage.getItem('funflick_admin_token'));
   });
 
   // Sync profile data and live feeds directly from AWS MySQL backend on app startup
@@ -61,6 +61,9 @@ export const AppProvider = ({ children }) => {
     if (adminTok) {
       fetchAdminPendingContent();
       fetchAdminStats();
+      if (!localStorage.getItem('funflick_token')) {
+        localStorage.setItem('funflick_token', adminTok);
+      }
     }
 
     const token = localStorage.getItem('funflick_token');

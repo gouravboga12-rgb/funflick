@@ -29,8 +29,32 @@ import { MobileAdPopup } from '../common/MobileAdPopup';
 export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { adminPayouts, pendingApprovals, copyrightReports, adminAdRequests, showToast, theme, setTheme } = useApp();
+  const { adminPayouts, pendingApprovals, copyrightReports, adminAdRequests, showToast, theme, setTheme, loginUser, setIsAuthenticated } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleOpenUserApp = () => {
+    const adminToken = localStorage.getItem('funflick_admin_token');
+    if (adminToken) {
+      localStorage.setItem('funflick_token', adminToken);
+      sessionStorage.setItem('funflick_authenticated', 'true');
+      if (setIsAuthenticated) setIsAuthenticated(true);
+      if (loginUser) {
+        loginUser({
+          id: 999999,
+          name: 'FunFlick Super Administrator',
+          username: 'super_admin',
+          email: 'funflick0308@gmail.com',
+          role: 'admin',
+          avatar_url: '/brand/funflick-logo.png',
+          hasPublishingSubscription: true
+        });
+      }
+    } else {
+      sessionStorage.setItem('funflick_authenticated', 'true');
+      if (setIsAuthenticated) setIsAuthenticated(true);
+    }
+    navigate('/feed');
+  };
 
   const isLight = theme === 'light';
   const pendingPayoutCount = adminPayouts.filter(p => p.status === 'Partially Paid').length;
@@ -164,12 +188,12 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
           </button>
 
           <button
-            onClick={() => navigate('/')}
+            onClick={handleOpenUserApp}
             className={`w-full flex items-center justify-center gap-2 py-2 rounded-2xl ${
               isLight 
                 ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200' 
                 : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border-white/5'
-            } text-xs font-semibold border transition`}
+            } text-xs font-semibold border transition cursor-pointer`}
           >
             <Smartphone className="w-3.5 h-3.5 text-pink-400" />
             <span>Open User App</span>

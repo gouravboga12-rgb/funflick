@@ -518,6 +518,23 @@ export async function forgotPasswordReset(req, res) {
  */
 export async function getCurrentUser(req, res) {
   try {
+    // Return Super Administrator profile if authenticated as admin
+    if (req.user && (req.user.role === 'admin' || req.user.id === 999999)) {
+      return res.json({
+        user: {
+          id: 999999,
+          name: req.user.name || 'FunFlick Super Administrator',
+          username: req.user.username || 'super_admin',
+          email: req.user.email || 'funflick0308@gmail.com',
+          role: 'admin',
+          avatar: '/brand/funflick-logo.png',
+          avatar_url: '/brand/funflick-logo.png',
+          accountStatus: 'Admin',
+          hasPublishingSubscription: true
+        }
+      });
+    }
+
     const [rows] = await pool.query(
       'SELECT id, name, username, email, phone, avatar_url, bio, role, created_at FROM users WHERE id = ?',
       [req.user.id]
