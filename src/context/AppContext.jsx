@@ -3,6 +3,7 @@ import {
   DEFAULT_AVATAR,
   INFLUENCER_SUBSCRIPTION_PLANS
 } from '../data/mockData';
+import { calculateISTDaysRemaining, formatISTDate, formatISTDateTime } from '../utils/istDateUtils';
 
 const AppContext = createContext(null);
 
@@ -1348,7 +1349,7 @@ export const AppProvider = ({ children }) => {
     }
 
     const newExpiryDate = new Date(baseExpiry.getTime() + durationDays * 24 * 60 * 60 * 1000);
-    const totalRemainingDays = Math.max(1, Math.ceil((newExpiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    const totalRemainingDays = calculateISTDaysRemaining(newExpiryDate, now);
 
     const newTransaction = {
       id: 'pay_' + (paymentId || ('test_' + Date.now())),
@@ -1424,7 +1425,7 @@ export const AppProvider = ({ children }) => {
         if (subRes.ok) {
           const subData = await subRes.json();
           const remDays = subData.daysRemaining || subData.totalRemainingDays || totalRemainingDays;
-          const expFormatted = new Date(subData.expiresAt || newExpiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          const expFormatted = formatISTDate(subData.expiresAt || newExpiryDate);
           if (subData.isExtended || subData.isExtension || isExtension) {
             showToast(`🎉 Subscription Extended! Added ${durationDays} days. Total validity: ${remDays} days (until ${expFormatted})`, 'success');
           } else {

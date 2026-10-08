@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { calculateISTDaysRemaining, formatISTDate, formatISTDateTime } from '../utils/istDateUtils.js';
 
 export async function getActivePlans(req, res) {
   try {
@@ -192,7 +193,7 @@ export async function subscribeUser(req, res) {
 
     // 3. Calculate new expiry date by adding duration to baseExpiryDate
     const newExpiryDate = new Date(baseExpiryDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
-    const totalRemainingDays = Math.max(1, Math.ceil((newExpiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    const totalRemainingDays = calculateISTDaysRemaining(newExpiryDate, now);
 
     // 4. Record transaction in user_subscriptions history table
     await pool.query(
@@ -222,10 +223,10 @@ export async function subscribeUser(req, res) {
       [finalPlanName, baseStartDate, newExpiryDate, userId]
     );
 
-    // 6. User notification with precise validity details
-    const expiryDateStr = newExpiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    // 6. User notification with precise validity details as per IST in India
+    const expiryDateStr = formatISTDate(newExpiryDate);
     const notificationMsg = isExtension
-      ? `🔄 Plan Extended! Added ${durationDays} days to your active subscription. Your new validity is until ${expiryDateStr} (${totalRemainingDays} days total).`
+      ? `🔄 Plan Extended! Added ${durationDays} days to your active subscription. Your new validity is until ${expiryDateStr} (${totalRemainingDays} days left).`
       : `🌟 Subscription Activated! You are an active Influencer on ${finalPlanName}. Valid for ${durationDays} days until ${expiryDateStr}.`;
 
     try {
@@ -273,9 +274,7 @@ export async function getUserSubscriptionStatus(req, res) {
     const now = new Date();
     const expiresAt = u.subscription_expires_at ? new Date(u.subscription_expires_at) : null;
     const isActive = Boolean(u.is_influencer && expiresAt && expiresAt > now);
-    const daysRemaining = (expiresAt && expiresAt > now)
-      ? Math.max(1, Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
-      : 0;
+    const daysRemaining = calculateISTDaysRemaining(expiresAt, now);
 
     // Fetch subscription purchase history from database
     const [historyRows] = await pool.query(
@@ -289,8 +288,9 @@ export async function getUserSubscriptionStatus(req, res) {
     const hasStackedPacks = historyRows.length > 1 && isActive;
     const futurePacksCount = historyRows.length > 1 ? historyRows.length - 1 : 0;
     const totalDaysAdded = historyRows.reduce((acc, h) => acc + (Number(h.duration_days) || 0), 0);
-    const formattedExpiry = expiresAt ? expiresAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
-    const formattedStart = u.subscription_start ? new Date(u.subscription_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+    const formattedExpiry = expiresAt ? formatISTDate(expiresAt) : null;
+    const formattedExpiryTime = expiresAt ? formatISTDateTime(expiresAt) : null;
+    const formattedStart = u.subscription_start ? formatISTDate(new Date(u.subscription_start)) : null;
 
     return res.json({
       isActive,
@@ -300,8 +300,10 @@ export async function getUserSubscriptionStatus(req, res) {
       formattedStart,
       expiresAt: u.subscription_expires_at,
       formattedExpiry,
+      formattedExpiryTime,
       daysRemaining,
       totalRemainingDays: daysRemaining,
+      timezone: 'Asia/Kolkata',
       hasStackedPacks,
       futurePacksCount,
       totalDaysAdded,
@@ -309,13 +311,13 @@ export async function getUserSubscriptionStatus(req, res) {
         id: h.id,
         planId: h.plan_id,
         planName: h.plan_name,
-        price: `₹${Number(h.price).toLocaleString()}`,
+        price: `₹${Number(h.price).toLocaleString('en-IN')}`,
         durationDays: h.duration_days,
         paymentId: h.payment_id,
         status: h.payment_status,
         startDate: h.start_date,
         endDate: h.end_date,
-        date: new Date(h.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+        date: formatISTDate(new Date(h.created_at))
       }))
     });
   } catch (err) {

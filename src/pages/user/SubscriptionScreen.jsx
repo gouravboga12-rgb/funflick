@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { PUBLISHING_PLANS } from '../../data/mockData';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
 import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDetailsModal';
+import { calculateISTDaysRemaining, formatISTDate, formatISTDateTime } from '../../utils/istDateUtils';
 import { 
   ChevronLeft, 
   Crown, 
@@ -145,7 +146,7 @@ export const SubscriptionScreen = () => {
   const activeExpiresAt = subscriptionStatus?.expiresAt || currentUser?.subscriptionExpiresAt;
   const activeDaysRemaining = subscriptionStatus?.daysRemaining !== undefined 
     ? Number(subscriptionStatus.daysRemaining)
-    : (activeExpiresAt ? Math.max(0, Math.ceil((new Date(activeExpiresAt) - new Date()) / (1000 * 60 * 60 * 24))) : 0);
+    : (activeExpiresAt ? calculateISTDaysRemaining(activeExpiresAt) : 0);
 
   const getPlanDays = (plan) => {
     if (plan.durationDays) return Number(plan.durationDays);
@@ -213,7 +214,9 @@ export const SubscriptionScreen = () => {
                 <span className="text-lg font-extrabold text-amber-300 font-mono block">
                   {activeDaysRemaining}
                 </span>
-                <span className="text-[9px] text-gray-300 block -mt-1 font-medium">days remaining</span>
+                <span className="text-[9px] text-gray-300 block -mt-1 font-medium">
+                  {activeDaysRemaining === 1 ? 'day remaining' : 'days remaining'}
+                </span>
               </div>
             </div>
 
@@ -223,7 +226,7 @@ export const SubscriptionScreen = () => {
                 <span className="text-gray-400 block text-[10px]">Start Date:</span>
                 <strong className="text-gray-200">
                   {activeStartDate 
-                    ? new Date(activeStartDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                    ? formatISTDate(activeStartDate)
                     : 'Active'}
                 </strong>
               </div>
@@ -231,7 +234,7 @@ export const SubscriptionScreen = () => {
                 <span className="text-gray-400 block text-[10px]">Valid Until / Expiry:</span>
                 <strong className="text-emerald-300">
                   {activeExpiresAt 
-                    ? new Date(activeExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                    ? formatISTDate(activeExpiresAt)
                     : `${activeDaysRemaining} Days`}
                 </strong>
               </div>
@@ -346,7 +349,7 @@ export const SubscriptionScreen = () => {
                     </span>
                     {isUserSubscribed && activeDaysRemaining > 0 && (
                       <span className="text-[9px] text-gray-400">
-                        Until {calculateProjectedExpiry(plan).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        Until {formatISTDate(calculateProjectedExpiry(plan))}
                       </span>
                     )}
                   </div>

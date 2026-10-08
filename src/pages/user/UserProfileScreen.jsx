@@ -10,6 +10,7 @@ import { HelpSupportModal } from './HelpSupportModal';
 import { FollowListModal } from '../../components/user/FollowListModal';
 import { SubmitAdRequestModal } from '../../components/user/SubmitAdRequestModal';
 import { BlockedUsersModal } from '../../components/user/BlockedUsersModal';
+import { calculateISTDaysRemaining, formatISTDate, formatISTDateTime } from '../../utils/istDateUtils';
 import { 
   ChevronLeft, 
   Settings, 
@@ -132,7 +133,7 @@ export const UserProfileScreen = () => {
   const userPlanName = subscriptionStatus?.planName || currentUser?.subscriptionPlan || 'Monthly Influencer Pro';
   const userDaysRemaining = subscriptionStatus?.daysRemaining !== undefined 
     ? Number(subscriptionStatus.daysRemaining) 
-    : (userPlanExpiresAt ? Math.max(0, Math.ceil((new Date(userPlanExpiresAt) - new Date()) / (1000 * 60 * 60 * 24))) : 0);
+    : (userPlanExpiresAt ? calculateISTDaysRemaining(userPlanExpiresAt) : 0);
 
   const [activeProfileMode, setActiveProfileMode] = useState(initialTab); // 'viewer' | 'influencer'
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -428,12 +429,14 @@ export const UserProfileScreen = () => {
                   <span className="text-base font-extrabold text-amber-300 font-mono block">
                     {userDaysRemaining}
                   </span>
-                  <span className="text-[9px] text-gray-300 -mt-1 block font-medium">days left</span>
+                  <span className="text-[9px] text-gray-300 -mt-1 block font-medium">
+                    {userDaysRemaining === 1 ? 'day left' : 'days left'}
+                  </span>
                 </div>
               </div>
 
               <div className="flex items-center justify-between pt-1 border-t border-white/5 text-[10px] text-gray-300">
-                <span>Valid until <strong className="text-emerald-300">{userPlanExpiresAt ? new Date(userPlanExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Active'}</strong></span>
+                <span>Valid until <strong className="text-emerald-300">{userPlanExpiresAt ? formatISTDate(userPlanExpiresAt) : 'Active'}</strong></span>
                 {subscriptionStatus?.hasStackedPacks && (
                   <span className="inline-flex items-center gap-1 text-amber-300 font-bold bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
                     <span>⭐</span>
@@ -541,9 +544,9 @@ export const UserProfileScreen = () => {
                     {isUserSubscribed
                       ? (
                         <span>
-                          {userPlanStartDate && <span className="text-gray-400 mr-1.5">Started: {new Date(userPlanStartDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ·</span>}
-                          Valid until <strong className="text-emerald-300">{userPlanExpiresAt ? new Date(userPlanExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Active'}</strong>
-                          {userDaysRemaining > 0 && <span className="text-amber-300 font-semibold ml-1.5">({userDaysRemaining} days left)</span>}
+                          {userPlanStartDate && <span className="text-gray-400 mr-1.5">Started: {formatISTDate(userPlanStartDate, { year: undefined })} ·</span>}
+                          Valid until <strong className="text-emerald-300">{userPlanExpiresAt ? formatISTDate(userPlanExpiresAt) : 'Active'}</strong>
+                          {userDaysRemaining > 0 && <span className="text-amber-300 font-semibold ml-1.5">({userDaysRemaining} {userDaysRemaining === 1 ? 'day' : 'days'} left)</span>}
                         </span>
                       )
                       : 'Free uploads active for everyone. Subscribe to become an Influencer and unlock deep analytics & rewards!'}
