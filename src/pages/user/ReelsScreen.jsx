@@ -51,9 +51,14 @@ export const ReelsScreen = () => {
       const nextIdx = currentIdx + 1;
       setCurrentIdx(nextIdx);
 
-      // Trigger ad strictly every 5 reels for unshown ads only
+      // Trigger ad strictly every 5 reels for unshown ads only (1st ad after 5 reels, 2nd after 10 reels, etc.)
       if (nextIdx > 0 && nextIdx % 5 === 0) {
-        const availableAds = (adsList || []).filter(a => a.active && !shownAdIdsRef.current.has(a.id));
+        // Exclude ads designated as 'Pop-up Ads' so they do not interrupt reels
+        const availableAds = (adsList || []).filter(a => 
+          a.active && 
+          a.frequency !== 'Pop-up Ads' && 
+          !shownAdIdsRef.current.has(a.id)
+        );
         if (availableAds.length > 0) {
           const nextAd = availableAds[0];
           shownAdIdsRef.current.add(nextAd.id);

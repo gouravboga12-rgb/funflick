@@ -1640,7 +1640,7 @@ export const AppProvider = ({ children }) => {
       allowCloseAfter: Number(adData.allowCloseAfter) || 8,
       startDate: adData.startDate || '2026-10-01',
       endDate: adData.endDate || '2026-11-30',
-      frequency: adData.frequency || 'Every 3 Reels',
+      frequency: adData.frequency || 'After Every 5 Reels',
       actionUrl: adData.actionUrl || 'https://funflick.in',
       actionText: adData.actionText || 'Learn More'
     };
@@ -1794,24 +1794,21 @@ export const AppProvider = ({ children }) => {
       return;
     }
 
-    // 1. Check for "On App Open" active ads (Fires once per app mount/session)
-    const onOpenAd = adsList.find(a => a.active && a.frequency === 'On App Open');
-    if (onOpenAd && !hasTriggeredAppOpenRef.current) {
-      hasTriggeredAppOpenRef.current = true;
-      const timer = setTimeout(() => {
-        showMobileAd(onOpenAd.id);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-
-    // 2. Check for "Once per session" active ads
-    const sessionAd = adsList.find(a => a.active && a.frequency === 'Once per session');
-    if (sessionAd) {
-      const sessionKey = `funflick_session_seen_${sessionAd.id}`;
+    // Check for "Pop-up Ads" (or legacy "On App Open" / "Once per session") active ads
+    const popupAd = adsList.find(a => 
+      a.active && (
+        a.frequency === 'Pop-up Ads' || 
+        a.frequency === 'On App Open' || 
+        a.frequency === 'Once per session'
+      )
+    );
+    if (popupAd && !hasTriggeredAppOpenRef.current) {
+      const sessionKey = `funflick_session_seen_${popupAd.id}`;
       if (!sessionStorage.getItem(sessionKey)) {
         sessionStorage.setItem(sessionKey, 'true');
+        hasTriggeredAppOpenRef.current = true;
         const timer = setTimeout(() => {
-          showMobileAd(sessionAd.id);
+          showMobileAd(popupAd.id);
         }, 1200);
         return () => clearTimeout(timer);
       }

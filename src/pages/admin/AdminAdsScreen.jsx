@@ -52,7 +52,7 @@ export const AdminAdsScreen = () => {
     active: true,
     startDate: '2026-10-01',
     endDate: '2026-11-30',
-    frequency: 'Every 3 Reels',
+    frequency: 'After Every 5 Reels',
     actionUrl: 'https://funflick.in',
     actionText: 'Learn More'
   });
@@ -142,7 +142,7 @@ export const AdminAdsScreen = () => {
       active: true,
       startDate: '2026-10-01',
       endDate: '2026-11-30',
-      frequency: 'Every 3 Reels',
+      frequency: 'After Every 5 Reels',
       actionUrl: 'https://funflick.in',
       actionText: 'Shop Special Offer'
     });
@@ -154,7 +154,12 @@ export const AdminAdsScreen = () => {
     setUploadedFileName(ad.title || 'Current Media');
     setUploadedFileSize(ad.type === 'video' ? 'Video File' : 'Image File');
     setShowUrlFallback(false);
-    setCurrentAd({ ...ad });
+    const normalizedFrequency = (!ad.frequency || ad.frequency === 'Every 3 Reels' || ad.frequency === 'Every 5 Reels')
+      ? 'After Every 5 Reels'
+      : (ad.frequency === 'On App Open' || ad.frequency === 'Once per session')
+        ? 'Pop-up Ads'
+        : ad.frequency;
+    setCurrentAd({ ...ad, frequency: normalizedFrequency });
     setModalOpen(true);
   };
 
@@ -365,7 +370,7 @@ export const AdminAdsScreen = () => {
 
                     <span className="flex items-center gap-1 text-blue-400 font-semibold">
                       <Calendar className="w-3.5 h-3.5" />
-                      <span>Freq: {ad.frequency}</span>
+                      <span>Freq: {ad.frequency === 'Every 3 Reels' || ad.frequency === 'Every 5 Reels' ? 'After Every 5 Reels' : (ad.frequency === 'On App Open' || ad.frequency === 'Once per session') ? 'Pop-up Ads' : ad.frequency}</span>
                     </span>
                   </div>
 
@@ -756,20 +761,18 @@ export const AdminAdsScreen = () => {
                   <div className="space-y-1">
                     <label className="text-xs font-bold block">Display Frequency</label>
                     <select
-                      value={currentAd.frequency}
+                      value={currentAd.frequency === 'Every 3 Reels' || currentAd.frequency === 'Every 5 Reels' ? 'After Every 5 Reels' : (currentAd.frequency === 'On App Open' || currentAd.frequency === 'Once per session') ? 'Pop-up Ads' : currentAd.frequency}
                       onChange={(e) => setCurrentAd({ ...currentAd, frequency: e.target.value })}
                       className={`w-full px-3 py-2 rounded-xl text-xs font-semibold ${
                         isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#0a0618] border-white/10'
                       } border focus:outline-none`}
                     >
-                      <option value="Every 3 Reels">Every 3 Reels</option>
-                      <option value="On App Open">On App Open</option>
-                      <option value="Once per session">Once per session</option>
+                      <option value="After Every 5 Reels">After Every 5 Reels</option>
+                      <option value="Pop-up Ads">Pop-up Ads</option>
                     </select>
                     <span className="text-[10px] text-gray-400 block mt-0.5">
-                      {currentAd.frequency === 'On App Open' && '⚡ Triggers popup overlay whenever users open the app'}
-                      {currentAd.frequency === 'Once per session' && '🎯 Shows popup once per browser session'}
-                      {currentAd.frequency === 'Every 3 Reels' && '🎬 Triggers every 3 reels while scrolling'}
+                      {currentAd.frequency === 'After Every 5 Reels' && '🎬 Triggers sequentially: 1st ad after 5 reels, 2nd after 10 reels (once per ad)'}
+                      {currentAd.frequency === 'Pop-up Ads' && '⚡ Triggers popup overlay for users'}
                     </span>
                   </div>
 
