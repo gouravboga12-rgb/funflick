@@ -472,7 +472,7 @@ export async function initDatabase() {
         active TINYINT DEFAULT 1,
         start_date VARCHAR(50) DEFAULT NULL,
         end_date VARCHAR(50) DEFAULT NULL,
-        frequency VARCHAR(100) DEFAULT 'After Every 5 Reels',
+        frequency VARCHAR(100) DEFAULT 'After 5 Reels',
         action_url TEXT,
         action_text VARCHAR(100) DEFAULT 'Learn More',
         impressions INT DEFAULT 0,
@@ -482,11 +482,11 @@ export async function initDatabase() {
       ) ENGINE=InnoDB;
     `);
 
-    // Ensure legacy 'Every 3 Reels' values are migrated to 'After Every 5 Reels'
+    // Ensure all reel-type values are migrated to 'After 5 Reels'
     await connection.query(`
       UPDATE platform_ads 
-      SET frequency = 'After Every 5 Reels' 
-      WHERE frequency = 'Every 3 Reels' OR frequency = 'Every 5 Reels' OR frequency IS NULL
+      SET frequency = 'After 5 Reels' 
+      WHERE frequency != 'Pop-up Ads' OR frequency IS NULL
     `).catch(() => {});
 
     // Platform Settings Table

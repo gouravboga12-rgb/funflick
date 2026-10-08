@@ -1640,7 +1640,7 @@ export const AppProvider = ({ children }) => {
       allowCloseAfter: Number(adData.allowCloseAfter) || 8,
       startDate: adData.startDate || '2026-10-01',
       endDate: adData.endDate || '2026-11-30',
-      frequency: adData.frequency || 'After Every 5 Reels',
+      frequency: adData.frequency || 'After 5 Reels',
       actionUrl: adData.actionUrl || 'https://funflick.in',
       actionText: adData.actionText || 'Learn More'
     };

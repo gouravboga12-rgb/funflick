@@ -54,7 +54,7 @@ export const AdminAdRequestsScreen = () => {
 
   // Approve modal state
   const [selectedApproveRequest, setSelectedApproveRequest] = useState(null);
-  const [approveFrequency, setApproveFrequency] = useState('After Every 5 Reels');
+  const [approveFrequency, setApproveFrequency] = useState('After 5 Reels');
   const [approveDuration, setApproveDuration] = useState(20);
   const [approveCloseAfter, setApproveCloseAfter] = useState(8);
   const [isApproving, setIsApproving] = useState(false);
@@ -572,7 +572,7 @@ export const AdminAdRequestsScreen = () => {
                     onChange={(e) => setApproveFrequency(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-pink-500"
                   >
-                    <option value="After Every 5 Reels" className="bg-[#120a24]">After Every 5 Reels (Reels Sequential 5, 10, once per ad)</option>
+                    <option value="After 5 Reels" className="bg-[#120a24]">After 5 Reels (Reels Feed: Ad 1 at 5 reels, Ad 2 at 10 reels, 1 time each)</option>
                     <option value="Pop-up Ads" className="bg-[#120a24]">Pop-up Ads (In-App Overlay Pop-up)</option>
                   </select>
                 </div>

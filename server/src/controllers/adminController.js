@@ -793,11 +793,9 @@ export async function getAdminAds(req, res) {
       active: Boolean(r.active),
       startDate: r.start_date || '2026-10-01',
       endDate: r.end_date || '2026-11-30',
-      frequency: (r.frequency === 'Every 3 Reels' || r.frequency === 'Every 5 Reels' || !r.frequency) 
-        ? 'After Every 5 Reels' 
-        : (r.frequency === 'On App Open' || r.frequency === 'Once per session') 
-          ? 'Pop-up Ads' 
-          : r.frequency,
+      frequency: (r.frequency === 'Pop-up Ads' || r.frequency === 'On App Open' || r.frequency === 'Once per session') 
+        ? 'Pop-up Ads' 
+        : 'After 5 Reels',
       actionUrl: r.action_url || 'https://funflick.in',
       actionText: r.action_text || 'Learn More',
       impressions: Number(r.impressions) || 0,
@@ -824,16 +822,14 @@ export async function createAdminAd(req, res) {
       active = true,
       startDate = '2026-10-01',
       endDate = '2026-11-30',
-      frequency = 'After Every 5 Reels',
+      frequency = 'After 5 Reels',
       actionUrl = 'https://funflick.in',
       actionText = 'Learn More'
     } = req.body;
 
-    const normalizedFrequency = (frequency === 'Every 3 Reels' || frequency === 'Every 5 Reels' || !frequency)
-      ? 'After Every 5 Reels'
-      : (frequency === 'On App Open' || frequency === 'Once per session')
-        ? 'Pop-up Ads'
-        : frequency;
+    const normalizedFrequency = (frequency === 'Pop-up Ads' || frequency === 'On App Open' || frequency === 'Once per session')
+      ? 'Pop-up Ads'
+      : 'After 5 Reels';
 
     if (!title || !mediaUrl) {
       return res.status(400).json({ error: 'Title and media URL are required' });
@@ -1229,11 +1225,9 @@ export async function approveAdminAdRequest(req, res) {
     const request = rows[0];
     const newAdId = `ad_${Date.now()}`;
 
-    const normalizedFrequency = (frequency === 'Every 3 Reels' || frequency === 'Every 5 Reels' || !frequency)
-      ? 'After Every 5 Reels'
-      : (frequency === 'On App Open' || frequency === 'Once per session')
-        ? 'Pop-up Ads'
-        : frequency;
+    const normalizedFrequency = (frequency === 'Pop-up Ads' || frequency === 'On App Open' || frequency === 'Once per session')
+      ? 'Pop-up Ads'
+      : 'After 5 Reels';
 
     // 1. Insert into platform_ads table so it is instantly live
     await pool.query(

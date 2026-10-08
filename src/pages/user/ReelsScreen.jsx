@@ -43,31 +43,35 @@ export const ReelsScreen = () => {
   }, [currentPost?.id, setActivePlayingVideoId]);
 
   // Controlled Sequential Ad Frequency:
-  // Shows Ad 1 after 5 reels, Ad 2 after 10 reels, then stops once available active ads have been shown
+  // Shows Ad 1 after 5 reels, Ad 2 after 10 reels (5 more reels), strictly ONCE per ad (never repeats)
   const shownAdIdsRef = useRef(new Set());
+  const reelsScrolledCountRef = useRef(0);
 
   const handleNext = () => {
-    if (currentIdx < visiblePosts.length - 1) {
-      const nextIdx = currentIdx + 1;
-      setCurrentIdx(nextIdx);
+    if (visiblePosts.length === 0) return;
 
-      // Trigger ad strictly every 5 reels for unshown ads only (1st ad after 5 reels, 2nd after 10 reels, etc.)
-      if (nextIdx > 0 && nextIdx % 5 === 0) {
-        // Exclude ads designated as 'Pop-up Ads' so they do not interrupt reels
-        const availableAds = (adsList || []).filter(a => 
-          a.active && 
-          a.frequency !== 'Pop-up Ads' && 
-          !shownAdIdsRef.current.has(a.id)
-        );
-        if (availableAds.length > 0) {
-          const nextAd = availableAds[0];
-          shownAdIdsRef.current.add(nextAd.id);
-          showMobileAd(nextAd.id);
-        }
+    let nextIdx = currentIdx + 1;
+    if (nextIdx >= visiblePosts.length) {
+      nextIdx = 0; // Loop back smoothly
+    }
+    setCurrentIdx(nextIdx);
+
+    // Track total reels advanced
+    reelsScrolledCountRef.current += 1;
+
+    // Trigger ad strictly after 5 reels (5, 10, etc.) for unshown ads only
+    if (reelsScrolledCountRef.current > 0 && reelsScrolledCountRef.current % 5 === 0) {
+      // Exclude ads designated as 'Pop-up Ads' so they do not interrupt reels
+      const availableAds = (adsList || []).filter(a => 
+        a.active && 
+        a.frequency !== 'Pop-up Ads' && 
+        !shownAdIdsRef.current.has(a.id)
+      );
+      if (availableAds.length > 0) {
+        const nextAd = availableAds[0];
+        shownAdIdsRef.current.add(nextAd.id);
+        showMobileAd(nextAd.id);
       }
-    } else if (visiblePosts.length > 0) {
-      // Loop back smoothly without forcing repeated ads
-      setCurrentIdx(0);
     }
   };
 
