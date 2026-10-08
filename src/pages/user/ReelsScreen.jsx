@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { VideoPostCard } from '../../components/feed/VideoPostCard';
@@ -42,23 +42,27 @@ export const ReelsScreen = () => {
     };
   }, [currentPost?.id, setActivePlayingVideoId]);
 
+  // Controlled Sequential Ad Frequency:
+  // Shows Ad 1 after 5 reels, Ad 2 after 10 reels, then stops once available active ads have been shown
+  const shownAdIdsRef = useRef(new Set());
+
   const handleNext = () => {
-    const hasActiveAds = adsList?.some(a => a.active);
     if (currentIdx < visiblePosts.length - 1) {
       const nextIdx = currentIdx + 1;
       setCurrentIdx(nextIdx);
-      // Trigger sponsor ad every 3 reels, or on reaching the end if fewer than 3 reels exist
-      if (hasActiveAds) {
-        if (nextIdx > 0 && (nextIdx % 3 === 0 || (visiblePosts.length <= 2 && nextIdx === visiblePosts.length - 1))) {
-          showMobileAd();
+
+      // Trigger ad strictly every 5 reels for unshown ads only
+      if (nextIdx > 0 && nextIdx % 5 === 0) {
+        const availableAds = (adsList || []).filter(a => a.active && !shownAdIdsRef.current.has(a.id));
+        if (availableAds.length > 0) {
+          const nextAd = availableAds[0];
+          shownAdIdsRef.current.add(nextAd.id);
+          showMobileAd(nextAd.id);
         }
       }
     } else if (visiblePosts.length > 0) {
-      // Loop back to first reel smoothly and trigger ad
+      // Loop back smoothly without forcing repeated ads
       setCurrentIdx(0);
-      if (hasActiveAds) {
-        showMobileAd();
-      }
     }
   };
 

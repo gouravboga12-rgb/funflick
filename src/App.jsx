@@ -49,6 +49,7 @@ import { AdminCategoriesScreen } from './pages/admin/AdminCategoriesScreen';
 import { AdminSettingsScreen } from './pages/admin/AdminSettingsScreen';
 import { AdminInfluencerMediaScreen } from './pages/admin/AdminInfluencerMediaScreen';
 import { AdminAdsScreen } from './pages/admin/AdminAdsScreen';
+import { AdminAdRequestsScreen } from './pages/admin/AdminAdRequestsScreen';
 import { AdminCopyrightScreen } from './pages/admin/AdminCopyrightScreen';
 
 import { AdminLoginScreen } from './pages/admin/AdminLoginScreen';
@@ -121,6 +122,7 @@ function AppRoutes() {
           <Route path="/admin" element={<AdminRouteGuard><AdminDashboardScreen /></AdminRouteGuard>} />
           <Route path="/admin/influencer-media" element={<AdminRouteGuard><AdminInfluencerMediaScreen /></AdminRouteGuard>} />
           <Route path="/admin/ads" element={<AdminRouteGuard><AdminAdsScreen /></AdminRouteGuard>} />
+          <Route path="/admin/ad-requests" element={<AdminRouteGuard><AdminAdRequestsScreen /></AdminRouteGuard>} />
           <Route path="/admin/users" element={<AdminRouteGuard><AdminUsersScreen /></AdminRouteGuard>} />
           <Route path="/admin/creators" element={<AdminRouteGuard><AdminCreatorsScreen /></AdminRouteGuard>} />
           <Route path="/admin/content" element={<AdminRouteGuard><AdminContentScreen /></AdminRouteGuard>} />

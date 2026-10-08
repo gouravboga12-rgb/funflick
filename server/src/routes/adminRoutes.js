@@ -19,7 +19,11 @@ import {
   createAdminAd,
   deleteAdminAd,
   recordAdMetric,
-  getAdminInfluencerMedia
+  getAdminInfluencerMedia,
+  getAdminAdRequests,
+  approveAdminAdRequest,
+  rejectAdminAdRequest,
+  deleteAdminAdRequest
 } from '../controllers/adminController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -66,6 +70,12 @@ router.get('/ads', getAdminAds);
 router.post('/ads', authenticateToken, requireAdmin, createAdminAd);
 router.delete('/ads/:id', authenticateToken, requireAdmin, deleteAdminAd);
 router.post('/ads/:id/metric', recordAdMetric);
+
+// Ad Requests & Ingestion Moderation
+router.get('/ad-requests', authenticateToken, requireAdmin, getAdminAdRequests);
+router.put('/ad-requests/:id/approve', authenticateToken, requireAdmin, approveAdminAdRequest);
+router.put('/ad-requests/:id/reject', authenticateToken, requireAdmin, rejectAdminAdRequest);
+router.delete('/ad-requests/:id', authenticateToken, requireAdmin, deleteAdminAdRequest);
 
 export default router;
 

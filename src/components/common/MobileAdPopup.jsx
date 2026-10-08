@@ -14,13 +14,27 @@ import {
 } from 'lucide-react';
 
 export const MobileAdPopup = () => {
-  const { activePopupAd, dismissMobileAd, showToast } = useApp();
+  const { activePopupAd, dismissMobileAd, showToast, isReelsMuted, setIsReelsMuted } = useApp();
   const videoRef = useRef(null);
 
-  const [muted, setMuted] = useState(true);
+  // Synchronize audio volume with app's Reels volume preference
+  const [muted, setMuted] = useState(isReelsMuted !== undefined ? isReelsMuted : false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
   const [canClose, setCanClose] = useState(false);
+
+  useEffect(() => {
+    if (isReelsMuted !== undefined) {
+      setMuted(isReelsMuted);
+    }
+  }, [isReelsMuted]);
+
+  const handleToggleMute = (e) => {
+    e?.stopPropagation();
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+    if (setIsReelsMuted) setIsReelsMuted(nextMuted);
+  };
 
   const adId = activePopupAd?.id;
 
@@ -149,8 +163,9 @@ export const MobileAdPopup = () => {
               {/* Video control overlays */}
               <div className="absolute bottom-3 right-3 flex items-center gap-2 z-20">
                 <button
-                  onClick={() => setMuted(!muted)}
-                  className="p-2 rounded-full bg-black/70 hover:bg-black text-white border border-white/10 backdrop-blur-sm transition"
+                  onClick={handleToggleMute}
+                  className="p-2 rounded-full bg-black/70 hover:bg-black text-white border border-white/10 backdrop-blur-sm transition cursor-pointer"
+                  title={muted ? "Unmute Video" : "Mute Video"}
                 >
                   {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
                 </button>

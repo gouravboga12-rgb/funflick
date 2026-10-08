@@ -482,6 +482,55 @@ export async function initDatabase() {
       ) ENGINE=InnoDB;
     `);
 
+    // Platform Settings Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS platform_settings (
+        setting_key VARCHAR(100) PRIMARY KEY,
+        setting_value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+
+    // Ad Requests Table for Advertisers & Promotion Submissions
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS ad_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT DEFAULT NULL,
+        brand_name VARCHAR(150) NOT NULL,
+        contact_person VARCHAR(100) DEFAULT NULL,
+        phone VARCHAR(30) NOT NULL,
+        whatsapp VARCHAR(30) DEFAULT NULL,
+        email VARCHAR(120) DEFAULT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT DEFAULT NULL,
+        ad_type ENUM('video', 'image') DEFAULT 'video',
+        media_url TEXT NOT NULL,
+        thumbnail_url TEXT DEFAULT NULL,
+        action_url TEXT DEFAULT NULL,
+        action_text VARCHAR(100) DEFAULT 'Learn More',
+        status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+        admin_notes TEXT DEFAULT NULL,
+        published_ad_id VARCHAR(100) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB;
+    `);
+
+    // Seed default advertiser contact settings if not present
+    const defaultAdSettings = [
+      ['ad_contact_email', 'ads@funflick.in'],
+      ['ad_contact_phone', '+91 98765 43210'],
+      ['ad_contact_whatsapp', '+91 98765 43210'],
+      ['ad_contact_timings', 'Mon - Sat, 9:00 AM - 7:00 PM IST']
+    ];
+    for (const [key, val] of defaultAdSettings) {
+      await connection.query(
+        'INSERT IGNORE INTO platform_settings (setting_key, setting_value) VALUES (?, ?)',
+        [key, val]
+      );
+    }
+
     connection.release();
     console.log('✅ MySQL schema initialized successfully');
   } catch (err) {

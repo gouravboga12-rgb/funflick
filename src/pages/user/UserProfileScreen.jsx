@@ -8,6 +8,7 @@ import { CreateChooserModal } from '../../components/user/create/CreateChooserMo
 import { AccountSettingsModal } from './AccountSettingsModal';
 import { HelpSupportModal } from './HelpSupportModal';
 import { FollowListModal } from '../../components/user/FollowListModal';
+import { SubmitAdRequestModal } from '../../components/user/SubmitAdRequestModal';
 import { 
   ChevronLeft, 
   Settings, 
@@ -34,7 +35,11 @@ import {
   Info,
   Trash2,
   Lock,
-  User
+  User,
+  Megaphone,
+  Phone,
+  MessageCircle,
+  Mail
 } from 'lucide-react';
 
 export const UserProfileScreen = () => {
@@ -59,8 +64,11 @@ export const UserProfileScreen = () => {
     followRequests,
     transactions,
     subscriptionStatus,
-    fetchUserSubscriptionStatus
+    fetchUserSubscriptionStatus,
+    adContactSettings
   } = useApp();
+
+  const [isAdRequestModalOpen, setIsAdRequestModalOpen] = useState(false);
 
   // Dynamic live follower counts from backend
   const [liveFollowCounts, setLiveFollowCounts] = useState({
@@ -183,6 +191,14 @@ export const UserProfileScreen = () => {
       label: 'My Content Library',
       badge: `${realPostCount} posts`,
       path: '/my-content'
+    },
+    {
+      icon: Megaphone,
+      color: 'text-pink-400',
+      label: 'Advertise with FunFlick',
+      badge: 'Promote',
+      badgeColor: 'bg-pink-500/20 text-pink-300 font-bold',
+      action: 'advertise'
     },
     {
       icon: Settings,
@@ -767,6 +783,8 @@ export const UserProfileScreen = () => {
                         setIsSettingsModalOpen(true);
                       } else if (item.action === 'help') {
                         setIsHelpModalOpen(true);
+                      } else if (item.action === 'advertise') {
+                        setIsAdRequestModalOpen(true);
                       } else if (item.path) {
                         navigate(item.path);
                       }
@@ -810,6 +828,92 @@ export const UserProfileScreen = () => {
             </div>
           </div>
         )}
+
+        {/* ======================================================== */}
+        {/* 📢 ADVERTISE & PROMOTE WITH FUNFLICK (SPONSOR & BRAND HUB)*/}
+        {/* ======================================================== */}
+        <div className="p-4 rounded-3xl bg-gradient-to-br from-[#1c0b38] via-[#120a24] to-[#1a0e33] border border-pink-500/25 shadow-xl space-y-3.5 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-36 h-36 bg-pink-500/10 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-white shadow-md shadow-pink-500/20">
+                <Megaphone className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-black text-white font-heading block">
+                  Advertise with FunFlick
+                </span>
+                <span className="text-[10px] text-pink-300 font-semibold">
+                  Promote your brand or business to thousands
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsAdRequestModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 via-[#ff007a] to-purple-600 hover:opacity-95 text-white font-extrabold text-[10px] shadow-md shadow-pink-500/20 flex items-center gap-1 transition active:scale-95 cursor-pointer"
+            >
+              <span>Submit Ad</span>
+              <Sparkles className="w-3 h-3" />
+            </button>
+          </div>
+
+          <p className="text-[11px] text-gray-300 leading-relaxed">
+            Run video ads in full-screen reels, home feeds, and popup placements. Upload your creative to AWS S3 and our advertising team will get in touch with you.
+          </p>
+
+          {/* Dynamic Admin Contact Details */}
+          <div className="p-3 rounded-2xl bg-black/40 border border-white/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Official Advertising Support
+              </span>
+              <span className="text-[9px] text-emerald-400 font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{adContactSettings?.adContactTimings || 'Mon - Sat, 9am - 7pm'}</span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+              <a
+                href={`https://wa.me/${(adContactSettings?.adContactWhatsapp || '+91 98765 43210').replace(/[^0-9]/g, '')}?text=Hi%20FunFlick%20Advertising%20Team%2C%20I%20want%20to%20advertise%20my%20brand`}
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex flex-col items-center text-center gap-1 transition text-emerald-300"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[10px] font-bold leading-tight">WhatsApp</span>
+                <span className="text-[8px] text-gray-400 truncate max-w-full">
+                  {adContactSettings?.adContactWhatsapp || '+91 98765 43210'}
+                </span>
+              </a>
+
+              <a
+                href={`tel:${(adContactSettings?.adContactPhone || '+91 98765 43210').replace(/\s+/g, '')}`}
+                className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 flex flex-col items-center text-center gap-1 transition text-blue-300"
+              >
+                <Phone className="w-3.5 h-3.5 text-blue-400" />
+                <span className="text-[10px] font-bold leading-tight">Call Direct</span>
+                <span className="text-[8px] text-gray-400 truncate max-w-full">
+                  {adContactSettings?.adContactPhone || '+91 98765 43210'}
+                </span>
+              </a>
+
+              <a
+                href={`mailto:${adContactSettings?.adContactEmail || 'ads@funflick.in'}`}
+                className="p-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 flex flex-col items-center text-center gap-1 transition text-purple-300"
+              >
+                <Mail className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-[10px] font-bold leading-tight">Email Desk</span>
+                <span className="text-[8px] text-gray-400 truncate max-w-full">
+                  {adContactSettings?.adContactEmail || 'ads@funflick.in'}
+                </span>
+              </a>
+            </div>
+          </div>
+        </div>
 
         {/* ======================================================== */}
         {/* OFFICIAL FUNFLICK COMPANY FOOTER & BRANDING              */}
@@ -888,6 +992,12 @@ export const UserProfileScreen = () => {
         initialTab={followModalTab}
         currentUsername={currentUser.username}
         onRelationshipChanged={fetchLiveFollowCounts}
+      />
+
+      {/* Interactive Ad Campaign Submission & Tracking Modal */}
+      <SubmitAdRequestModal
+        isOpen={isAdRequestModalOpen}
+        onClose={() => setIsAdRequestModalOpen(false)}
       />
     </div>
   );

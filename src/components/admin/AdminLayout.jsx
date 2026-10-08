@@ -20,6 +20,7 @@ import {
   Search,
   Sun,
   Moon,
+  Inbox,
   Sparkles,
   Megaphone
 } from 'lucide-react';
@@ -28,17 +29,19 @@ import { MobileAdPopup } from '../common/MobileAdPopup';
 export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { adminPayouts, pendingApprovals, copyrightReports, showToast, theme, setTheme } = useApp();
+  const { adminPayouts, pendingApprovals, copyrightReports, adminAdRequests, showToast, theme, setTheme } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isLight = theme === 'light';
   const pendingPayoutCount = adminPayouts.filter(p => p.status === 'Partially Paid').length;
   const pendingCopyrightCount = (copyrightReports || []).filter(r => r.status === 'Pending').length;
+  const pendingAdRequestsCount = (adminAdRequests || []).filter(r => r.status === 'Pending').length;
 
   const navLinks = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
     { label: 'Influencer Media & Rewards', icon: Sparkles, path: '/admin/influencer-media' },
     { label: 'Ads & Promotions', icon: Megaphone, path: '/admin/ads' },
+    { label: 'Ad Requests', icon: Inbox, path: '/admin/ad-requests', badge: pendingAdRequestsCount },
     { label: 'Users', icon: Users, path: '/admin/users' },
     { label: 'Creators', icon: Video, path: '/admin/creators' },
     { label: 'Content Moderation', icon: Video, path: '/admin/content', badge: pendingApprovals.length },

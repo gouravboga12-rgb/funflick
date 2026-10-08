@@ -1049,3 +1049,267 @@ export async function getAdminInfluencerMedia(req, res) {
   }
 }
 
+// -----------------------------------------------------------------------------
+// AD REQUESTS & PROMOTION MANAGEMENT
+// -----------------------------------------------------------------------------
+
+// Submit new ad campaign request (User Profile / Public Advertisers)
+export async function createAdRequest(req, res) {
+  try {
+    const {
+      brandName,
+      contactPerson,
+      phone,
+      whatsapp,
+      email,
+      title,
+      description = '',
+      adType = 'video',
+      mediaUrl,
+      thumbnailUrl = null,
+      actionUrl = 'https://funflick.in',
+      actionText = 'Learn More'
+    } = req.body;
+
+    if (!brandName || !phone || !title || !mediaUrl) {
+      return res.status(400).json({ error: 'Brand name, phone number, title, and media file are required' });
+    }
+
+    const userId = req.user?.id || null;
+    const finalWhatsapp = whatsapp || phone;
+
+    const [result] = await pool.query(
+      `INSERT INTO ad_requests 
+        (user_id, brand_name, contact_person, phone, whatsapp, email, title, description, ad_type, media_url, thumbnail_url, action_url, action_text, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')`,
+      [
+        userId,
+        brandName,
+        contactPerson || brandName,
+        phone,
+        finalWhatsapp,
+        email || null,
+        title,
+        description,
+        adType,
+        mediaUrl,
+        thumbnailUrl || mediaUrl,
+        actionUrl,
+        actionText
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Ad request submitted successfully! FunFlick team will review and contact you via WhatsApp / Phone.',
+      id: result.insertId
+    });
+  } catch (err) {
+    console.error('Create ad request error:', err);
+    return res.status(500).json({ error: 'Failed to submit ad request' });
+  }
+}
+
+// Get ad requests submitted by authenticated user
+export async function getUserAdRequests(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.json({ requests: [] });
+
+    const [rows] = await pool.query(
+      `SELECT * FROM ad_requests WHERE user_id = ? ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    const requests = rows.map(r => ({
+      id: r.id,
+      brandName: r.brand_name,
+      contactPerson: r.contact_person,
+      phone: r.phone,
+      whatsapp: r.whatsapp,
+      email: r.email,
+      title: r.title,
+      description: r.description,
+      adType: r.ad_type,
+      mediaUrl: r.media_url,
+      thumbnailUrl: r.thumbnail_url || r.media_url,
+      actionUrl: r.action_url,
+      actionText: r.action_text,
+      status: r.status,
+      adminNotes: r.admin_notes,
+      publishedAdId: r.published_ad_id,
+      createdAt: r.created_at,
+      date: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    }));
+
+    return res.json({ requests });
+  } catch (err) {
+    console.error('Get user ad requests error:', err);
+    return res.status(500).json({ error: 'Failed to fetch ad requests' });
+  }
+}
+
+// Get all ad requests for Admin Review Portal
+export async function getAdminAdRequests(req, res) {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        ar.*,
+        u.name AS user_name,
+        u.username AS user_username,
+        u.avatar_url AS user_avatar
+      FROM ad_requests ar
+      LEFT JOIN users u ON ar.user_id = u.id
+      ORDER BY ar.created_at DESC
+    `);
+
+    const requests = rows.map(r => ({
+      id: r.id,
+      userId: r.user_id,
+      userName: r.user_name || r.contact_person,
+      username: r.user_username || 'guest_advertiser',
+      userAvatar: r.user_avatar || '/brand/default-avatar.svg',
+      brandName: r.brand_name,
+      contactPerson: r.contact_person || r.brand_name,
+      phone: r.phone,
+      whatsapp: r.whatsapp || r.phone,
+      email: r.email || '',
+      title: r.title,
+      description: r.description || '',
+      adType: r.ad_type || 'video',
+      mediaUrl: r.media_url,
+      thumbnailUrl: r.thumbnail_url || r.media_url,
+      actionUrl: r.action_url || 'https://funflick.in',
+      actionText: r.action_text || 'Learn More',
+      status: r.status || 'Pending',
+      adminNotes: r.admin_notes || '',
+      publishedAdId: r.published_ad_id || null,
+      createdAt: r.created_at,
+      date: new Date(r.created_at).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }));
+
+    return res.json({ requests, totalCount: requests.length });
+  } catch (err) {
+    console.error('Get admin ad requests error:', err);
+    return res.status(500).json({ error: 'Failed to fetch ad requests' });
+  }
+}
+
+// 1-Click Approve and Publish Ad to Live Platform Ads
+export async function approveAdminAdRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const {
+      frequency = 'Every 5 Reels',
+      duration = 20,
+      allowCloseAfter = 8,
+      startDate = '2026-10-01',
+      endDate = '2026-12-31'
+    } = req.body;
+
+    const [rows] = await pool.query('SELECT * FROM ad_requests WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Ad request not found' });
+
+    const request = rows[0];
+    const newAdId = `ad_${Date.now()}`;
+
+    // 1. Insert into platform_ads table so it is instantly live
+    await pool.query(
+      `INSERT INTO platform_ads 
+        (id, title, type, media_url, thumbnail_url, duration, allow_close_after, active, start_date, end_date, frequency, action_url, action_text)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+      [
+        newAdId,
+        request.title,
+        request.ad_type || 'video',
+        request.media_url,
+        request.thumbnail_url || request.media_url,
+        Number(duration) || 20,
+        Number(allowCloseAfter) || 8,
+        startDate,
+        endDate,
+        frequency,
+        request.action_url || 'https://funflick.in',
+        request.action_text || 'Learn More'
+      ]
+    );
+
+    // 2. Mark request as Approved
+    await pool.query(
+      `UPDATE ad_requests 
+       SET status = 'Approved', published_ad_id = ?, admin_notes = 'Approved & published to live ads' 
+       WHERE id = ?`,
+      [newAdId, id]
+    );
+
+    // 3. Notify user if authenticated
+    if (request.user_id) {
+      try {
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message)
+           VALUES (?, 'system', 'Ad Campaign Approved & Live! 🎉', ?)`,
+          [request.user_id, `Your ad request "${request.title}" has been approved and published to FunFlick!`]
+        );
+      } catch (e) {}
+    }
+
+    return res.json({
+      success: true,
+      message: 'Ad request approved and published live to FunFlick ads!',
+      adId: newAdId
+    });
+  } catch (err) {
+    console.error('Approve ad request error:', err);
+    return res.status(500).json({ error: 'Failed to approve ad request' });
+  }
+}
+
+// Reject Ad Request with notes
+export async function rejectAdminAdRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const { notes = 'Ad does not meet platform quality or creative guidelines.' } = req.body;
+
+    const [rows] = await pool.query('SELECT user_id, title FROM ad_requests WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Ad request not found' });
+
+    await pool.query(
+      `UPDATE ad_requests SET status = 'Rejected', admin_notes = ? WHERE id = ?`,
+      [notes, id]
+    );
+
+    if (rows[0].user_id) {
+      try {
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message)
+           VALUES (?, 'system', 'Ad Request Status Update', ?)`,
+          [rows[0].user_id, `Your ad request "${rows[0].title}" was not approved: ${notes}`]
+        );
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, message: 'Ad request marked as rejected' });
+  } catch (err) {
+    console.error('Reject ad request error:', err);
+    return res.status(500).json({ error: 'Failed to reject ad request' });
+  }
+}
+
+// Delete Ad Request
+export async function deleteAdminAdRequest(req, res) {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM ad_requests WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Ad request deleted successfully' });
+  } catch (err) {
+    console.error('Delete ad request error:', err);
+    return res.status(500).json({ error: 'Failed to delete ad request' });
+  }
+}
+

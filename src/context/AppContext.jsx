@@ -226,6 +226,20 @@ export const AppProvider = ({ children }) => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
+  // Advertiser Contact Settings (Dynamic from DB, editable by Admin)
+  const [adContactSettings, setAdContactSettings] = useState({
+    adContactEmail: 'ads@funflick.in',
+    adContactPhone: '+91 98765 43210',
+    adContactWhatsapp: '+91 98765 43210',
+    adContactTimings: 'Mon - Sat, 9:00 AM - 7:00 PM IST'
+  });
+
+  // User submitted ad requests
+  const [myAdRequests, setMyAdRequests] = useState([]);
+
+  // Admin portal ad requests list
+  const [adminAdRequests, setAdminAdRequests] = useState([]);
+
   // Active Story Viewer Modal
   const [activeStoryGroup, setActiveStoryGroup] = useState(null);
 
@@ -267,6 +281,8 @@ export const AppProvider = ({ children }) => {
     fetchMyMedia();
     fetchUserSubscriptionStatus();
     fetchAdminAds();
+    fetchAdContactSettings();
+    fetchMyAdRequests();
   }, []);
 
   // Live Feed & Videos synchronization with AWS MySQL backend
@@ -2639,6 +2655,193 @@ export const AppProvider = ({ children }) => {
     showToast('Platform data synchronized fresh from AWS backend!', 'info');
   };
 
+  // -----------------------------------------------------------------------------
+  // AD REQUESTS & DYNAMIC ADVERTISER CONTACT SETTINGS
+  // -----------------------------------------------------------------------------
+
+  // Fetch global platform & ad contact settings
+  const fetchAdContactSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) {
+          setAdContactSettings({
+            adContactEmail: data.settings.adContactEmail || 'ads@funflick.in',
+            adContactPhone: data.settings.adContactPhone || '+91 98765 43210',
+            adContactWhatsapp: data.settings.adContactWhatsapp || '+91 98765 43210',
+            adContactTimings: data.settings.adContactTimings || 'Mon - Sat, 9:00 AM - 7:00 PM IST'
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch ad contact settings:', e);
+    }
+  };
+
+  // Admin updates advertiser contact settings
+  const updateAdContactSettings = async (newSettings) => {
+    try {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(newSettings)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAdContactSettings(prev => ({ ...prev, ...newSettings }));
+        showToast('Advertiser contact details updated successfully!', 'success');
+        return { success: true };
+      } else {
+        showToast(data.error || 'Failed to update contact settings', 'error');
+        return { success: false, error: data.error };
+      }
+    } catch (e) {
+      showToast('Network error updating contact settings', 'error');
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Submit new Ad Campaign Request (from User Profile)
+  const submitAdRequest = async (requestPayload) => {
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const res = await fetch('/api/ads/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(requestPayload)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Ad request submitted successfully! We will contact you soon.', 'success');
+        fetchMyAdRequests();
+        return { success: true, id: data.id };
+      } else {
+        showToast(data.error || 'Failed to submit ad request', 'error');
+        return { success: false, error: data.error };
+      }
+    } catch (e) {
+      showToast('Error submitting ad request', 'error');
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Fetch authenticated user's own submitted ad requests
+  const fetchMyAdRequests = async () => {
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      if (!token) return;
+      const res = await fetch('/api/ads/my-requests', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.requests) setMyAdRequests(data.requests);
+      }
+    } catch (e) {
+      console.warn('Could not fetch user ad requests:', e);
+    }
+  };
+
+  // Fetch all Ad Requests for Admin
+  const fetchAdminAdRequests = async () => {
+    try {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+      if (!token) return;
+      const res = await fetch('/api/admin/ad-requests', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.requests) setAdminAdRequests(data.requests);
+      }
+    } catch (e) {
+      console.warn('Could not fetch admin ad requests:', e);
+    }
+  };
+
+  // 1-Click Approve and Publish Ad Request to live Platform Ads
+  const approveAdRequest = async (requestId, publishOptions = {}) => {
+    try {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+      const res = await fetch(`/api/admin/ad-requests/${requestId}/approve`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(publishOptions)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Ad campaign approved and published live! 🎉', 'success');
+        fetchAdminAdRequests();
+        fetchAdminAds();
+        return { success: true, adId: data.adId };
+      } else {
+        showToast(data.error || 'Failed to approve ad request', 'error');
+        return { success: false, error: data.error };
+      }
+    } catch (e) {
+      showToast('Error approving ad request', 'error');
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Reject Ad Request with notes
+  const rejectAdRequest = async (requestId, notes = '') => {
+    try {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+      const res = await fetch(`/api/admin/ad-requests/${requestId}/reject`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ notes })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Ad request marked as rejected', 'info');
+        fetchAdminAdRequests();
+        return { success: true };
+      } else {
+        showToast(data.error || 'Failed to reject ad request', 'error');
+        return { success: false, error: data.error };
+      }
+    } catch (e) {
+      showToast('Error rejecting ad request', 'error');
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Delete Ad Request
+  const deleteAdRequest = async (requestId) => {
+    try {
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+      const res = await fetch(`/api/admin/ad-requests/${requestId}`, {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        showToast('Ad request deleted', 'info');
+        fetchAdminAdRequests();
+        return { success: true };
+      }
+    } catch (e) {
+      console.warn('Error deleting ad request:', e);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -2760,7 +2963,19 @@ export const AppProvider = ({ children }) => {
         activePlayingVideoId,
         setActivePlayingVideoId,
         isReelsMuted,
-        setIsReelsMuted
+        setIsReelsMuted,
+        adContactSettings,
+        setAdContactSettings,
+        fetchAdContactSettings,
+        updateAdContactSettings,
+        myAdRequests,
+        fetchMyAdRequests,
+        submitAdRequest,
+        adminAdRequests,
+        fetchAdminAdRequests,
+        approveAdRequest,
+        rejectAdRequest,
+        deleteAdRequest
       }}
     >
       {children}
