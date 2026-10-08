@@ -10,7 +10,7 @@ export const authStorage = {
     localStorage.getItem('funflick_admin_token') || 
     localStorage.getItem(TOKEN_KEY) || 
     sessionStorage.getItem(TOKEN_KEY) || 
-    'local_admin_token_active',
+    null,
   setToken: (token) => localStorage.setItem(TOKEN_KEY, token),
   clearToken: () => {
     localStorage.removeItem(TOKEN_KEY);

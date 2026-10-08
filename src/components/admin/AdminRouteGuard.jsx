@@ -14,10 +14,6 @@ export const AdminRouteGuard = ({ children }) => {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
-  if (adminToken === 'local_admin_token_active') {
-    return children;
-  }
-
   // Validate JWT expiration strictly against AWS token
   if (adminToken) {
     try {

@@ -12,7 +12,7 @@ export async function uploadFileToS3(file, folder = 'videos', onProgress = () =>
     localStorage.getItem('funflick_admin_token') || 
     localStorage.getItem('funflick_token') || 
     sessionStorage.getItem('funflick_token') || 
-    'local_admin_token_active';
+    '';
 
   // 1. Get presigned upload URL from AWS EC2 backend
   const res = await fetch('/api/media/upload-url', {

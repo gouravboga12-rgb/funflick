@@ -142,18 +142,24 @@ export const LoginScreen = () => {
       </div>
 
       {/* Main Login Form */}
-      <form onSubmit={handleLogin} className="space-y-4 my-auto py-4">
+      <form onSubmit={handleLogin} autoComplete="off" className="space-y-4 my-auto py-4">
         
         {/* Flexible Identifier Input (Username, Email, or Phone) */}
         <div className="space-y-1">
-          <label className="text-[11px] font-semibold text-gray-300 block">
+          <label htmlFor="user_app_identifier" className="text-[11px] font-semibold text-gray-300 block">
             User ID, Email, or Mobile Number
           </label>
           <div className="relative flex items-center">
             <Smartphone className="w-4 h-4 text-gray-400 absolute left-4 pointer-events-none" />
             <input
+              id="user_app_identifier"
+              name="user_app_identifier"
               type="text"
               required
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck="false"
               value={identifier}
               onChange={e => setIdentifier(e.target.value)}
               placeholder="@username, email, or +91..."
@@ -164,14 +170,17 @@ export const LoginScreen = () => {
 
         {/* Password with Eye Icon Toggle */}
         <div className="space-y-1">
-          <label className="text-[11px] font-semibold text-gray-300 block">
+          <label htmlFor="user_app_password" className="text-[11px] font-semibold text-gray-300 block">
             Password
           </label>
           <div className="relative flex items-center">
             <Lock className="w-4 h-4 text-gray-400 absolute left-4 pointer-events-none" />
             <input
+              id="user_app_password"
+              name="user_app_password"
               type={showPassword ? 'text' : 'password'}
               required
+              autoComplete="new-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="Your password"
@@ -180,7 +189,7 @@ export const LoginScreen = () => {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="p-1.5 text-gray-400 hover:text-white absolute right-3 rounded-lg transition"
+              className="p-1.5 text-gray-400 hover:text-white absolute right-3 rounded-lg transition cursor-pointer"
               title={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

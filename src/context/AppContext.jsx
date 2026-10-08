@@ -80,7 +80,20 @@ export const AppProvider = ({ children }) => {
         'Authorization': `Bearer ${token}`
       }
     })
-      .then(res => (res.ok ? res.json() : null))
+      .then(async res => {
+        if (res.status === 401 || res.status === 403) {
+          const errData = await res.json().catch(() => ({}));
+          const reason = errData.reason || errData.error || 'Your account is suspended by an administrator.';
+          console.warn('Authentication rejected (user blocked or invalid session):', reason);
+          logoutUser();
+          showToast(`⚠️ ${reason}`, 'error');
+          if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/admin')) {
+            window.location.href = '/login';
+          }
+          return null;
+        }
+        return res.ok ? res.json() : null;
+      })
       .then(data => {
         if (data && data.user) {
           setCurrentUser(prev => {
@@ -141,6 +154,7 @@ export const AppProvider = ({ children }) => {
     sessionStorage.removeItem('funflick_authenticated');
     localStorage.removeItem('funflick_token');
     sessionStorage.removeItem('funflick_token');
+    localStorage.removeItem('funflick_admin_token');
     dismissMobileAd();
     setMyMedia([]);
     setCurrentUser({
@@ -1737,7 +1751,7 @@ export const AppProvider = ({ children }) => {
 
     setAdsList(prev => [newAd, ...prev.filter(a => a.id !== newAd.id)]);
 
-    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || 'local_admin_token_active';
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     try {
       const res = await fetch('/api/admin/ads', {
         method: 'POST',
@@ -1759,7 +1773,7 @@ export const AppProvider = ({ children }) => {
 
     const target = adsList.find(a => a.id === id) || {};
     const fullAd = { ...target, ...adData, id };
-    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || 'local_admin_token_active';
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     try {
       const res = await fetch('/api/admin/ads', {
         method: 'POST',
@@ -1778,7 +1792,7 @@ export const AppProvider = ({ children }) => {
   const deleteAd = async (id) => {
     setAdsList(prev => prev.filter(ad => ad.id !== id));
 
-    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || 'local_admin_token_active';
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     try {
       const res = await fetch(`/api/admin/ads/${id}`, {
         method: 'DELETE',
@@ -1806,7 +1820,7 @@ export const AppProvider = ({ children }) => {
     }));
 
     if (updatedAd) {
-      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || 'local_admin_token_active';
+      const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
       try {
         await fetch('/api/admin/ads', {
           method: 'POST',

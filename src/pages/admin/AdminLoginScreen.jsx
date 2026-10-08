@@ -11,7 +11,7 @@ export const AdminLoginScreen = () => {
   const isSessionExpired = location.state?.expired || searchParams.get('expired') === '1';
   const { showToast } = useApp();
 
-  const [identifier, setIdentifier] = useState('funflick0308@gmail.com');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -100,33 +100,42 @@ export const AdminLoginScreen = () => {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleAdminLogin} className="space-y-4">
+        <form onSubmit={handleAdminLogin} autoComplete="off" className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-300 block">
+            <label htmlFor="admin_sec_identifier" className="text-[11px] font-bold uppercase tracking-wider text-gray-300 block">
               Admin Identifier / Email
             </label>
             <div className="relative flex items-center">
               <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
               <input
+                id="admin_sec_identifier"
+                name="admin_sec_identifier"
                 type="text"
                 required
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck="false"
                 value={identifier}
                 onChange={e => setIdentifier(e.target.value)}
-                placeholder="funflick0308@gmail.com"
+                placeholder="Enter admin identifier..."
                 className="w-full bg-[#181033] text-white placeholder-gray-500 text-xs pl-10 pr-4 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500 transition shadow-inner"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-300 block">
+            <label htmlFor="admin_sec_password" className="text-[11px] font-bold uppercase tracking-wider text-gray-300 block">
               Admin Password
             </label>
             <div className="relative flex items-center">
               <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
               <input
+                id="admin_sec_password"
+                name="admin_sec_password"
                 type={showPassword ? 'text' : 'password'}
                 required
+                autoComplete="new-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Enter password..."
@@ -135,7 +144,7 @@ export const AdminLoginScreen = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="p-1.5 text-gray-400 hover:text-white absolute right-2.5 rounded-lg transition"
+                className="p-1.5 text-gray-400 hover:text-white absolute right-2.5 rounded-lg transition cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
