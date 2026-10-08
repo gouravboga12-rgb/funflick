@@ -42,33 +42,6 @@ export const ReelsScreen = () => {
     };
   }, [currentPost?.id, setActivePlayingVideoId]);
 
-  // Check if an ad has "On App Open" or "Once per session" frequency
-  useEffect(() => {
-    if (!adsList || adsList.length === 0) return;
-
-    // 1. On App Open
-    const onOpenAd = adsList.find(a => a.active && a.frequency === 'On App Open');
-    if (onOpenAd) {
-      const timer = setTimeout(() => {
-        showMobileAd(onOpenAd.id);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-
-    // 2. Once per session
-    const sessionAd = adsList.find(a => a.active && a.frequency === 'Once per session');
-    if (sessionAd) {
-      const sessionKey = `funflick_session_seen_${sessionAd.id}`;
-      if (!sessionStorage.getItem(sessionKey)) {
-        sessionStorage.setItem(sessionKey, 'true');
-        const timer = setTimeout(() => {
-          showMobileAd(sessionAd.id);
-        }, 1200);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [adsList, showMobileAd]);
-
   const handleNext = () => {
     const hasActiveAds = adsList?.some(a => a.active);
     if (currentIdx < visiblePosts.length - 1) {

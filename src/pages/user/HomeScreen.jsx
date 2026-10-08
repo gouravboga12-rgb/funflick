@@ -14,7 +14,7 @@ import { Sparkles, TrendingUp, Flame, Video, Plus } from 'lucide-react';
 
 export const HomeScreen = () => {
   const navigate = useNavigate();
-  const { posts, blockedUsers, activePlayingVideoId, setActivePlayingVideoId, adsList, showMobileAd } = useApp();
+  const { posts, blockedUsers, activePlayingVideoId, setActivePlayingVideoId, adsList } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
 
   const filteredPosts = posts.filter(post => {
@@ -25,33 +25,6 @@ export const HomeScreen = () => {
     if (activeTab === 'Latest') return post.timeAgo?.includes('hour') || post.timeAgo?.includes('Just');
     return true; // For You shows all
   });
-
-  // Handle "On App Open" and "Once per session" popup overlays on Home Screen
-  useEffect(() => {
-    if (!adsList || adsList.length === 0) return;
-
-    // 1. On App Open
-    const onOpenAd = adsList.find(a => a.active && a.frequency === 'On App Open');
-    if (onOpenAd) {
-      const timer = setTimeout(() => {
-        showMobileAd(onOpenAd.id);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-
-    // 2. Once per session
-    const sessionAd = adsList.find(a => a.active && a.frequency === 'Once per session');
-    if (sessionAd) {
-      const sessionKey = `funflick_session_seen_${sessionAd.id}`;
-      if (!sessionStorage.getItem(sessionKey)) {
-        sessionStorage.setItem(sessionKey, 'true');
-        const timer = setTimeout(() => {
-          showMobileAd(sessionAd.id);
-        }, 1200);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [adsList, showMobileAd]);
 
   // Activate the first video on the Home feed automatically if none active
   useEffect(() => {

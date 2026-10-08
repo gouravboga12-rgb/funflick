@@ -1736,9 +1736,20 @@ export const AppProvider = ({ children }) => {
   };
 
   // Mobile In-App Ad Popup Trigger
+  const activePopupAdRef = useRef(null);
+  const hasTriggeredAppOpenRef = useRef(false);
+
   const showMobileAd = (adId) => {
+    // If a popup ad is already actively showing, do not restart or reset it
+    if (activePopupAdRef.current) {
+      if (!adId || activePopupAdRef.current.id === adId) {
+        return;
+      }
+    }
     const targetAd = adId ? adsList.find(a => a.id === adId) : adsList.find(a => a.active) || adsList[0];
     if (targetAd) {
+      if (activePopupAdRef.current?.id === targetAd.id) return;
+      activePopupAdRef.current = targetAd;
       setActivePopupAd(targetAd);
       recordAdImpression(targetAd.id);
     } else {
@@ -1747,6 +1758,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const dismissMobileAd = () => {
+    activePopupAdRef.current = null;
     setActivePopupAd(null);
   };
 
@@ -1766,9 +1778,10 @@ export const AppProvider = ({ children }) => {
       return;
     }
 
-    // 1. Check for "On App Open" active ads
+    // 1. Check for "On App Open" active ads (Fires once per app mount/session)
     const onOpenAd = adsList.find(a => a.active && a.frequency === 'On App Open');
-    if (onOpenAd) {
+    if (onOpenAd && !hasTriggeredAppOpenRef.current) {
+      hasTriggeredAppOpenRef.current = true;
       const timer = setTimeout(() => {
         showMobileAd(onOpenAd.id);
       }, 1000);

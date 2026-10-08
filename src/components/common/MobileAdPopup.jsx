@@ -22,8 +22,10 @@ export const MobileAdPopup = () => {
   const [secondsRemaining, setSecondsRemaining] = useState(0);
   const [canClose, setCanClose] = useState(false);
 
+  const adId = activePopupAd?.id;
+
   useEffect(() => {
-    if (!activePopupAd) {
+    if (!adId || !activePopupAd) {
       setCanClose(false);
       setSecondsRemaining(0);
       return;
@@ -49,7 +51,7 @@ export const MobileAdPopup = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [activePopupAd]);
+  }, [adId]);
 
   if (!activePopupAd) return null;
 
