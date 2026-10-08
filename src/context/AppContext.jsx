@@ -1872,8 +1872,6 @@ export const AppProvider = ({ children }) => {
 
   const dismissMobileAd = () => {
     const dismissedAd = activePopupAdRef.current;
-    activePopupAdRef.current = null;
-    setActivePopupAd(null);
 
     // Sequential Pop-up Ads Queue:
     // If the dismissed ad was an active Pop-up Ad and not in admin center,
@@ -1896,11 +1894,16 @@ export const AppProvider = ({ children }) => {
 
       if (nextPopupAd) {
         sessionStorage.setItem(`funflick_session_seen_${nextPopupAd.id}`, 'true');
-        setTimeout(() => {
-          showMobileAd(nextPopupAd.id);
-        }, 250);
+        activePopupAdRef.current = nextPopupAd;
+        setActivePopupAd(nextPopupAd);
+        recordAdImpression(nextPopupAd.id);
+        return;
       }
     }
+
+    // No further ads in queue: dismiss popup completely
+    activePopupAdRef.current = null;
+    setActivePopupAd(null);
   };
 
   // Automatic Global Ad Frequency Engine (Handles "Pop-up Ads" strictly after login in sequence)

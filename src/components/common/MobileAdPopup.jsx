@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   X, 
   Volume2, 
@@ -8,9 +8,8 @@ import {
   ExternalLink, 
   Sparkles, 
   Clock, 
-  Check, 
   Play, 
-  Pause 
+  Loader2 
 } from 'lucide-react';
 
 export const MobileAdPopup = () => {
@@ -19,25 +18,57 @@ export const MobileAdPopup = () => {
 
   // Synchronize audio volume with app's Reels volume preference
   const [muted, setMuted] = useState(isReelsMuted !== undefined ? isReelsMuted : false);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
   const [canClose, setCanClose] = useState(false);
 
   useEffect(() => {
     if (isReelsMuted !== undefined) {
       setMuted(isReelsMuted);
+      if (videoRef.current) {
+        videoRef.current.muted = isReelsMuted;
+      }
     }
   }, [isReelsMuted]);
 
-  const handleToggleMute = (e) => {
-    e?.stopPropagation();
-    const nextMuted = !muted;
-    setMuted(nextMuted);
-    if (setIsReelsMuted) setIsReelsMuted(nextMuted);
-  };
+  // Guarantee background media silence: pause all other videos on the page whenever a popup ad is open
+  useEffect(() => {
+    if (!activePopupAd) return;
+
+    const pauseBackgroundMedia = () => {
+      document.querySelectorAll('video, audio').forEach((el) => {
+        if (el !== videoRef.current && !el.paused) {
+          try {
+            el.pause();
+          } catch (e) {}
+        }
+      });
+    };
+
+    pauseBackgroundMedia();
+    const interval = setInterval(pauseBackgroundMedia, 300);
+
+    return () => clearInterval(interval);
+  }, [activePopupAd]);
 
   const adId = activePopupAd?.id;
 
+  const isVideo = Boolean(
+    activePopupAd && (
+      activePopupAd.type === 'video' ||
+      /\.(mp4|webm|mov|m4v)($|\?)/i.test(activePopupAd.mediaUrl || '') ||
+      (typeof activePopupAd.mediaUrl === 'string' && activePopupAd.mediaUrl.startsWith('data:video/'))
+    )
+  );
+
+  const isVideoExt = (url) => typeof url === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(url);
+  const validPoster = (!isVideoExt(activePopupAd?.thumbnailUrl) && activePopupAd?.thumbnailUrl) 
+    ? activePopupAd.thumbnailUrl 
+    : undefined;
+
+  // Countdown timer before close button is allowed
   useEffect(() => {
     if (!adId || !activePopupAd) {
       setCanClose(false);
@@ -54,7 +85,7 @@ export const MobileAdPopup = () => {
     setCanClose(false);
 
     const timer = setInterval(() => {
-      setSecondsRemaining(prev => {
+      setSecondsRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
           setCanClose(true);
@@ -67,27 +98,113 @@ export const MobileAdPopup = () => {
     return () => clearInterval(timer);
   }, [adId]);
 
-  const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
-  const isAdminAuth = Boolean(localStorage.getItem('funflick_admin_token')) || (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
+  // Video autoplay with sound & resilient fallback to muted autoplay if browser blocks audio
+  useEffect(() => {
+    if (!activePopupAd || !isVideo) {
+      setIsLoading(false);
+      return;
+    }
 
-  if (!activePopupAd || (!isUserAuth && !isAdminAuth)) return null;
+    setIsLoading(true);
+    setAutoplayBlocked(false);
 
-  const isVideo = (
-    activePopupAd.type === 'video' ||
-    /\.(mp4|webm|mov|m4v)($|\?)/i.test(activePopupAd.mediaUrl || '') ||
-    (typeof activePopupAd.mediaUrl === 'string' && activePopupAd.mediaUrl.startsWith('data:video/'))
-  );
+    const video = videoRef.current;
+    if (!video) return;
 
-  const handleTogglePlay = () => {
+    try {
+      video.currentTime = 0;
+    } catch (e) {}
+
+    const attemptPlayback = () => {
+      if (!video) return;
+      video.muted = muted;
+      video.volume = 1.0;
+
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+            setIsLoading(false);
+            setAutoplayBlocked(false);
+          })
+          .catch((err) => {
+            console.warn('Autoplay with audio blocked by browser policy; retrying with muted autoplay:', err);
+            // Browser blocked unmuted autoplay. Mute video and play immediately so user never sees black screen!
+            video.muted = true;
+            setMuted(true);
+            setAutoplayBlocked(true);
+            video.play()
+              .then(() => {
+                setIsPlaying(true);
+                setIsLoading(false);
+              })
+              .catch((e) => {
+                console.error('Muted autoplay also failed:', e);
+                setIsPlaying(false);
+                setIsLoading(false);
+              });
+          });
+      }
+    };
+
+    video.load();
+    if (video.readyState >= 2) {
+      attemptPlayback();
+    } else {
+      video.addEventListener('canplay', attemptPlayback, { once: true });
+    }
+
+    return () => {
+      if (video) {
+        video.removeEventListener('canplay', attemptPlayback);
+      }
+    };
+  }, [adId, isVideo]);
+
+  const handleToggleMute = (e) => {
+    e?.stopPropagation();
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+    setAutoplayBlocked(false);
+    if (videoRef.current) {
+      videoRef.current.muted = nextMuted;
+      videoRef.current.volume = 1.0;
+      if (videoRef.current.paused) {
+        videoRef.current.play().catch(() => {});
+      }
+    }
+    if (setIsReelsMuted) setIsReelsMuted(nextMuted);
+  };
+
+  const handleVideoClick = () => {
     if (!videoRef.current) return;
+
+    // If browser previously blocked audio autoplay, user clicking video unmutes immediately!
+    if (autoplayBlocked || muted) {
+      videoRef.current.muted = false;
+      videoRef.current.volume = 1.0;
+      setMuted(false);
+      setAutoplayBlocked(false);
+      if (setIsReelsMuted) setIsReelsMuted(false);
+      if (videoRef.current.paused) {
+        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+      }
+      return;
+    }
+
     if (videoRef.current.paused) {
-      videoRef.current.play();
-      setIsPlaying(true);
+      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     } else {
       videoRef.current.pause();
       setIsPlaying(false);
     }
   };
+
+  const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
+  const isAdminAuth = Boolean(localStorage.getItem('funflick_admin_token')) || (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
+
+  if (!activePopupAd || (!isUserAuth && !isAdminAuth)) return null;
 
   const handleClose = () => {
     if (!canClose) {
@@ -150,32 +267,76 @@ export const MobileAdPopup = () => {
           {isVideo ? (
             <>
               <video
+                key={activePopupAd.id}
                 ref={videoRef}
                 src={activePopupAd.mediaUrl}
-                poster={activePopupAd.thumbnailUrl}
+                poster={validPoster}
+                preload="auto"
                 autoPlay
                 playsInline
                 loop
                 muted={muted}
-                onPlay={() => setIsPlaying(true)}
+                onWaiting={() => setIsLoading(true)}
+                onCanPlay={() => setIsLoading(false)}
+                onPlaying={() => {
+                  setIsPlaying(true);
+                  setIsLoading(false);
+                }}
                 onPause={() => setIsPlaying(false)}
-                onClick={handleTogglePlay}
+                onError={() => setIsLoading(false)}
+                onClick={handleVideoClick}
                 className="w-full h-full object-cover cursor-pointer"
               />
+
+              {/* Loading Spinner */}
+              {isLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-xs z-15 pointer-events-none">
+                  <Loader2 className="w-8 h-8 text-pink-500 animate-spin mb-2" />
+                  <span className="text-xs text-white/90 font-medium">Loading sponsor ad...</span>
+                </div>
+              )}
+
+              {/* Tap to Unmute Banner if Browser blocked unmuted autoplay */}
+              {autoplayBlocked && isPlaying && (
+                <button
+                  onClick={handleToggleMute}
+                  className="absolute top-14 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white text-[11px] font-bold shadow-xl border border-white/20 flex items-center gap-1.5 z-30 cursor-pointer animate-pulse hover:scale-105 transition"
+                >
+                  <VolumeX className="w-3.5 h-3.5" />
+                  <span>Tap to Unmute Audio 🔊</span>
+                </button>
+              )}
+
+              {/* Play Pause Button Overlay if paused */}
+              {!isPlaying && !isLoading && (
+                <div 
+                  onClick={handleVideoClick}
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 z-10 cursor-pointer"
+                >
+                  <div className="w-14 h-14 rounded-full bg-black/75 border border-white/25 flex items-center justify-center shadow-xl hover:scale-110 transition">
+                    <Play className="w-6 h-6 text-white fill-current ml-0.5" />
+                  </div>
+                </div>
+              )}
               
-              {/* Video control overlays */}
+              {/* Video sound toggle overlay */}
               <div className="absolute bottom-3 right-3 flex items-center gap-2 z-20">
                 <button
                   onClick={handleToggleMute}
-                  className="p-2 rounded-full bg-black/70 hover:bg-black text-white border border-white/10 backdrop-blur-sm transition cursor-pointer"
-                  title={muted ? "Unmute Video" : "Mute Video"}
+                  className="p-2.5 rounded-full bg-black/80 hover:bg-black text-white border border-white/20 backdrop-blur-md shadow-lg transition cursor-pointer hover:scale-110 active:scale-95"
+                  title={muted ? "Unmute Ad Video" : "Mute Ad Video"}
                 >
-                  {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+                  {muted ? (
+                    <VolumeX className="w-4 h-4 text-pink-400" />
+                  ) : (
+                    <Volume2 className="w-4 h-4 text-emerald-400" />
+                  )}
                 </button>
               </div>
             </>
           ) : (
             <img
+              key={activePopupAd.id}
               src={activePopupAd.mediaUrl}
               alt={activePopupAd.title}
               className="w-full h-full object-cover"

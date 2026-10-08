@@ -14,7 +14,7 @@ import {
 import { motion } from 'framer-motion';
 
 export const SponsoredAdCard = ({ ad }) => {
-  const { recordAdImpression, recordAdClick, showMobileAd, theme } = useApp();
+  const { recordAdImpression, recordAdClick, showMobileAd, theme, activePopupAd } = useApp();
   const isLight = theme === 'light';
 
   const videoRef = useRef(null);
@@ -27,6 +27,14 @@ export const SponsoredAdCard = ({ ad }) => {
     /\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.mediaUrl || '') ||
     (typeof ad.mediaUrl === 'string' && ad.mediaUrl.startsWith('data:video/'))
   );
+
+  // Pause feed sponsored card video if pop-up ad is active
+  useEffect(() => {
+    if (activePopupAd && videoRef.current) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+  }, [activePopupAd]);
 
   // Record impression once when ad card appears in feed
   useEffect(() => {

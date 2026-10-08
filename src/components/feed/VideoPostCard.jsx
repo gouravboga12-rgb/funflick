@@ -48,7 +48,8 @@ export const VideoPostCard = ({ post, isReel = true }) => {
     activePlayingVideoId,
     setActivePlayingVideoId,
     isReelsMuted,
-    setIsReelsMuted
+    setIsReelsMuted,
+    activePopupAd
   } = useApp();
 
   const isOwner = post.creator?.username === currentUser?.username;
@@ -136,6 +137,13 @@ export const VideoPostCard = ({ post, isReel = true }) => {
     const video = videoRef.current;
     if (!video || post.mediaType !== 'video') return;
 
+    // When a pop-up advertisement is currently displayed, pause background video and silence audio completely
+    if (activePopupAd) {
+      video.pause();
+      setIsPlaying(false);
+      return;
+    }
+
     if (isCardActive && !isLocked) {
       setIsLoading(true);
       setHasError(false);
@@ -178,7 +186,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
       setIsPlaying(false);
       setIsLoading(false);
     }
-  }, [isCardActive, isLocked, post.mediaType, post.mediaUrl, isReelsMuted]);
+  }, [isCardActive, isLocked, post.mediaType, post.mediaUrl, isReelsMuted, activePopupAd]);
 
   // Synchronize mute state in real-time when isReelsMuted changes
   useEffect(() => {
