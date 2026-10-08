@@ -13,25 +13,24 @@ import {
 } from 'lucide-react';
 
 export const MobileAdPopup = () => {
-  const { activePopupAd, dismissMobileAd, showToast, isReelsMuted, setIsReelsMuted, isAuthenticated } = useApp();
+  const { activePopupAd, dismissMobileAd, showToast, isAuthenticated } = useApp();
   const videoRef = useRef(null);
 
-  // Synchronize audio volume with app's Reels volume preference
-  const [muted, setMuted] = useState(isReelsMuted !== undefined ? isReelsMuted : false);
+  // Sponsored Ads default to volume/sound ON
+  const [muted, setMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
   const [canClose, setCanClose] = useState(false);
 
+  // Reset to sound ON whenever a new popup ad appears
   useEffect(() => {
-    if (isReelsMuted !== undefined) {
-      setMuted(isReelsMuted);
-      if (videoRef.current) {
-        videoRef.current.muted = isReelsMuted;
-      }
+    if (activePopupAd) {
+      setMuted(false);
+      setAutoplayBlocked(false);
     }
-  }, [isReelsMuted]);
+  }, [activePopupAd?.id]);
 
   // Guarantee background media silence: pause all other videos on the page whenever a popup ad is open
   useEffect(() => {
@@ -117,7 +116,8 @@ export const MobileAdPopup = () => {
 
     const attemptPlayback = () => {
       if (!video) return;
-      video.muted = muted;
+      // Default volume is ON with full sound
+      video.muted = false;
       video.volume = 1.0;
 
       const playPromise = video.play();
@@ -127,10 +127,11 @@ export const MobileAdPopup = () => {
             setIsPlaying(true);
             setIsLoading(false);
             setAutoplayBlocked(false);
+            setMuted(false);
           })
           .catch((err) => {
             console.warn('Autoplay with audio blocked by browser policy; retrying with muted autoplay:', err);
-            // Browser blocked unmuted autoplay. Mute video and play immediately so user never sees black screen!
+            // Browser blocked unmuted autoplay without prior interaction. Mute video and play immediately so user never sees black screen!
             video.muted = true;
             setMuted(true);
             setAutoplayBlocked(true);
@@ -174,7 +175,6 @@ export const MobileAdPopup = () => {
         videoRef.current.play().catch(() => {});
       }
     }
-    if (setIsReelsMuted) setIsReelsMuted(nextMuted);
   };
 
   const handleVideoClick = () => {
@@ -186,7 +186,6 @@ export const MobileAdPopup = () => {
       videoRef.current.volume = 1.0;
       setMuted(false);
       setAutoplayBlocked(false);
-      if (setIsReelsMuted) setIsReelsMuted(false);
       if (videoRef.current.paused) {
         videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
       }
@@ -211,10 +210,20 @@ export const MobileAdPopup = () => {
       showToast(`⏳ Please watch ${secondsRemaining}s before closing this sponsor ad`, 'info');
       return;
     }
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+      } catch (e) {}
+    }
     dismissMobileAd();
   };
 
   const handleAction = () => {
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+      } catch (e) {}
+    }
     showToast(`Redirecting to sponsor: ${activePopupAd.actionText || 'Visit'}`, 'success');
     if (activePopupAd.actionUrl) {
       window.open(activePopupAd.actionUrl, '_blank', 'noopener,noreferrer');
