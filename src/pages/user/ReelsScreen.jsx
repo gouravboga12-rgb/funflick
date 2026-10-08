@@ -12,7 +12,7 @@ export const ReelsScreen = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const targetId = searchParams.get('id');
-  const { posts, blockedUsers, showMobileAd, adsList, setActivePlayingVideoId } = useApp();
+  const { posts, blockedUsers, showMobileAd, adsList, setActivePlayingVideoId, isAuthenticated } = useApp();
 
   const visiblePosts = posts.filter(p => !blockedUsers?.includes(p.creator?.username));
 
@@ -59,8 +59,9 @@ export const ReelsScreen = () => {
     // Track total reels advanced
     reelsScrolledCountRef.current += 1;
 
-    // Trigger ad strictly after 5 reels (5, 10, etc.) for unshown ads only
-    if (reelsScrolledCountRef.current > 0 && reelsScrolledCountRef.current % 5 === 0) {
+    // Trigger ad strictly after 5 reels (5, 10, etc.) for unshown ads only, strictly for logged-in users
+    const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
+    if (isUserAuth && reelsScrolledCountRef.current > 0 && reelsScrolledCountRef.current % 5 === 0) {
       // Exclude ads designated as 'Pop-up Ads' so they do not interrupt reels
       const availableAds = (adsList || []).filter(a => 
         a.active && 

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export const MobileAdPopup = () => {
-  const { activePopupAd, dismissMobileAd, showToast, isReelsMuted, setIsReelsMuted } = useApp();
+  const { activePopupAd, dismissMobileAd, showToast, isReelsMuted, setIsReelsMuted, isAuthenticated } = useApp();
   const videoRef = useRef(null);
 
   // Synchronize audio volume with app's Reels volume preference
@@ -67,7 +67,10 @@ export const MobileAdPopup = () => {
     return () => clearInterval(timer);
   }, [adId]);
 
-  if (!activePopupAd) return null;
+  const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
+  const isAdminAuth = Boolean(localStorage.getItem('funflick_admin_token')) || (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
+
+  if (!activePopupAd || (!isUserAuth && !isAdminAuth)) return null;
 
   const isVideo = (
     activePopupAd.type === 'video' ||

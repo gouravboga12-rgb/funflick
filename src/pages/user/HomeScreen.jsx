@@ -14,7 +14,7 @@ import { Sparkles, TrendingUp, Flame, Video, Plus } from 'lucide-react';
 
 export const HomeScreen = () => {
   const navigate = useNavigate();
-  const { posts, blockedUsers, activePlayingVideoId, setActivePlayingVideoId, adsList } = useApp();
+  const { posts, blockedUsers, activePlayingVideoId, setActivePlayingVideoId, adsList, isAuthenticated } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
 
   const filteredPosts = posts.filter(post => {
@@ -90,7 +90,8 @@ export const HomeScreen = () => {
                 // 2nd ad strictly after 10 reels/posts (idx === 9)
                 // Strictly 1 time per ad, never repeating the same ad
                 const adSlotIdx = idx === 4 ? 0 : idx === 9 ? 1 : idx === 14 ? 2 : -1;
-                const targetAd = adSlotIdx !== -1 && activeAds[adSlotIdx] ? activeAds[adSlotIdx] : null;
+                const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
+                const targetAd = isUserAuth && adSlotIdx !== -1 && activeAds[adSlotIdx] ? activeAds[adSlotIdx] : null;
                 const shouldShowAd = Boolean(targetAd);
 
                 return (

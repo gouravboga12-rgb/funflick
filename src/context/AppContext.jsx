@@ -132,6 +132,7 @@ export const AppProvider = ({ children }) => {
     sessionStorage.removeItem('funflick_authenticated');
     localStorage.removeItem('funflick_token');
     sessionStorage.removeItem('funflick_token');
+    dismissMobileAd();
     setMyMedia([]);
     setCurrentUser({
       id: null,
@@ -1806,6 +1807,13 @@ export const AppProvider = ({ children }) => {
   const hasTriggeredAppOpenRef = useRef(false);
 
   const showMobileAd = (adId) => {
+    // Strictly ensure user is logged in before any ad can be shown (admin portal preview allowed)
+    const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
+    const isAdminAuth = Boolean(localStorage.getItem('funflick_admin_token')) || window.location.pathname.startsWith('/admin');
+    if (!isUserAuth && !isAdminAuth) {
+      return;
+    }
+
     // If a popup ad is already actively showing, do not restart or reset it
     if (activePopupAdRef.current) {
       if (!adId || activePopupAdRef.current.id === adId) {
@@ -1828,18 +1836,22 @@ export const AppProvider = ({ children }) => {
     setActivePopupAd(null);
   };
 
-  // Automatic Global Ad Frequency Engine (Handles "On App Open" and "Once per session")
+  // Automatic Global Ad Frequency Engine (Handles "Pop-up Ads" strictly after login)
   useEffect(() => {
+    // Strictly require user to be logged in before automatic popup ads can appear
+    const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
+    if (!isUserAuth) return;
     if (!adsList || adsList.length === 0) return;
 
-    // Do not trigger popups on admin center or auth flow
+    // Do not trigger popups on admin center or auth/splash flow
     const pathname = window.location.pathname;
     if (
       pathname.startsWith('/admin') ||
       pathname === '/login' ||
       pathname === '/signup' ||
       pathname === '/verify' ||
-      pathname === '/forgot-password'
+      pathname === '/forgot-password' ||
+      pathname === '/splash'
     ) {
       return;
     }
@@ -1863,7 +1875,7 @@ export const AppProvider = ({ children }) => {
         return () => clearTimeout(timer);
       }
     }
-  }, [adsList]);
+  }, [adsList, isAuthenticated]);
 
   // Publish a new Post
   const publishNewPost = (newPostData) => {
