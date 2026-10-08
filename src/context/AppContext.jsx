@@ -149,6 +149,7 @@ export const AppProvider = ({ children }) => {
       if (typeof fetchMyMedia === 'function') fetchMyMedia();
       if (typeof fetchLiveNotifications === 'function') fetchLiveNotifications();
       if (typeof fetchLiveConversations === 'function') fetchLiveConversations();
+      if (typeof fetchLiveCreators === 'function') fetchLiveCreators();
     }, 50);
   };
 
@@ -160,6 +161,9 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('funflick_admin_token');
     dismissMobileAd();
     setMyMedia([]);
+    setTimeout(() => {
+      if (typeof fetchLiveCreators === 'function') fetchLiveCreators();
+    }, 50);
     setCurrentUser({
       id: null,
       name: 'FunFlick Member',
@@ -514,7 +518,7 @@ export const AppProvider = ({ children }) => {
       if (prev && prev.length > 0) return prev;
       if (!posts || posts.length === 0) return [];
       return posts.map(p => {
-        const isSelf = p.creator?.username === currentUser?.username || p.isSelf;
+        const isSelf = Boolean(currentUser?.username && p.creator?.username && p.creator.username.toLowerCase() === currentUser.username.toLowerCase());
         const isUserInfluencer = isSelf ? Boolean(currentUser?.isInfluencer) : Boolean(p.creator?.isInfluencer);
         const views = typeof p.viewsCount === 'number' ? p.viewsCount : parseInt(p.viewsCount) || parseInt(p.views) || 350;
         const likes = typeof p.likesCount === 'number' ? p.likesCount : parseInt(p.likesCount) || 28;
@@ -1005,9 +1009,10 @@ export const AppProvider = ({ children }) => {
             id: u.id,
             name: u.name,
             username: u.username,
-            avatar: u.avatar || '/brand/default-avatar.svg',
+            avatar: (u.username === 'super_admin')
+              ? (u.avatar && !u.avatar.includes('default-avatar') ? u.avatar : '/brand/funflick-logo.png')
+              : (u.avatar || '/brand/default-avatar.svg'),
             isFollowing: Boolean(u.isFollowing),
-            isSelf: Boolean(u.isSelf),
             stats: {
               followers: u.followersCount > 999 ? `${(u.followersCount / 1000).toFixed(1)}K` : String(u.followersCount)
             }

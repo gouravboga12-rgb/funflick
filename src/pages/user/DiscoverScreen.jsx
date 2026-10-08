@@ -458,7 +458,15 @@ export const DiscoverScreen = () => {
           ) : (
             <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
               {filteredCreators.map(creator => {
-                const isSelf = creator.username === currentUser?.username || creator.isSelf;
+                const isSelf = Boolean(
+                  currentUser?.username && 
+                  creator.username && 
+                  creator.username.toLowerCase() === currentUser.username.toLowerCase()
+                );
+                const creatorAvatar = (creator.username === 'super_admin')
+                  ? (creator.avatar && !creator.avatar.includes('default-avatar') ? creator.avatar : '/brand/funflick-logo.png')
+                  : (creator.avatar || '/brand/default-avatar.svg');
+
                 return (
                   <div
                     key={creator.id || creator.username}
@@ -469,8 +477,9 @@ export const DiscoverScreen = () => {
                       className="w-14 h-14 rounded-full p-[1.5px] bg-gradient-to-tr from-pink-500 to-purple-600 cursor-pointer group-hover:scale-105 transition-transform"
                     >
                       <img
-                        src={creator.avatar || '/brand/default-avatar.svg'}
-                        alt={creator.name}
+                        src={creatorAvatar}
+                        alt={creator.name || creator.username}
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
                         className="w-full h-full rounded-full object-cover border border-[#18122c]"
                       />
                     </div>

@@ -32,17 +32,25 @@ export async function searchUsers(req, res) {
 
     const [rows] = await pool.query(query, params);
 
-    const users = rows.map(r => ({
-      id: r.id,
-      name: r.name,
-      username: r.username,
-      avatar: r.avatar_url || '/brand/default-avatar.svg',
-      role: r.role,
-      isInfluencer: Boolean(r.is_influencer),
-      followersCount: r.followers_count || 0,
-      isFollowing: Boolean(r.is_following),
-      isSelf: r.id === currentUserId
-    }));
+    const users = rows.map(r => {
+      const isSelf = Boolean(
+        (currentUserId && r.id === currentUserId) ||
+        (req.user?.username && r.username?.toLowerCase() === req.user.username.toLowerCase())
+      );
+      return {
+        id: r.id,
+        name: r.name,
+        username: r.username,
+        avatar: (r.username === 'super_admin')
+          ? (r.avatar_url && !r.avatar_url.includes('default-avatar') ? r.avatar_url : '/brand/funflick-logo.png')
+          : (r.avatar_url || '/brand/default-avatar.svg'),
+        role: r.role,
+        isInfluencer: Boolean(r.is_influencer),
+        followersCount: r.followers_count || 0,
+        isFollowing: Boolean(r.is_following),
+        isSelf
+      };
+    });
 
     return res.json({ users, count: users.length });
   } catch (err) {
@@ -80,7 +88,9 @@ export async function getUserProfile(req, res) {
         id: r.id,
         name: r.name,
         username: r.username,
-        avatar: r.avatar_url || '/brand/default-avatar.svg',
+        avatar: (r.username === 'super_admin')
+          ? (r.avatar_url && !r.avatar_url.includes('default-avatar') ? r.avatar_url : '/brand/funflick-logo.png')
+          : (r.avatar_url || '/brand/default-avatar.svg'),
         bio: r.bio || '',
         role: r.role,
         isInfluencer: Boolean(r.is_influencer),
@@ -90,7 +100,10 @@ export async function getUserProfile(req, res) {
         postsCount: r.posts_count || 0,
         iFollowThem: Boolean(r.i_follow_them),
         theyFollowMe: Boolean(r.they_follow_me),
-        isSelf: r.id === currentUserId
+        isSelf: Boolean(
+          (currentUserId && r.id === currentUserId) ||
+          (req.user?.username && r.username?.toLowerCase() === req.user.username.toLowerCase())
+        )
       }
     });
   } catch (err) {
