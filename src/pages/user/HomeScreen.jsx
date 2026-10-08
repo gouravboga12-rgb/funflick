@@ -77,7 +77,7 @@ export const HomeScreen = () => {
             </div>
           ) : (
             (() => {
-              const activeAds = (adsList || []).filter(a => a.active);
+              const activeAds = (adsList || []).filter(a => a.active && a.frequency !== 'Pop-up Ads');
               return filteredPosts.map((post, idx) => {
                 const url = post.mediaUrl || '';
                 const isImage = post.mediaType === 'image' ||
@@ -85,13 +85,13 @@ export const HomeScreen = () => {
                                 url.startsWith('data:image/');
                 const isVideo = !isImage && (post.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(url));
                 
-                // Show sponsored ad after post 1 or every 3 posts
-                const shouldShowAd = activeAds.length > 0 && (
-                  (filteredPosts.length === 1 && idx === 0) || 
-                  idx === 1 || 
-                  (idx > 1 && (idx + 1) % 3 === 0)
-                );
-                const targetAd = activeAds[Math.floor(idx / 2) % activeAds.length];
+                // Controlled Sequential Ad Placement:
+                // 1st ad strictly after 5 reels/posts (idx === 4)
+                // 2nd ad strictly after 10 reels/posts (idx === 9)
+                // Strictly 1 time per ad, never repeating the same ad
+                const adSlotIdx = idx === 4 ? 0 : idx === 9 ? 1 : idx === 14 ? 2 : -1;
+                const targetAd = adSlotIdx !== -1 && activeAds[adSlotIdx] ? activeAds[adSlotIdx] : null;
+                const shouldShowAd = Boolean(targetAd);
 
                 return (
                   <React.Fragment key={post.id}>
@@ -100,7 +100,7 @@ export const HomeScreen = () => {
                     ) : (
                       <StandardPostCard post={post} />
                     )}
-                    {shouldShowAd && (
+                    {shouldShowAd && targetAd && (
                       <SponsoredAdCard ad={targetAd} />
                     )}
                   </React.Fragment>
