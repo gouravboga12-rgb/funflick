@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   DEFAULT_AVATAR,
   INFLUENCER_SUBSCRIPTION_PLANS
