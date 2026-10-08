@@ -52,13 +52,13 @@ export const VideoPostCard = ({ post, isReel = true }) => {
     activePopupAd
   } = useApp();
 
-  const isOwner = post.creator?.username === currentUser?.username;
-  const isPrivateAccount = !!post.creator?.isPrivate;
-  const hasAccess = isOwner || post.isFollowing || post.isSubscribed;
+  const isOwner = post?.creator?.username === currentUser?.username;
+  const isPrivateAccount = !!post?.creator?.isPrivate;
+  const hasAccess = isOwner || post?.isFollowing || post?.isSubscribed;
   const isLocked = isPrivateAccount && !hasAccess;
 
   // Dynamic showcase duration configured by admin (defaults: Reels 30s, Stories 15s)
-  const maxShowcaseDuration = post.contentType === 'story'
+  const maxShowcaseDuration = post?.contentType === 'story'
     ? (mediaLimits?.maxStoryDuration || 15)
     : (mediaLimits?.maxReelDuration || 30);
 
@@ -97,14 +97,14 @@ export const VideoPostCard = ({ post, isReel = true }) => {
 
   // Check if poster is an actual image (not an mp4/mov video URL)
   const isVideoExt = (url) => typeof url === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(url);
-  const validPosterUrl = (!isVideoExt(post.posterUrl) && post.posterUrl) ? post.posterUrl : undefined;
+  const validPosterUrl = (!isVideoExt(post?.posterUrl) && post?.posterUrl) ? post.posterUrl : undefined;
 
-  const isCardActive = activePlayingVideoId === post.id;
+  const isCardActive = activePlayingVideoId === post?.id;
 
   // Viewport Intersection Observer: activate reel when >=25% in view (reliable across mobile & desktop)
   useEffect(() => {
     const el = cardRef.current;
-    if (!el || post.mediaType !== 'video') return;
+    if (!el || post?.mediaType !== 'video') return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -135,7 +135,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
   // When scrolling away, the previous Reel is completely paused and reset.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || post.mediaType !== 'video') return;
+    if (!video || post?.mediaType !== 'video') return;
 
     // When a pop-up advertisement is currently displayed, pause background video and silence audio completely
     if (activePopupAd) {
@@ -262,6 +262,8 @@ export const VideoPostCard = ({ post, isReel = true }) => {
     if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
     return String(n);
   };
+
+  if (!post) return null;
 
   return (
     <article ref={cardRef} className="relative w-full aspect-[9/16] max-h-[720px] bg-black overflow-hidden select-none border-b border-white/10 sm:rounded-3xl sm:mb-4 sm:border sm:border-white/10 shadow-2xl">
@@ -770,7 +772,8 @@ export const VideoPostCard = ({ post, isReel = true }) => {
                 onClick={() => {
                   setShowOptionsMenu(false);
                   try {
-                    navigator.clipboard?.writeText(window.location.href);
+                    const shareUrl = `${window.location.origin}/video/${post?.id || ''}`;
+                    navigator.clipboard?.writeText(shareUrl);
                     showToast('Link copied to clipboard! 📋');
                   } catch (e) {}
                 }}

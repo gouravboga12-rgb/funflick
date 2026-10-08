@@ -38,9 +38,9 @@ export const StandardPostCard = ({ post }) => {
     showToast 
   } = useApp();
 
-  const isOwner = post.creator?.username === currentUser?.username;
-  const isPrivateAccount = !!post.creator?.isPrivate;
-  const hasAccess = isOwner || post.isFollowing || post.isSubscribed;
+  const isOwner = post?.creator?.username === currentUser?.username;
+  const isPrivateAccount = !!post?.creator?.isPrivate;
+  const hasAccess = isOwner || post?.isFollowing || post?.isSubscribed;
   const isLocked = isPrivateAccount && !hasAccess;
 
   const [showHeartBurst, setShowHeartBurst] = useState(false);
@@ -113,6 +113,8 @@ export const StandardPostCard = ({ post }) => {
       return w + ' ';
     });
   };
+
+  if (!post) return null;
 
   return (
     <article className="relative w-full bg-[#130b26] border border-white/10 rounded-3xl overflow-hidden select-none mb-4 shadow-xl text-left">
@@ -490,7 +492,8 @@ export const StandardPostCard = ({ post }) => {
                 onClick={() => {
                   setShowOptionsMenu(false);
                   try {
-                    navigator.clipboard?.writeText(window.location.href);
+                    const shareUrl = `${window.location.origin}/video/${post?.id || ''}`;
+                    navigator.clipboard?.writeText(shareUrl);
                     showToast('Link copied to clipboard! 📋');
                   } catch (e) {}
                 }}
