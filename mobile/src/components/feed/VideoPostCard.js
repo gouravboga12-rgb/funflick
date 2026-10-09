@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Share, Dimensions } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, Play } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
@@ -9,31 +9,43 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const { toggleLikePost, recordPostView, toggleFollowCreator, isReelsMuted, toggleMute } = useApp();
-  const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [lastTap, setLastTap] = useState(0);
 
+  const isVideo = post.mediaType === 'video' && Boolean(post.mediaUrl);
+  const player = useVideoPlayer(isVideo ? post.mediaUrl : null, p => {
+    if (!p) return;
+    p.loop = true;
+    p.muted = isReelsMuted;
+    if (isActive) {
+      p.play();
+      setIsPlaying(true);
+    }
+  });
+
   // Play/pause based on active viewport state
   useEffect(() => {
-    if (!videoRef.current) return;
-    if (isActive) {
-      videoRef.current.playAsync().then(() => {
+    if (!player) return;
+    try {
+      if (isActive) {
+        player.play();
         setIsPlaying(true);
         recordPostView(post.id);
-      }).catch(() => {});
-    } else {
-      videoRef.current.pauseAsync().then(() => {
+      } else {
+        player.pause();
         setIsPlaying(false);
-      }).catch(() => {});
-    }
-  }, [isActive, post.id]);
+      }
+    } catch {}
+  }, [isActive, player, post.id]);
 
   // Sync mute state
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.setIsMutedAsync(isReelsMuted);
+    if (player) {
+      try {
+        player.muted = isReelsMuted;
+      } catch {}
     }
-  }, [isReelsMuted]);
+  }, [isReelsMuted, player]);
 
   const handleTap = () => {
     const now = Date.now();
@@ -45,14 +57,16 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
       }
     } else {
       // Single tap -> Toggle Play/Pause
-      if (videoRef.current) {
-        if (isPlaying) {
-          videoRef.current.pauseAsync();
-          setIsPlaying(false);
-        } else {
-          videoRef.current.playAsync();
-          setIsPlaying(true);
-        }
+      if (player) {
+        try {
+          if (player.playing) {
+            player.pause();
+            setIsPlaying(false);
+          } else {
+            player.play();
+            setIsPlaying(true);
+          }
+        } catch {}
       }
     }
     setLastTap(now);
@@ -94,16 +108,12 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
 
       {/* 2. Media Player */}
       <TouchableOpacity activeOpacity={0.95} onPress={handleTap} style={styles.playerContainer}>
-        {post.mediaType === 'video' && post.mediaUrl ? (
-          <Video
-            ref={videoRef}
-            source={{ uri: post.mediaUrl }}
-            posterSource={{ uri: post.posterUrl || post.thumbnailUrl }}
-            usePoster={true}
-            resizeMode={ResizeMode.COVER}
-            isLooping
-            isMuted={isReelsMuted}
+        {isVideo && player ? (
+          <VideoView
+            player={player}
             style={styles.videoPlayer}
+            contentFit="cover"
+            nativeControls={false}
           />
         ) : (
           <Image
@@ -114,7 +124,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         )}
 
         {/* Play Overlay if Paused */}
-        {!isPlaying && post.mediaType === 'video' && (
+        {!isPlaying && isVideo && (
           <View style={styles.playOverlay}>
             <View style={styles.playIconCircle}>
               <Play size={28} color="#fff" fill="#fff" />
@@ -123,7 +133,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         )}
 
         {/* Volume Mute Toggle Button */}
-        {post.mediaType === 'video' && (
+        {isVideo && (
           <TouchableOpacity style={styles.muteBtn} onPress={toggleMute}>
             {isReelsMuted ? <VolumeX size={18} color="#fff" /> : <Volume2 size={18} color="#fff" />}
           </TouchableOpacity>
@@ -142,8 +152,11 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
             <Text style={styles.actionCount}>{post.likesCount}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn}>
-            <MessageCircle size={24} color="#fff" />
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => navigation?.navigate('VideoDetail', { videoId: post.id })}
+          >
+            <MessageCircle size={23} color="#fff" />
             <Text style={styles.actionCount}>{post.commentsCount}</Text>
           </TouchableOpacity>
 
@@ -152,20 +165,27 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn}>
           <Bookmark size={23} color="#fff" />
         </TouchableOpacity>
       </View>
 
       {/* 4. Caption & Details */}
-      <View style={styles.details}>
-        {post.title ? (
+      <View style={styles.captionArea}>
+        <Text style={styles.title} numberOfLines={2}>
+          {post.title}
+        </Text>
+        {post.caption ? (
           <Text style={styles.caption} numberOfLines={2}>
-            <Text style={styles.captionUser}>@{post.creator?.username} </Text>
-            {post.caption || post.title}
+            {post.caption}
           </Text>
         ) : null}
-        <Text style={styles.timestamp}>{post.timeAgo || 'Recently'}</Text>
+        <View style={styles.metaRow}>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{post.category}</Text>
+          </View>
+          <Text style={styles.timeAgo}>• {post.timeAgo}</Text>
+        </View>
       </View>
     </View>
   );
@@ -173,20 +193,19 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
+    backgroundColor: '#110920',
+    borderRadius: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: colors.cardHeader,
+    paddingVertical: 12,
   },
   creatorRow: {
     flexDirection: 'row',
@@ -194,35 +213,37 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#231545',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#261b44',
   },
   creatorName: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   username: {
-    color: colors.textMuted,
-    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
   },
   followBtn: {
     paddingHorizontal: 14,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: colors.primary,
+    backgroundColor: 'rgba(255,0,122,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,0,122,0.4)',
   },
   followText: {
-    color: '#fff',
-    fontSize: 11,
+    color: colors.primary,
+    fontSize: 12,
     fontWeight: '700',
   },
   playerContainer: {
     width: '100%',
     height: SCREEN_WIDTH * 1.15,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
@@ -232,25 +253,27 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   playOverlay: {
-    position: 'absolute',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   playIconCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingLeft: 4,
   },
   muteBtn: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    bottom: 14,
+    right: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -260,7 +283,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   leftActions: {
     flexDirection: 'row',
@@ -270,29 +293,48 @@ const styles = StyleSheet.create({
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   actionCount: {
-    color: '#fff',
-    fontSize: 12,
+    color: '#ffffff',
+    fontSize: 13,
     fontWeight: '600',
   },
-  details: {
+  captionArea: {
     paddingHorizontal: 14,
     paddingBottom: 14,
-    gap: 4,
+  },
+  title: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   caption: {
-    color: '#e5e7eb',
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 13,
+    marginTop: 4,
     lineHeight: 18,
   },
-  captionUser: {
-    fontWeight: '700',
-    color: '#fff',
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
   },
-  timestamp: {
-    color: colors.textDim,
+  categoryBadge: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  categoryText: {
+    color: 'rgba(255,255,255,0.8)',
     fontSize: 11,
+    fontWeight: '600',
+  },
+  timeAgo: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
   },
 });

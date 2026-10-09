@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import * as ImagePicker from 'expo-image-picker';
 import { ArrowLeft, Video as VideoIcon, UploadCloud, CheckCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +10,23 @@ import { uploadMediaToS3 } from '../../services/s3Upload';
 import { apiRequest } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
+
+function ReelPreview({ videoUri }) {
+  const player = useVideoPlayer(videoUri, p => {
+    if (!p) return;
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+  return (
+    <VideoView
+      player={player}
+      style={styles.previewVideo}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
+}
 
 export const UploadReelScreen = ({ navigation }) => {
   const { fetchFeed } = useApp();
@@ -117,14 +134,7 @@ export const UploadReelScreen = ({ navigation }) => {
           disabled={isUploading}
         >
           {videoUri ? (
-            <Video
-              source={{ uri: videoUri }}
-              style={styles.previewVideo}
-              resizeMode={ResizeMode.COVER}
-              isLooping
-              shouldPlay
-              isMuted
-            />
+            <ReelPreview videoUri={videoUri} />
           ) : (
             <View style={styles.emptyPicker}>
               <View style={styles.iconCircle}>

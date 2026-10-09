@@ -8,10 +8,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#07040d",
-    "splash": {
-      "backgroundColor": "#07040d",
-      "resizeMode": "contain"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.funflick.app",
@@ -56,6 +52,15 @@
         {
           "icon": "./assets/icon.png",
           "color": "#ff007a"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#07040d",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
         }
       ]
     ],

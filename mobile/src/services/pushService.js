@@ -5,19 +5,30 @@ import { Platform } from 'react-native';
 import { apiRequest } from './api';
 import { ensureNotificationsPermission } from './permissionsService';
 
-// Configure how notifications appear when app is in foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+let handlerInitialized = false;
+
+function initNotificationHandlerSafe() {
+  if (handlerInitialized) return;
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+    handlerInitialized = true;
+  } catch (err) {
+    console.warn('Notification handler init skipped:', err?.message);
+  }
+}
 
 /**
  * Register device for Expo Push Notifications and sync token with FunFlick backend
  */
 export async function registerForPushNotificationsAsync() {
+  initNotificationHandlerSafe();
+
   if (!Device.isDevice) {
     console.log('Push notifications require a physical device');
     return null;
@@ -31,13 +42,17 @@ export async function registerForPushNotificationsAsync() {
     }
 
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'FunFlick Activity',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#ff007a',
-        sound: 'default',
-      });
+      try {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'FunFlick Activity',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#ff007a',
+          sound: 'default',
+        });
+      } catch (channelErr) {
+        console.warn('Notification channel setup error:', channelErr?.message);
+      }
     }
 
     const projectId =
@@ -48,7 +63,8 @@ export async function registerForPushNotificationsAsync() {
       projectId,
     });
 
-    const pushToken = tokenResponse.data;
+    const pushToken = tokenResponse?.data;
+    if (!pushToken) return null;
 
     // Send push token to FunFlick backend
     try {
@@ -63,7 +79,7 @@ export async function registerForPushNotificationsAsync() {
 
     return pushToken;
   } catch (error) {
-    console.warn('Error during push notification registration:', error);
+    console.warn('Push notification setup gracefully handled:', error?.message);
     return null;
   }
 }
