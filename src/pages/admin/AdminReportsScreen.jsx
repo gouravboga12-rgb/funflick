@@ -641,12 +641,22 @@ export const AdminReportsScreen = () => {
                   {/* Video Player */}
                   <div className="w-full aspect-[4/5] sm:aspect-video rounded-xl overflow-hidden bg-black flex items-center justify-center border border-white/10 relative">
                     {compareModalData.report.mediaUrl ? (
-                      <video
-                        src={compareModalData.report.mediaUrl}
-                        controls
-                        playsInline
-                        className="w-full h-full object-contain"
-                      />
+                      (/\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i.test(compareModalData.report.mediaUrl)) ? (
+                        <img
+                          src={compareModalData.report.mediaUrl}
+                          alt={compareModalData.report.targetTitle || 'Reported media'}
+                          className="w-full h-full object-contain bg-black"
+                        />
+                      ) : (
+                        <video
+                          src={compareModalData.report.mediaUrl}
+                          poster={compareModalData.report.thumbnailUrl || compareModalData.report.posterUrl}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          className="w-full h-full object-contain bg-black"
+                        />
+                      )
                     ) : (
                       <div className="text-center p-4 text-gray-500 text-xs">
                         No video media stream available
@@ -688,13 +698,23 @@ export const AdminReportsScreen = () => {
                         <Loader2 className="w-7 h-7 animate-spin text-pink-500 mb-2" />
                         <span className="text-xs">Loading original video #{compareModalData.origLink?.videoId}...</span>
                       </div>
-                    ) : originalVideoData?.mediaUrl || originalVideoData?.videoUrl ? (
-                      <video
-                        src={originalVideoData.mediaUrl || originalVideoData.videoUrl}
-                        controls
-                        playsInline
-                        className="w-full h-full object-contain"
-                      />
+                    ) : (originalVideoData?.mediaUrl || originalVideoData?.videoUrl) ? (
+                      (/\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i.test(originalVideoData.mediaUrl || originalVideoData.videoUrl)) ? (
+                        <img
+                          src={originalVideoData.mediaUrl || originalVideoData.videoUrl}
+                          alt={originalVideoData.title || 'Original Media'}
+                          className="w-full h-full object-contain bg-black"
+                        />
+                      ) : (
+                        <video
+                          src={originalVideoData.mediaUrl || originalVideoData.videoUrl}
+                          poster={originalVideoData.posterUrl || originalVideoData.thumbnailUrl || originalVideoData.thumbnail}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          className="w-full h-full object-contain bg-black"
+                        />
+                      )
                     ) : (
                       <div className="p-6 text-center text-gray-400 space-y-2">
                         <Film className="w-8 h-8 text-gray-600 mx-auto" />
