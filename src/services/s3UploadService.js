@@ -8,6 +8,12 @@
  * @returns {Promise<string>} S3 public permanent URL
  */
 export async function uploadFileToS3(file, folder = 'videos', onProgress = () => {}) {
+  // Enforce 10MB maximum file size limit
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  if (file && file.size > MAX_FILE_SIZE) {
+    throw new Error(`File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds the 10MB limit. Please select a video under 10MB.`);
+  }
+
   const token = 
     localStorage.getItem('funflick_admin_token') || 
     localStorage.getItem('funflick_token') || 

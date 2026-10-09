@@ -146,8 +146,8 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   tabLabel: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     marginTop: 2,
   },
   createBtnContainer: {

@@ -29,6 +29,12 @@ export async function uploadMediaToS3(localUri, fileName, mimeType, folder = 'vi
   const response = await fetch(localUri);
   const blob = await response.blob();
 
+  // Enforce 10MB maximum file size limit
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  if (blob && blob.size > MAX_FILE_SIZE) {
+    throw new Error(`Video file size (${(blob.size / (1024 * 1024)).toFixed(1)}MB) exceeds 10MB limit. Please choose a video under 10MB.`);
+  }
+
   // 3. Upload directly to AWS S3 via XMLHttpRequest with real progress monitoring
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();

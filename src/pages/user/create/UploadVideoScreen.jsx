@@ -159,6 +159,14 @@ export const UploadVideoScreen = () => {
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Enforce 10MB limit
+      const MAX_BYTES = 10 * 1024 * 1024;
+      if (file.size > MAX_BYTES) {
+        showToast(`⚠️ Video size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Videos must be 10MB or less!`, 'error');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
       setSelectedFile(file);
       const blobUrl = URL.createObjectURL(file);
       setVideoSrc(blobUrl);
@@ -499,6 +507,10 @@ export const UploadVideoScreen = () => {
               <UploadCloud className="w-4 h-4 text-pink-400" />
               <span>{selectedFile ? 'Choose Different Video from Device' : 'Choose Video from Device / Gallery'}</span>
             </button>
+            <p className="text-[11px] text-gray-400 text-center mt-1.5 flex items-center justify-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-pink-400"></span>
+              <span>Video limit: <strong className="text-pink-300">Maximum 10MB</strong> (MP4, MOV, WebM)</span>
+            </p>
           </div>
         </div>
 

@@ -266,7 +266,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
   if (!post) return null;
 
   return (
-    <article ref={cardRef} className="relative w-full aspect-[9/16] max-h-[720px] bg-black overflow-hidden select-none border-b border-white/10 sm:rounded-3xl sm:mb-4 sm:border sm:border-white/10 shadow-2xl">
+    <article ref={cardRef} className="relative w-full aspect-[4/5] sm:aspect-[9/16] max-h-[calc(100dvh-130px)] sm:max-h-[720px] bg-black overflow-hidden select-none border-b border-white/10 sm:rounded-3xl sm:mb-4 sm:border sm:border-white/10 shadow-2xl">
       {/* Video / Media Player */}
       <div 
         className="absolute inset-0 z-0 cursor-pointer flex items-center justify-center bg-black"
@@ -466,7 +466,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
             onClick={() => navigate(`/creator/${post.creator.username}`)}
             className="flex items-center gap-1.5 group"
           >
-            <span className="font-extrabold text-sm text-white drop-shadow-md group-hover:underline">
+            <span className="font-extrabold text-[15px] sm:text-base text-white drop-shadow-md group-hover:underline">
               @{post.creator.username}
             </span>
             {isPrivateAccount && (
@@ -482,7 +482,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
           </button>
 
           {isOwner ? (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/15 backdrop-blur-md text-pink-300 border border-white/10 shadow-sm">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/15 backdrop-blur-md text-pink-300 border border-white/10 shadow-sm">
               My Account
             </span>
           ) : (
@@ -500,14 +500,14 @@ export const VideoPostCard = ({ post, isReel = true }) => {
         </div>
 
         {/* Caption */}
-        <div className="text-xs text-white/95 leading-snug drop-shadow-sm">
+        <div className="text-[13px] sm:text-sm text-white/95 leading-snug drop-shadow-sm">
           <p className={captionExpanded ? '' : 'line-clamp-2'}>
             {post.caption}
           </p>
           {post.caption.length > 70 && (
             <button
               onClick={() => setCaptionExpanded(!captionExpanded)}
-              className="text-gray-300 font-bold hover:text-white mt-0.5 inline-block text-[11px]"
+              className="text-gray-300 font-bold hover:text-white mt-0.5 inline-block text-xs"
             >
               {captionExpanded ? 'less' : '...more'}
             </button>
@@ -516,9 +516,9 @@ export const VideoPostCard = ({ post, isReel = true }) => {
 
         {/* Audio Track Badge */}
         <div className="flex items-center gap-2 pt-0.5">
-          <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 max-w-[240px]">
-            <Music className="w-3 h-3 text-pink-400 shrink-0 animate-spin" style={{ animationDuration: '6s' }} />
-            <span className="text-[11px] text-gray-200 font-medium truncate">
+          <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 max-w-[260px]">
+            <Music className="w-3.5 h-3.5 text-pink-400 shrink-0 animate-spin" style={{ animationDuration: '6s' }} />
+            <span className="text-xs text-gray-200 font-medium truncate">
               {post.audioTitle || 'Original Audio'}
             </span>
           </div>
@@ -559,7 +559,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
           }`}>
             <Heart className={`w-7 h-7 transition-all ${post.isLiked ? 'fill-current scale-110 drop-shadow-[0_0_10px_rgba(255,0,122,0.6)]' : 'stroke-[2]'}`} />
           </div>
-          <span className="text-[11px] font-bold drop-shadow">
+          <span className="text-xs font-bold drop-shadow">
             {formatNumber(post.likesCount)}
           </span>
         </button>
@@ -572,7 +572,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
           <div className="p-2 rounded-full text-white drop-shadow-md group-hover:text-pink-300">
             <MessageCircle className="w-7 h-7 stroke-[2]" />
           </div>
-          <span className="text-[11px] font-bold drop-shadow">
+          <span className="text-xs font-bold drop-shadow">
             {formatNumber(post.commentsCount)}
           </span>
         </button>
@@ -585,7 +585,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
           <div className="p-2 rounded-full text-white drop-shadow-md group-hover:text-pink-300">
             <Share2 className="w-7 h-7 stroke-[2]" />
           </div>
-          <span className="text-[11px] font-bold drop-shadow">
+          <span className="text-xs font-bold drop-shadow">
             {formatNumber(post.sharesCount)}
           </span>
         </button>
@@ -600,7 +600,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
           }`}>
             <Bookmark className={`w-6 h-6 ${post.isSaved ? 'fill-current' : 'stroke-[2]'}`} />
           </div>
-          <span className="text-[11px] font-bold drop-shadow">
+          <span className="text-xs font-bold drop-shadow">
             {formatNumber(post.savesCount)}
           </span>
         </button>
@@ -610,7 +610,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
           <div className="p-1.5 rounded-full text-white drop-shadow-md">
             <Eye className="w-5 h-5 stroke-[2] text-pink-300" />
           </div>
-          <span className="text-[10px] font-extrabold drop-shadow text-pink-200">
+          <span className="text-[11px] font-extrabold drop-shadow text-pink-200">
             {formatNumber(post.viewsCount || post.views || 0)}
           </span>
         </div>

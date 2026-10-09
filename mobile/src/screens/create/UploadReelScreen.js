@@ -55,6 +55,14 @@ export const UploadReelScreen = ({ navigation }) => {
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
+        // Enforce 10MB size limit
+        if (asset.fileSize && asset.fileSize > 10 * 1024 * 1024) {
+          Alert.alert(
+            'Video Exceeds Limit',
+            `The selected video is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB. Videos must be 10MB or less. Please select a smaller video.`
+          );
+          return;
+        }
         setVideoUri(asset.uri);
         setVideoDuration(asset.duration ? Math.round(asset.duration / 1000) : 15);
       }
@@ -141,7 +149,7 @@ export const UploadReelScreen = ({ navigation }) => {
                 <VideoIcon size={32} color={colors.primary} />
               </View>
               <Text style={styles.pickerPrompt}>Tap to Select Reel Video</Text>
-              <Text style={styles.pickerSub}>MP4, MOV up to 60 seconds</Text>
+              <Text style={styles.pickerSub}>Maximum 10MB • MP4, MOV up to 60s</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -290,8 +298,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   pickerSub: {
-    color: colors.textMuted,
-    fontSize: 12,
+    color: '#d1d5db',
+    fontSize: 13,
+    fontWeight: '500',
   },
   previewVideo: {
     width: '100%',
@@ -301,9 +310,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    color: '#d1d5db',
-    fontSize: 13,
-    fontWeight: '600',
+    color: '#e5e7eb',
+    fontSize: 14,
+    fontWeight: '700',
   },
   textInput: {
     backgroundColor: colors.inputBg,
@@ -313,7 +322,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 14,
+    fontSize: 14.5,
   },
   textArea: {
     height: 80,
@@ -325,8 +334,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   catPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
     borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.07)',
   },
@@ -335,7 +344,7 @@ const styles = StyleSheet.create({
   },
   catText: {
     color: colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   catTextActive: {

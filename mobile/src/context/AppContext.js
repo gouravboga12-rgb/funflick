@@ -9,10 +9,47 @@ export const AppProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [posts, setPosts] = useState([]);
+  const [stories, setStories] = useState([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isReelsMuted, setIsReelsMuted] = useState(false);
   const [activePlayingVideoId, setActivePlayingVideoId] = useState(null);
   const [blockedUsers, setBlockedUsers] = useState([]);
+
+  // Fetch live stories from EC2 MySQL backend
+  const fetchLiveStories = useCallback(async () => {
+    try {
+      const data = await apiRequest('/stories');
+      if (data && data.stories && Array.isArray(data.stories)) {
+        const myStory = {
+          id: 'my-story',
+          isUser: true,
+          username: 'Your Story',
+          name: 'Your Story',
+          avatar: currentUser?.avatar_url || currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+          hasUnseen: false,
+          stories: [],
+        };
+        const userGroup = data.stories.find(s => s.userId === currentUser?.id || s.username === currentUser?.username);
+        if (userGroup) {
+          myStory.stories = userGroup.stories || [];
+        }
+        const others = data.stories
+          .filter(s => s.userId !== currentUser?.id && s.username !== currentUser?.username)
+          .map(s => ({
+            id: s.id || `st_${s.username}`,
+            isUser: false,
+            username: s.username,
+            name: s.name || s.username,
+            avatar: s.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+            hasUnseen: true,
+            stories: s.stories || [],
+          }));
+        setStories([myStory, ...others]);
+      }
+    } catch (e) {
+      console.warn('Could not fetch live stories in mobile:', e.message);
+    }
+  }, [currentUser]);
 
   // Load auth session on launch
   useEffect(() => {
@@ -81,7 +118,8 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     fetchFeed();
-  }, [fetchFeed]);
+    fetchLiveStories();
+  }, [fetchFeed, fetchLiveStories]);
 
   // Login handler
   const login = async (identifier, password) => {
@@ -233,6 +271,8 @@ export const AppProvider = ({ children }) => {
         selectGoogleAccount,
         logout,
         posts,
+        stories,
+        fetchLiveStories,
         isLoadingFeed,
         fetchFeed,
         isReelsMuted,

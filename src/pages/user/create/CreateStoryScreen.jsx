@@ -48,6 +48,11 @@ export const CreateStoryScreen = () => {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        showToast(`⚠️ File size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Stories must be under 10MB!`, 'error');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
       setSelectedFile(file);
       setMediaUrl(URL.createObjectURL(file));
       showToast('Story media selected from device! 📸');

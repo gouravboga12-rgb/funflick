@@ -60,7 +60,7 @@ export const StoryBar = () => {
                     <Plus className="w-3.5 h-3.5 stroke-[3]" />
                   </div>
                 </div>
-                <span className="text-[11px] font-semibold text-gray-200 max-w-[66px] text-center truncate">
+                <span className="text-xs font-bold text-gray-200 max-w-[70px] text-center truncate">
                   Your Story
                 </span>
               </div>
@@ -87,7 +87,7 @@ export const StoryBar = () => {
                   />
                 </div>
               </div>
-              <span className="text-[11px] font-semibold text-gray-300 max-w-[66px] text-center truncate">
+              <span className="text-xs font-bold text-gray-200 max-w-[70px] text-center truncate">
                 {story.username.replace('_official', '')}
               </span>
             </div>
