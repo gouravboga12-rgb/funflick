@@ -29,12 +29,19 @@ export async function initDatabase() {
         password_hash VARCHAR(255) NOT NULL,
         avatar_url TEXT DEFAULT NULL,
         bio TEXT DEFAULT NULL,
-        role ENUM('user', 'creator', 'admin') DEFAULT 'user',
+        role ENUM('user', 'creator', 'admin', 'moderator') DEFAULT 'user',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_email (email),
         INDEX idx_phone (phone)
       ) ENGINE=InnoDB;
     `);
+
+    // Migration helper: support 'moderator' in users.role enum
+    try {
+      await connection.query(`
+        ALTER TABLE users MODIFY COLUMN role ENUM('user', 'creator', 'admin', 'moderator') DEFAULT 'user'
+      `);
+    } catch (err) {}
 
     // Migration helper: add phone column if not present
     try {

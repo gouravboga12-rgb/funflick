@@ -580,17 +580,29 @@ export async function handleContentModeration(req, res) {
     // Perform database status update or permanent deletion on reject
     if (action === 'reject') {
       if (itemType === 'story') {
-        await pool.query("DELETE FROM stories WHERE id = ?", [id]);
+        try {
+          await pool.query("DELETE FROM stories WHERE id = ?", [id]);
+        } catch (delErr) {
+          await pool.query("UPDATE stories SET status = 'Rejected' WHERE id = ?", [id]);
+        }
       } else {
-        await pool.query("DELETE FROM likes WHERE video_id = ?", [id]);
-        await pool.query("DELETE FROM comments WHERE video_id = ?", [id]);
-        await pool.query("DELETE FROM videos WHERE id = ?", [id]);
+        try {
+          await pool.query("DELETE FROM likes WHERE video_id = ?", [id]).catch(() => {});
+          await pool.query("DELETE FROM comments WHERE video_id = ?", [id]).catch(() => {});
+          await pool.query("DELETE FROM video_views WHERE video_id = ?", [id]).catch(() => {});
+          await pool.query("DELETE FROM saved_videos WHERE video_id = ?", [id]).catch(() => {});
+          await pool.query("DELETE FROM reports WHERE content_id = ? AND content_type = 'video'", [id]).catch(() => {});
+          await pool.query("DELETE FROM videos WHERE id = ?", [id]);
+        } catch (delErr) {
+          // If cascading constraint prevents hard delete, update status & moderation_status to Rejected
+          await pool.query("UPDATE videos SET status = 'Rejected', moderation_status = 'Rejected' WHERE id = ?", [id]);
+        }
       }
     } else {
       if (itemType === 'story') {
         await pool.query("UPDATE stories SET status = ? WHERE id = ?", [newStatus, id]);
       } else {
-        await pool.query("UPDATE videos SET status = ? WHERE id = ?", [newStatus, id]);
+        await pool.query("UPDATE videos SET status = ?, moderation_status = ? WHERE id = ?", [newStatus, newStatus, id]);
       }
     }
 

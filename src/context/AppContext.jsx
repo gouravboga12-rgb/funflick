@@ -2774,7 +2774,7 @@ export const AppProvider = ({ children }) => {
     try {
       const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
       if (token) {
-        await fetch(`/api/admin/content/${approvalId}/moderate`, {
+        const res = await fetch(`/api/admin/content/${approvalId}/moderate`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -2785,6 +2785,9 @@ export const AppProvider = ({ children }) => {
             itemType: target?.itemType || target?.contentType || 'video' 
           })
         });
+        if (res.ok) {
+          fetchAdminStats?.();
+        }
       }
     } catch (err) {
       console.error('Error moderating content on backend:', err);

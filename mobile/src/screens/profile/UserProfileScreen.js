@@ -1612,6 +1612,8 @@ export const UserProfileScreen = ({ navigation, route }) => {
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
       {/* =================================================== */}
       {/* MODAL 5C: SAVED VIDEOS                              */}
       {/* =================================================== */}
