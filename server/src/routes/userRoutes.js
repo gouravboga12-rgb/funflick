@@ -4,11 +4,15 @@ import {
   getUserProfile, 
   getBlockedUsers, 
   blockUser, 
-  unblockUser 
+  unblockUser,
+  updatePushToken
 } from '../controllers/userController.js';
 import { optionalAuth, authenticateToken } from '../middlewares/authMiddleware.js';
 
 const router = Router();
+
+// Push Notifications token registration (authenticated)
+router.post('/push-token', authenticateToken, updatePushToken);
 
 // Blocked users management (authenticated)
 router.get('/blocked', authenticateToken, getBlockedUsers);

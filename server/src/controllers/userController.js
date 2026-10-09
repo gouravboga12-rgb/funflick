@@ -181,3 +181,21 @@ export async function unblockUser(req, res) {
     return res.status(500).json({ error: 'Failed to unblock user' });
   }
 }
+
+// Register or update device Expo push token
+export async function updatePushToken(req, res) {
+  try {
+    const userId = req.user?.id;
+    const { pushToken } = req.body;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!pushToken || typeof pushToken !== 'string') {
+      return res.status(400).json({ error: 'Valid pushToken is required' });
+    }
+
+    await pool.query('UPDATE users SET push_token = ? WHERE id = ?', [pushToken, userId]);
+    return res.json({ success: true, message: 'Push token updated successfully' });
+  } catch (err) {
+    console.error('Update push token error:', err);
+    return res.status(500).json({ error: 'Failed to update push token' });
+  }
+}

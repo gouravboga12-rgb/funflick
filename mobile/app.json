@@ -1,0 +1,69 @@
+{
+  "expo": {
+    "name": "FunFlick",
+    "slug": "funflick",
+    "version": "1.0.0",
+    "scheme": "funflick",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#07040d",
+    "splash": {
+      "backgroundColor": "#07040d",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.funflick.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "FunFlick requires access to your photo and video gallery so you can upload viral reels, posts, and stories.",
+        "NSCameraUsageDescription": "FunFlick requires camera access so you can record videos and snap photos directly within the app."
+      }
+    },
+    "android": {
+      "package": "com.funflick.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#07040d",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-video",
+      "expo-web-browser",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FunFlick requires access to your photos and videos to publish reels and stories."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ff007a"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e7907d3d-a083-4787-bc7d-4dd0302f8516"
+      }
+    },
+    "owner": "mrspysoal"
+  }
+}

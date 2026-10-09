@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { sendPushNotification } from '../services/pushService.js';
 
 export async function listVideos(req, res) {
   try {
@@ -229,6 +230,13 @@ export async function toggleLike(req, res) {
              VALUES (?, ?, 'like', 'New Like', ?, ?)`,
             [vRows[0].user_id, userId, `liked your post "${vRows[0].title || 'FunFlick post'}"`, id]
           );
+
+          // Dispatch mobile push notification
+          sendPushNotification(vRows[0].user_id, {
+            title: '❤️ New Like on FunFlick',
+            body: `${req.user?.name || req.user?.username || 'Someone'} liked your post "${vRows[0].title || 'FunFlick post'}"`,
+            data: { type: 'like', videoId: id }
+          });
         }
       } catch (err) {}
 
@@ -292,6 +300,12 @@ export async function addComment(req, res) {
            VALUES (?, ?, 'comment', 'New Comment', ?, ?)`,
           [vRows[0].user_id, req.user.id, `commented: "${commentText.slice(0, 40)}"`, id]
         );
+
+        sendPushNotification(vRows[0].user_id, {
+          title: '💬 New Comment on FunFlick',
+          body: `${req.user?.name || req.user?.username || 'Someone'} commented: "${commentText.slice(0, 50)}"`,
+          data: { type: 'comment', videoId: id }
+        });
       }
     } catch (err) {}
 
