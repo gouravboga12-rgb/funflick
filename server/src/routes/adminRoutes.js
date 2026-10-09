@@ -23,59 +23,87 @@ import {
   getAdminAdRequests,
   approveAdminAdRequest,
   rejectAdminAdRequest,
-  deleteAdminAdRequest
+  deleteAdminAdRequest,
+  getAdminStaff,
+  createAdminStaff,
+  deleteAdminStaff,
+  toggleAdminStaff
 } from '../controllers/adminController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
-// Middleware ensuring admin role or token
-const requireAdmin = (req, res, next) => {
+// Middleware: Super Administrator privileges only
+const requireSuperAdmin = (req, res, next) => {
   if (req.user?.role !== 'admin') {
-    return res.status(403).json({ error: 'Access denied. Administrator privileges required.' });
+    return res.status(403).json({ error: 'Access denied. Super Administrator privileges required.' });
   }
   next();
 };
 
-router.get('/stats', authenticateToken, requireAdmin, getAdminStats);
-router.get('/users', authenticateToken, requireAdmin, getAdminUsers);
-router.put('/users/:id/status', authenticateToken, requireAdmin, toggleUserStatus);
-router.put('/users/:id/suspend', authenticateToken, requireAdmin, suspendUserWithDuration);
-router.put('/users/:id/reactivate', authenticateToken, requireAdmin, reactivateUser);
-router.get('/creators', authenticateToken, requireAdmin, getAdminCreators);
-router.get('/reports', authenticateToken, requireAdmin, getAdminReports);
-router.put('/reports/:id/resolve', authenticateToken, requireAdmin, resolveAdminReport);
-router.patch('/reports/:id/resolve', authenticateToken, requireAdmin, resolveAdminReport);
+// Middleware: Staff (Admin or Moderator) privileges
+const requireStaffOrAdmin = (req, res, next) => {
+  if (req.user?.role !== 'admin' && req.user?.role !== 'moderator') {
+    return res.status(403).json({ error: 'Access denied. Administrator or Moderator privileges required.' });
+  }
+  next();
+};
 
-// Permanent content moderation (Videos, Reels, Photos, Posts)
-router.get('/content', authenticateToken, requireAdmin, getAdminContent);
-router.get('/content/pending', authenticateToken, requireAdmin, getAdminPendingContent);
-router.put('/content/:id/moderate', authenticateToken, requireAdmin, handleContentModeration);
-router.delete('/content/:id', authenticateToken, requireAdmin, deleteAdminContent);
+// -------------------------------------------------------------
+// Super Admin Only: System Stats, Users, Revenue, Staff Management
+// -------------------------------------------------------------
+router.get('/stats', authenticateToken, requireSuperAdmin, getAdminStats);
+router.get('/users', authenticateToken, requireSuperAdmin, getAdminUsers);
+router.put('/users/:id/status', authenticateToken, requireSuperAdmin, toggleUserStatus);
+router.put('/users/:id/suspend', authenticateToken, requireSuperAdmin, suspendUserWithDuration);
+router.put('/users/:id/reactivate', authenticateToken, requireSuperAdmin, reactivateUser);
+router.get('/creators', authenticateToken, requireSuperAdmin, getAdminCreators);
+router.get('/transactions', authenticateToken, requireSuperAdmin, getAdminTransactions);
+router.get('/influencer-media', authenticateToken, requireSuperAdmin, getAdminInfluencerMedia);
 
-// Story moderation (Active stories monitoring, immediate deletion, user suspension)
-router.get('/stories', authenticateToken, requireAdmin, getAdminActiveStories);
-router.delete('/stories/:id', authenticateToken, requireAdmin, deleteAdminStory);
-router.put('/stories/users/:userId/suspend', authenticateToken, requireAdmin, suspendUserWithDuration);
-router.put('/stories/users/:userId/reactivate', authenticateToken, requireAdmin, reactivateUser);
+// Moderator Staff Accounts Management (Super Admin only)
+router.get('/staff', authenticateToken, requireSuperAdmin, getAdminStaff);
+router.post('/staff', authenticateToken, requireSuperAdmin, createAdminStaff);
+router.delete('/staff/:id', authenticateToken, requireSuperAdmin, deleteAdminStaff);
+router.put('/staff/:id/toggle', authenticateToken, requireSuperAdmin, toggleAdminStaff);
 
-// Admin subscription transaction ledger for revenue page
-router.get('/transactions', authenticateToken, requireAdmin, getAdminTransactions);
+// -------------------------------------------------------------
+// Staff & Moderator Accessible Routes (5 permitted sections):
+// 1. Reports
+// 2. Content Moderation
+// 3. Story Moderation
+// 4. Ads List & Creation
+// 5. Ad Requests
+// -------------------------------------------------------------
 
-// Influencer Media & Rewards review
-router.get('/influencer-media', authenticateToken, requireAdmin, getAdminInfluencerMedia);
+// 1. Reports & User Help Support
+router.get('/reports', authenticateToken, requireStaffOrAdmin, getAdminReports);
+router.put('/reports/:id/resolve', authenticateToken, requireStaffOrAdmin, resolveAdminReport);
+router.patch('/reports/:id/resolve', authenticateToken, requireStaffOrAdmin, resolveAdminReport);
 
-// Ads & In-App Promotions management
+// 2. Permanent Content Moderation (Videos, Reels, Photos, Posts)
+router.get('/content', authenticateToken, requireStaffOrAdmin, getAdminContent);
+router.get('/content/pending', authenticateToken, requireStaffOrAdmin, getAdminPendingContent);
+router.put('/content/:id/moderate', authenticateToken, requireStaffOrAdmin, handleContentModeration);
+router.delete('/content/:id', authenticateToken, requireStaffOrAdmin, deleteAdminContent);
+
+// 3. Story Moderation (Active stories monitoring, immediate deletion, user suspension)
+router.get('/stories', authenticateToken, requireStaffOrAdmin, getAdminActiveStories);
+router.delete('/stories/:id', authenticateToken, requireStaffOrAdmin, deleteAdminStory);
+router.put('/stories/users/:userId/suspend', authenticateToken, requireStaffOrAdmin, suspendUserWithDuration);
+router.put('/stories/users/:userId/reactivate', authenticateToken, requireStaffOrAdmin, reactivateUser);
+
+// 4. Ads Management
 router.get('/ads', getAdminAds);
-router.post('/ads', authenticateToken, requireAdmin, createAdminAd);
-router.delete('/ads/:id', authenticateToken, requireAdmin, deleteAdminAd);
+router.post('/ads', authenticateToken, requireStaffOrAdmin, createAdminAd);
+router.delete('/ads/:id', authenticateToken, requireStaffOrAdmin, deleteAdminAd);
 router.post('/ads/:id/metric', recordAdMetric);
 
-// Ad Requests & Ingestion Moderation
-router.get('/ad-requests', authenticateToken, requireAdmin, getAdminAdRequests);
-router.put('/ad-requests/:id/approve', authenticateToken, requireAdmin, approveAdminAdRequest);
-router.put('/ad-requests/:id/reject', authenticateToken, requireAdmin, rejectAdminAdRequest);
-router.delete('/ad-requests/:id', authenticateToken, requireAdmin, deleteAdminAdRequest);
+// 5. Ad Requests & Ingestion Moderation
+router.get('/ad-requests', authenticateToken, requireStaffOrAdmin, getAdminAdRequests);
+router.put('/ad-requests/:id/approve', authenticateToken, requireStaffOrAdmin, approveAdminAdRequest);
+router.put('/ad-requests/:id/reject', authenticateToken, requireStaffOrAdmin, rejectAdminAdRequest);
+router.delete('/ad-requests/:id', authenticateToken, requireStaffOrAdmin, deleteAdminAdRequest);
 
 export default router;
 

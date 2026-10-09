@@ -77,12 +77,43 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
       .catch(() => {});
   }, [location.pathname]);
 
-  const navLinks = [
+  const adminUser = (() => {
+    try {
+      const u = localStorage.getItem('funflick_admin_user');
+      return u ? JSON.parse(u) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+  const isModerator = adminUser?.role === 'moderator';
+
+  const MODERATOR_ALLOWED_PATHS = [
+    '/admin/ad-requests',
+    '/admin/ads',
+    '/admin/content',
+    '/admin/stories',
+    '/admin/reports'
+  ];
+
+  useEffect(() => {
+    if (isModerator && !MODERATOR_ALLOWED_PATHS.includes(location.pathname)) {
+      navigate('/admin/content', { replace: true });
+    }
+  }, [isModerator, location.pathname, navigate]);
+
+  const navLinks = isModerator ? [
+    { label: 'Ad Requests', icon: Inbox, path: '/admin/ad-requests', badge: pendingAdRequestsCount },
+    { label: 'Ads & Promotions', icon: Megaphone, path: '/admin/ads' },
+    { label: 'Content Moderation', icon: Video, path: '/admin/content', badge: pendingApprovals.length },
+    { label: 'Story Moderation', icon: Sparkles, path: '/admin/stories' },
+    { label: 'Reports', icon: Flag, path: '/admin/reports', badge: pendingReportsCount },
+  ] : [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
     { label: 'Influencer Media & Rewards', icon: Sparkles, path: '/admin/influencer-media' },
     { label: 'Ads & Promotions', icon: Megaphone, path: '/admin/ads' },
     { label: 'Ad Requests', icon: Inbox, path: '/admin/ad-requests', badge: pendingAdRequestsCount },
     { label: 'Users', icon: Users, path: '/admin/users' },
+    { label: 'Staff / Moderators', icon: ShieldCheck, path: '/admin/staff' },
     { label: 'Creators', icon: Video, path: '/admin/creators' },
     { label: 'Content Moderation', icon: Video, path: '/admin/content', badge: pendingApprovals.length },
     { label: 'Story Moderation', icon: Sparkles, path: '/admin/stories' },

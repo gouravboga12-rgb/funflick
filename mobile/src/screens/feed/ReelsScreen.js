@@ -4,6 +4,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Music, Bookmark, Plus, Eye, Check } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
@@ -22,6 +23,7 @@ function formatCount(num) {
 function ReelItem({
   item,
   isActive,
+  isScreenFocused,
   reelHeight,
   isReelsMuted,
   toggleMute,
@@ -40,7 +42,7 @@ function ReelItem({
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
-    if (isActive && !isPaused) {
+    if (isActive && isScreenFocused && !isPaused) {
       p.play();
     }
   });
@@ -48,13 +50,13 @@ function ReelItem({
   useEffect(() => {
     if (!player) return;
     try {
-      if (isActive && !isPaused) {
+      if (isActive && isScreenFocused && !isPaused) {
         player.play();
       } else {
         player.pause();
       }
     } catch {}
-  }, [isActive, isPaused, player]);
+  }, [isActive, isScreenFocused, isPaused, player]);
 
   useEffect(() => {
     if (player) {
@@ -276,6 +278,7 @@ function ReelItem({
 
 export const ReelsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   const { posts, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
@@ -328,6 +331,7 @@ export const ReelsScreen = ({ navigation }) => {
           <ReelItem
             item={item}
             isActive={index === currentIndex}
+            isScreenFocused={isFocused}
             reelHeight={containerHeight}
             isReelsMuted={isReelsMuted}
             toggleMute={toggleMute}

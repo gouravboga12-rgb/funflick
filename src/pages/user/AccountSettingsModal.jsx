@@ -25,7 +25,7 @@ import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDe
 import { BlockedUsersModal } from '../../components/user/BlockedUsersModal';
 
 export const AccountSettingsModal = ({ isOpen, onClose }) => {
-  const { currentUser, setCurrentUser, showToast, theme, setTheme, blockedUsers } = useApp();
+  const { currentUser, setCurrentUser, showToast, theme, setTheme, blockedUsers, logoutUser } = useApp();
 
   const [email, setEmail] = useState(currentUser?.email || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
@@ -35,8 +35,8 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
   const [highQuality, setHighQuality] = useState(true);
   const [notifLikes, setNotifLikes] = useState(true);
   const [notifEarnings, setNotifEarnings] = useState(true);
-  const [language, setLanguage] = useState('Telugu & Hindi');
   const [saving, setSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
   const [blockedModalOpen, setBlockedModalOpen] = useState(false);
 
@@ -51,6 +51,45 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
   }, [isOpen, currentUser?.email, currentUser?.phone, currentUser?.isPrivate, currentUser?.allowDMs]);
 
   if (!isOpen) return null;
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to permanently delete your account?\n\nAll your profile information, reels, videos, comments, and messages will be permanently deleted from the database. This action cannot be undone.\n\nPress OK to delete or Cancel to keep your account.'
+    );
+    if (!confirmed) {
+      return; // Cancel pressed: do not delete
+    }
+
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const res = await fetch('/api/auth/account', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || 'Failed to delete account', 'error');
+        setIsDeleting(false);
+        return;
+      }
+      showToast('Your account has been permanently deleted.', 'info');
+      onClose();
+      if (logoutUser) {
+        logoutUser();
+      } else {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.href = '/login';
+      }
+    } catch (e) {
+      showToast('Error deleting account', 'error');
+      setIsDeleting(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e?.preventDefault?.();
@@ -373,34 +412,14 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            {/* Playback & Content */}
+            {/* Playback & Quality */}
             <div className="space-y-2.5">
               <span className={`text-[11px] font-bold ${theme === 'light' ? 'text-slate-500' : 'text-gray-400'} uppercase tracking-wider block`}>
-                Video Playback & Language
+                Video Playback & Quality
               </span>
 
               <div className={`p-3 rounded-2xl ${theme === 'light' ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/5'} border space-y-3`}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs">
-                    <Globe className="w-4 h-4 text-purple-400" />
-                    <span className={`font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Content Languages</span>
-                  </div>
-                  <select
-                    value={language}
-                    onChange={e => setLanguage(e.target.value)}
-                    className={`${
-                      theme === 'light' 
-                        ? 'bg-white text-slate-900 border-slate-300 shadow-sm' 
-                        : 'bg-[#18122c] text-white border-white/10'
-                    } text-xs px-2.5 py-1 rounded-xl border focus:outline-none`}
-                  >
-                    <option value="Telugu & Hindi">Telugu & Hindi</option>
-                    <option value="Telugu, Hindi & English">Telugu, Hindi & English</option>
-                    <option value="All Indian Languages">All Indian Languages</option>
-                  </select>
-                </div>
-
-                <div className={`flex items-center justify-between pt-2 border-t ${theme === 'light' ? 'border-slate-200' : 'border-white/5'}`}>
                   <div>
                     <span className={`text-xs font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'} block`}>Autoplay on Wi-Fi Only</span>
                     <span className={`text-[10px] ${theme === 'light' ? 'text-slate-500' : 'text-gray-400'}`}>Save mobile data when scrolling feed</span>
@@ -475,19 +494,32 @@ export const AccountSettingsModal = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            {/* Clear Cache */}
-            <button
-              type="button"
-              onClick={handleClearCache}
-              className={`w-full py-2.5 rounded-2xl ${
-                theme === 'light'
-                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                  : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/5'
-              } text-xs font-semibold flex items-center justify-center gap-2 border transition`}
-            >
-              <Trash2 className="w-4 h-4 text-gray-400" />
-              <span>Clear Local App Cache (48.5 MB)</span>
-            </button>
+            {/* Clear Cache & Danger Zone */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={handleClearCache}
+                className={`w-full py-2.5 rounded-2xl ${
+                  theme === 'light'
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                    : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/5'
+                } text-xs font-semibold flex items-center justify-center gap-2 border transition`}
+              >
+                <Trash2 className="w-4 h-4 text-gray-400" />
+                <span>Clear Local App Cache (48.5 MB)</span>
+              </button>
+
+              {/* Delete Account Permanently */}
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className="w-full py-2.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4 text-rose-500" />
+                <span>{isDeleting ? 'Deleting Account...' : 'Delete Account Permanently'}</span>
+              </button>
+            </div>
           </form>
         </div>
 

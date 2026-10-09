@@ -16,7 +16,9 @@ import {
   Loader2,
   Maximize2,
   Download,
-  Play
+  Play,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 import { uploadFileToS3 } from '../../services/s3UploadService';
@@ -30,6 +32,7 @@ export const MessagesScreen = () => {
   const { 
     conversations, 
     sendMessage, 
+    unsendMessage,
     openOrCreateConversation, 
     fetchLiveConversations,
     fetchConversationMessages,
@@ -43,6 +46,7 @@ export const MessagesScreen = () => {
   const [attachedMedia, setAttachedMedia] = useState(null); // { file, type, url, name, size }
   const [viewingMedia, setViewingMedia] = useState(null); // Active media opened in full-screen modal
   const [isSending, setIsSending] = useState(false);
+  const [unsendTargetMsg, setUnsendTargetMsg] = useState(null); // message to unsend
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null); // auto-scroll anchor
 
@@ -384,10 +388,25 @@ export const MessagesScreen = () => {
                     )}
                   </div>
 
-                  <span className="text-[9px] text-gray-500 mt-1 px-1 flex items-center gap-1">
-                    {msg.time}
-                    {isMe && <CheckCheck className="w-3 h-3 text-pink-400" />}
-                  </span>
+                  <div className="flex items-center gap-1.5 mt-1 px-1">
+                    <span className="text-[9px] text-gray-500 flex items-center gap-1">
+                      {msg.time}
+                      {isMe && <CheckCheck className="w-3 h-3 text-pink-400" />}
+                    </span>
+
+                    {/* Instagram-style Unsend Option for Sent Messages */}
+                    {isMe && (
+                      <button
+                        type="button"
+                        onClick={() => setUnsendTargetMsg(msg)}
+                        title="Unsend message"
+                        className="opacity-70 hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-rose-400 transition ml-1 cursor-pointer flex items-center gap-0.5 text-[9px]"
+                      >
+                        <Trash2 className="w-2.5 h-2.5" />
+                        <span className="hover:underline">Unsend</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -592,6 +611,48 @@ export const MessagesScreen = () => {
         media={viewingMedia} 
         onClose={() => setViewingMedia(null)} 
       />
+
+      {/* Instagram-style Unsend Message Confirmation Dialog */}
+      {unsendTargetMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in select-none">
+          <div className="w-full max-w-xs bg-[#18122c] border border-white/10 rounded-3xl p-5 shadow-2xl text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/30">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            
+            <div className="space-y-1">
+              <h3 className="font-extrabold text-sm text-white font-heading">
+                Unsend Message?
+              </h3>
+              <p className="text-[11px] text-gray-400 leading-relaxed px-2">
+                Unsending will remove the message for everyone in this chat. People may have already seen or played it.
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const targetId = unsendTargetMsg.id;
+                  setUnsendTargetMsg(null);
+                  unsendMessage(activeConvId, targetId);
+                  showToast('Message unsent', 'info');
+                }}
+                className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition active:scale-95 cursor-pointer"
+              >
+                Unsend
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnsendTargetMsg(null)}
+                className="w-full py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-300 font-semibold text-xs transition cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

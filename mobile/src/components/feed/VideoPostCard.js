@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Share, Dimensions, Ani
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, Play, Music, Plus, Eye, Check } from 'lucide-react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
@@ -23,11 +24,13 @@ function formatCount(num) {
 }
 
 export const VideoPostCard = ({ post, isActive = false, navigation }) => {
+  const isFocused = useIsFocused();
   const { toggleLikePost, recordPostView, toggleFollowCreator, isReelsMuted, toggleMute, currentUser } = useApp();
   const [isPlaying, setIsPlaying] = useState(false);
   const [lastTap, setLastTap] = useState(0);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [avatarErr, setAvatarErr] = useState(false);
   const heartScale = useRef(new Animated.Value(0)).current;
 
   const isOwner = post.creator?.username === currentUser?.username;
@@ -37,17 +40,17 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
-    if (isActive) {
+    if (isActive && isFocused) {
       p.play();
       setIsPlaying(true);
     }
   });
 
-  // Play/pause based on active viewport state
+  // Play/pause based on active viewport state and screen focus
   useEffect(() => {
     if (!player) return;
     try {
-      if (isActive) {
+      if (isActive && isFocused) {
         player.play();
         setIsPlaying(true);
         recordPostView(post.id);
@@ -56,7 +59,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         setIsPlaying(false);
       }
     } catch {}
-  }, [isActive, player, post.id]);
+  }, [isActive, isFocused, player, post.id]);
 
   // Sync mute state
   useEffect(() => {
@@ -232,7 +235,19 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
               onPress={() => navigation?.navigate('CreatorProfile', { username: post.creator?.username })}
               style={styles.avatarTouch}
             >
-              <Image source={{ uri: post.creator?.avatar }} style={styles.sideAvatar} />
+              {post.creator?.avatar && !avatarErr ? (
+                <Image
+                  source={{ uri: post.creator?.avatar }}
+                  style={styles.sideAvatar}
+                  onError={() => setAvatarErr(true)}
+                />
+              ) : (
+                <View style={[styles.sideAvatar, styles.avatarFallback]}>
+                  <Text style={styles.avatarFallbackText}>
+                    {(post.creator?.name || post.creator?.username || 'F').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             {!post.isFollowing && !isOwner && (
               <TouchableOpacity
@@ -521,5 +536,15 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+  avatarFallback: {
+    backgroundColor: '#0d9488',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
   },
 });

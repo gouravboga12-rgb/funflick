@@ -117,7 +117,8 @@ export const UserProfileScreen = () => {
   const realFollowing = liveFollowCounts.following;
   const realFollowers = liveFollowCounts.followers;
   const realWallet = currentUser.walletBalance || 0;
-  const realViews = currentUser.creatorMetrics?.totalViews || '0';
+  const userMediaList = (myMedia && myMedia.length > 0) ? myMedia : (posts || []).filter(p => p.creator?.username === currentUser?.username);
+  const realViews = userMediaList.reduce((acc, p) => acc + (Number(p.views_count) || Number(p.viewsCount) || Number(p.views) || 0), 0);
   const realEarnings = currentUser.creatorMetrics?.performanceEarnings || '₹0';
   const realLikedCount = posts.filter(p => p.isLiked).length;
   const realSavedCount = posts.filter(p => p.isSaved).length;

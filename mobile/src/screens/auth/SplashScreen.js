@@ -46,16 +46,13 @@ export default function SplashScreen({ navigation }) {
               end={{ x: 1, y: 1 }}
             >
               <Image
-                source={require('../../../assets/icon.png')}
+                source={require('../../../assets/logo-white.png')}
                 style={styles.logoImage}
                 resizeMode="cover"
               />
             </LinearGradient>
           </View>
 
-          <Text style={styles.brandTitle}>
-            Fun<Text style={{ color: colors.primary }}>Flick</Text>
-          </Text>
           <Text style={styles.tagline}>Comedy. Entertainment. Always On!</Text>
           <Text style={styles.subTagline}>Watch, Share & Monetize Short Videos</Text>
         </View>
@@ -76,14 +73,6 @@ export default function SplashScreen({ navigation }) {
               <Text style={styles.btnText}>Get Started</Text>
               <ArrowRight size={18} color="#ffffff" strokeWidth={2.5} />
             </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.guestBtn}
-            activeOpacity={0.7}
-            onPress={() => navigation.replace('MainTabs')}
-          >
-            <Text style={styles.guestBtnText}>Explore Feed as Guest</Text>
           </TouchableOpacity>
 
           <View style={styles.brandKeywordsRow}>
@@ -153,26 +142,31 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   logoOuterGlow: {
+    width: 136,
+    height: 136,
+    borderRadius: 36,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
     elevation: 16,
     marginBottom: 20,
   },
   logoBorder: {
-    width: 120,
-    height: 120,
+    width: 136,
+    height: 136,
     borderRadius: 36,
     padding: 3,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   logoImage: {
     width: '100%',
     height: '100%',
     borderRadius: 33,
-    backgroundColor: '#07040d',
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
   },
   brandTitle: {
     fontSize: 36,

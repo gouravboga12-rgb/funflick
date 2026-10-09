@@ -35,6 +35,7 @@ export const DiscoverScreen = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Trending');
+  const [showAllTrending, setShowAllTrending] = useState(false);
 
   const getCategoryIcon = (iconName, isSelected, catColor) => {
     const iconClass = isSelected 
@@ -388,53 +389,67 @@ export const DiscoverScreen = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {filteredVideos.slice(0, 6).map((video, idx) => (
-                <div
-                  key={video.id}
-                  onClick={() => navigate(`/reels?id=${video.id}`)}
-                  className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-gray-900 cursor-pointer group shadow-lg hover:ring-2 hover:ring-pink-500/50 transition-all"
-                >
-                  <img
-                    src={video.posterUrl || video.mediaUrl || video.image}
-                    alt={video.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                  
-                  {/* Rank Badge & Views Badge */}
-                  <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-[#ff007a] text-white flex items-center justify-center text-[10px] font-black shadow">
-                      #{idx + 1}
-                    </span>
-                    <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white border border-white/10">
-                      <Eye className="w-2.5 h-2.5 text-pink-300" />
-                      <span>{video.viewsCount || video.views || '0'}</span>
+            <div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {(showAllTrending ? filteredVideos : filteredVideos.slice(0, 5)).map((video, idx) => (
+                  <div
+                    key={video.id}
+                    onClick={() => navigate(`/reels?id=${video.id}`)}
+                    className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-gray-900 cursor-pointer group shadow-lg hover:ring-2 hover:ring-pink-500/50 transition-all"
+                  >
+                    <img
+                      src={video.posterUrl || video.mediaUrl || video.image}
+                      alt={video.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                    
+                    {/* Rank Badge & Views Badge */}
+                    <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-[#ff007a] text-white flex items-center justify-center text-[10px] font-black shadow">
+                        #{idx + 1}
+                      </span>
+                      <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white border border-white/10">
+                        <Eye className="w-2.5 h-2.5 text-pink-300" />
+                        <span>{video.viewsCount || video.views || '0'}</span>
+                      </div>
+                    </div>
+
+                    {/* Likes badge if any */}
+                    {Number(video.likesCount || 0) > 0 && (
+                      <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white border border-white/10">
+                        <Heart className="w-2.5 h-2.5 text-rose-500 fill-current" />
+                        <span>{video.likesCount}</span>
+                      </div>
+                    )}
+
+                    {/* Bottom Title, Creator & Tag */}
+                    <div className="absolute bottom-2 left-2 right-2 text-left space-y-0.5">
+                      <p className="text-[11px] font-bold text-white truncate font-heading group-hover:text-pink-200">
+                        {video.title}
+                      </p>
+                      <p className="text-[10px] text-gray-300 truncate">
+                        @{video.creator?.username || 'creator'}
+                      </p>
+                      <span className="text-[9px] text-pink-400 font-semibold block truncate">
+                        {video.category ? `#${video.category.toLowerCase()}` : '#comedy'}
+                      </span>
                     </div>
                   </div>
+                ))}
+              </div>
 
-                  {/* Likes badge if any */}
-                  {Number(video.likesCount || 0) > 0 && (
-                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white border border-white/10">
-                      <Heart className="w-2.5 h-2.5 text-rose-500 fill-current" />
-                      <span>{video.likesCount}</span>
-                    </div>
-                  )}
-
-                  {/* Bottom Title, Creator & Tag */}
-                  <div className="absolute bottom-2 left-2 right-2 text-left space-y-0.5">
-                    <p className="text-[11px] font-bold text-white truncate font-heading group-hover:text-pink-200">
-                      {video.title}
-                    </p>
-                    <p className="text-[10px] text-gray-300 truncate">
-                      @{video.creator?.username || 'creator'}
-                    </p>
-                    <span className="text-[9px] text-pink-400 font-semibold block truncate">
-                      {video.category ? `#${video.category.toLowerCase()}` : '#comedy'}
-                    </span>
-                  </div>
+              {filteredVideos.length > 5 && (
+                <div className="mt-3.5 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllTrending(prev => !prev)}
+                    className="px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 text-pink-400 font-bold text-xs border border-white/10 transition active:scale-95 inline-flex items-center gap-1 shadow-sm"
+                  >
+                    <span>{showAllTrending ? 'Show Less ▴' : `+ Show More (${filteredVideos.length} Videos) ▾`}</span>
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>

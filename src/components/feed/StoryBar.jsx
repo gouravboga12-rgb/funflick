@@ -32,7 +32,7 @@ export const StoryBar = () => {
   return (
     <div className="w-full shrink-0 py-2.5 px-4 overflow-x-auto no-scrollbar border-b border-white/5 select-none bg-[#090514]">
       <div className="flex items-center gap-3.5 min-w-max pb-1">
-        {stories.map(story => {
+        {stories.filter(s => s.isUser || (s.stories && s.stories.length > 0)).map(story => {
           if (story.isUser) {
             const hasStories = story.stories && story.stories.length > 0;
             return (

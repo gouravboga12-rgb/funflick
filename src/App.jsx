@@ -51,6 +51,7 @@ import { AdminInfluencerMediaScreen } from './pages/admin/AdminInfluencerMediaSc
 import { AdminAdsScreen } from './pages/admin/AdminAdsScreen';
 import { AdminAdRequestsScreen } from './pages/admin/AdminAdRequestsScreen';
 import { AdminCopyrightScreen } from './pages/admin/AdminCopyrightScreen';
+import { AdminStaffScreen } from './pages/admin/AdminStaffScreen';
 
 import { AdminLoginScreen } from './pages/admin/AdminLoginScreen';
 import { AdminRouteGuard } from './components/admin/AdminRouteGuard';
@@ -124,6 +125,7 @@ function AppRoutes() {
           <Route path="/admin/ads" element={<AdminRouteGuard><AdminAdsScreen /></AdminRouteGuard>} />
           <Route path="/admin/ad-requests" element={<AdminRouteGuard><AdminAdRequestsScreen /></AdminRouteGuard>} />
           <Route path="/admin/users" element={<AdminRouteGuard><AdminUsersScreen /></AdminRouteGuard>} />
+          <Route path="/admin/staff" element={<AdminRouteGuard><AdminStaffScreen /></AdminRouteGuard>} />
           <Route path="/admin/creators" element={<AdminRouteGuard><AdminCreatorsScreen /></AdminRouteGuard>} />
           <Route path="/admin/content" element={<AdminRouteGuard><AdminContentScreen /></AdminRouteGuard>} />
           <Route path="/admin/stories" element={<AdminRouteGuard><AdminStoryScreen /></AdminRouteGuard>} />

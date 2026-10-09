@@ -586,7 +586,10 @@ export const AppProvider = ({ children }) => {
   // Live Stories synchronization with AWS MySQL backend
   const fetchLiveStories = async () => {
     try {
-      const res = await fetch('/api/stories');
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const res = await fetch('/api/stories', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.stories && Array.isArray(data.stories)) {
@@ -600,9 +603,14 @@ export const AppProvider = ({ children }) => {
           };
           const userStoriesGroup = data.stories.find(s => s.userId === currentUser?.id || s.username === currentUser?.username);
           if (userStoriesGroup) {
-            myStory.stories = userStoriesGroup.stories;
+            myStory.stories = userStoriesGroup.stories || [];
           }
-          const otherStories = data.stories.filter(s => s.userId !== currentUser?.id && s.username !== currentUser?.username);
+          // Only include accounts who actually posted active stories
+          const otherStories = data.stories.filter(s => 
+            s.userId !== currentUser?.id && 
+            s.username !== currentUser?.username &&
+            s.stories && s.stories.length > 0
+          );
           setStories([myStory, ...otherStories]);
         }
       }
@@ -2247,6 +2255,48 @@ export const AppProvider = ({ children }) => {
     // No automated mock replies! Only the real person can reply.
   };
 
+  // Delete / Unsend a message (Instagram style: removes for everyone in this conversation)
+  const unsendMessage = async (conversationId, messageId) => {
+    if (!messageId) return;
+
+    // Optimistically remove from state immediately
+    setConversations(prev => prev.map(c => {
+      const match = c.id === conversationId || 
+                    String(c.userId) === String(conversationId) || 
+                    c.user?.username === conversationId;
+      if (match) {
+        const remaining = (c.messages || []).filter(m => m.id !== messageId);
+        const lastMsg = remaining.length > 0 ? remaining[remaining.length - 1] : null;
+        let lastPreview = 'Chat started';
+        if (lastMsg) {
+          lastPreview = lastMsg.media ? (lastMsg.media.type === 'video' ? '🎥 Video' : '📷 Photo') : (lastMsg.text || 'Attachment');
+        }
+        return {
+          ...c,
+          messages: remaining,
+          lastMessage: lastPreview,
+          time: lastMsg ? (lastMsg.time || 'Just now') : 'Just now'
+        };
+      }
+      return c;
+    }));
+
+    // Call DELETE on server if numeric/real message ID
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (token && typeof messageId === 'number') {
+      try {
+        await fetch(`/api/messages/${messageId}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+      } catch (err) {
+        console.error('Failed to unsend message on server:', err);
+      }
+    }
+  };
+
   // Open or create conversation with a user (by username or user object)
   const openOrCreateConversation = (targetUser) => {
     if (!targetUser) return null;
@@ -3064,6 +3114,7 @@ export const AppProvider = ({ children }) => {
         submitStoryForVerification,
         sendPerformanceReward,
         sendMessage,
+        unsendMessage,
         openOrCreateConversation,
         processAdminPayout,
         processCustomAdminPayout,

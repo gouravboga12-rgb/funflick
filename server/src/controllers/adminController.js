@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import bcrypt from 'bcryptjs';
 
 export async function getAdminUsers(req, res) {
   try {
@@ -500,7 +501,7 @@ export async function getAdminPendingContent(req, res) {
         u.id AS user_id, u.name AS creator_name, u.username AS creator, u.avatar_url AS avatar, u.status AS user_status
       FROM videos v
       JOIN users u ON v.user_id = u.id
-      WHERE v.status = 'Pending'
+      WHERE (v.moderation_status = 'Pending' OR (v.moderation_status IS NULL AND v.status = 'Pending'))
       ORDER BY v.created_at DESC
     `);
 
@@ -552,13 +553,7 @@ export async function handleContentModeration(req, res) {
     else if (action === 'reject') newStatus = 'Rejected';
     else if (action === 'reopen') newStatus = 'Pending';
 
-    if (itemType === 'story') {
-      await pool.query("UPDATE stories SET status = ? WHERE id = ?", [newStatus, id]);
-    } else {
-      await pool.query("UPDATE videos SET status = ? WHERE id = ?", [newStatus, id]);
-    }
-
-    // In-app notifications
+    // In-app notifications before deletion
     try {
       const table = itemType === 'story' ? 'stories' : 'videos';
       const [rows] = await pool.query(
@@ -570,22 +565,39 @@ export async function handleContentModeration(req, res) {
           await pool.query(
             `INSERT INTO notifications (user_id, type, title, message)
              VALUES (?, 'system', 'Content Approved & Published! 🎉', ?)`,
-            [rows[0].user_id, `Your ${itemType} "${rows[0].title || 'upload'}" has been approved by admin and is now live on FunFlick!`]
+            [rows[0].user_id, `Your ${itemType} "${rows[0].title || 'upload'}" has been approved by admin and is confirmed on FunFlick!`]
           );
         } else if (action === 'reject') {
           await pool.query(
             `INSERT INTO notifications (user_id, type, title, message)
-             VALUES (?, 'system', 'Content Not Approved', ?)`,
-            [rows[0].user_id, `Your ${itemType} "${rows[0].title || 'upload'}" was not approved during quality review.`]
+             VALUES (?, 'system', 'Content Removed by Admin', ?)`,
+            [rows[0].user_id, `Your ${itemType} "${rows[0].title || 'upload'}" was rejected and removed from FunFlick by Admin Moderation.`]
           );
         }
       }
     } catch (e) {}
 
+    // Perform database status update or permanent deletion on reject
+    if (action === 'reject') {
+      if (itemType === 'story') {
+        await pool.query("DELETE FROM stories WHERE id = ?", [id]);
+      } else {
+        await pool.query("DELETE FROM likes WHERE video_id = ?", [id]);
+        await pool.query("DELETE FROM comments WHERE video_id = ?", [id]);
+        await pool.query("DELETE FROM videos WHERE id = ?", [id]);
+      }
+    } else {
+      if (itemType === 'story') {
+        await pool.query("UPDATE stories SET status = ? WHERE id = ?", [newStatus, id]);
+      } else {
+        await pool.query("UPDATE videos SET status = ? WHERE id = ?", [newStatus, id]);
+      }
+    }
+
     const message = action === 'approve' 
-      ? 'Content approved and published live!' 
+      ? 'Content approved and confirmed on FunFlick!' 
       : action === 'reject' 
-        ? 'Content marked as rejected.' 
+        ? 'Content rejected and deleted permanently from the platform.' 
         : 'Content reopened for review (Pending).';
 
     return res.json({ success: true, status: newStatus, message });
@@ -1320,6 +1332,111 @@ export async function deleteAdminAdRequest(req, res) {
   } catch (err) {
     console.error('Delete ad request error:', err);
     return res.status(500).json({ error: 'Failed to delete ad request' });
+  }
+}
+
+// -------------------------------------------------------------
+// Staff & Moderator Accounts Management (Audio 6)
+// -------------------------------------------------------------
+
+// 1. Get all staff/moderator accounts
+export async function getAdminStaff(req, res) {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, name, username, email, phone, role, status, created_at
+       FROM users 
+       WHERE role = 'moderator' 
+       ORDER BY created_at DESC`
+    );
+    return res.json({ staff: rows, count: rows.length });
+  } catch (err) {
+    console.error('Get admin staff error:', err);
+    return res.status(500).json({ error: 'Failed to fetch staff accounts' });
+  }
+}
+
+// 2. Create new moderator account
+export async function createAdminStaff(req, res) {
+  try {
+    const { name, username, email, password } = req.body;
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email, and password are required' });
+    }
+
+    const cleanUser = username.trim().toLowerCase().replace(/^@/, '');
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check uniqueness
+    const [existing] = await pool.query(
+      'SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1',
+      [cleanUser, cleanEmail]
+    );
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'Username or email already exists in system' });
+    }
+
+    const hash = await bcrypt.hash(password.trim(), 10);
+    const fullName = name?.trim() || cleanUser;
+
+    const [result] = await pool.query(
+      `INSERT INTO users (name, username, email, password_hash, role, status, avatar_url)
+       VALUES (?, ?, ?, ?, 'moderator', 'Active', '/brand/funflick-logo.png')`,
+      [fullName, cleanUser, cleanEmail, hash]
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: `Moderator account @${cleanUser} created successfully!`,
+      staff: {
+        id: result.insertId,
+        name: fullName,
+        username: cleanUser,
+        email: cleanEmail,
+        role: 'moderator',
+        status: 'Active'
+      }
+    });
+  } catch (err) {
+    console.error('Create admin staff error:', err);
+    return res.status(500).json({ error: 'Failed to create moderator account' });
+  }
+}
+
+// 3. Delete moderator account
+export async function deleteAdminStaff(req, res) {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query('SELECT id, username, role FROM users WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Staff account not found' });
+    if (rows[0].role !== 'moderator') {
+      return res.status(403).json({ error: 'Can only delete accounts with role moderator' });
+    }
+
+    await pool.query('DELETE FROM users WHERE id = ?', [id]);
+    return res.json({ success: true, message: `Moderator @${rows[0].username} deleted successfully` });
+  } catch (err) {
+    console.error('Delete admin staff error:', err);
+    return res.status(500).json({ error: 'Failed to delete moderator account' });
+  }
+}
+
+// 4. Toggle moderator active status
+export async function toggleAdminStaff(req, res) {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query('SELECT id, status, role FROM users WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Staff account not found' });
+    if (rows[0].role !== 'moderator') {
+      return res.status(403).json({ error: 'Can only modify moderator accounts' });
+    }
+
+    const newStatus = rows[0].status === 'Active' ? 'Suspended' : 'Active';
+    await pool.query('UPDATE users SET status = ? WHERE id = ?', [newStatus, id]);
+
+    return res.json({ success: true, status: newStatus, message: `Staff status changed to ${newStatus}` });
+  } catch (err) {
+    console.error('Toggle admin staff error:', err);
+    return res.status(500).json({ error: 'Failed to update staff status' });
   }
 }
 

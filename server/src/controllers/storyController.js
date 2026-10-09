@@ -3,6 +3,12 @@ import pool from '../config/db.js';
 export async function listStories(req, res) {
   try {
     const currentUserId = req.user?.id || 0;
+
+    // Instagram Model: Unauthenticated guests follow no one, so return empty stories
+    if (!currentUserId) {
+      return res.json({ stories: [] });
+    }
+
     const [rows] = await pool.query(`
       SELECT 
         s.id, s.user_id, s.media_url, s.media_type, s.caption, s.music, s.sticker, s.created_at, s.status,
@@ -11,9 +17,18 @@ export async function listStories(req, res) {
         u.name, u.username, u.avatar_url
       FROM stories s
       JOIN users u ON s.user_id = u.id
-      WHERE (s.expires_at IS NULL OR s.expires_at > NOW()) AND (s.status = 'Approved' OR s.status IS NULL) AND (u.status IS NULL OR u.status != 'Suspended')
+      WHERE (s.expires_at IS NULL OR s.expires_at > NOW()) 
+        AND (s.status = 'Approved' OR s.status IS NULL) 
+        AND (u.status IS NULL OR u.status != 'Suspended')
+        AND (
+          s.user_id = ? 
+          OR EXISTS (
+            SELECT 1 FROM follows f 
+            WHERE f.follower_id = ? AND f.following_id = s.user_id
+          )
+        )
       ORDER BY s.created_at DESC
-    `, [currentUserId]);
+    `, [currentUserId, currentUserId, currentUserId]);
 
     // Group stories by creator
     const grouped = {};

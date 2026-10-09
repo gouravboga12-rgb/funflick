@@ -11,6 +11,8 @@ import { CreatePostScreen } from '../screens/create/CreatePostScreen';
 import CreatorProfileScreen from '../screens/profile/CreatorProfileScreen';
 import { VideoDetailScreen } from '../screens/media/VideoDetailScreen';
 import StoryViewerScreen from '../screens/feed/StoryViewerScreen';
+import { SubscriptionScreen } from '../screens/subscription/SubscriptionScreen';
+import { WalletScreen } from '../screens/wallet/WalletScreen';
 import { colors } from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -72,6 +74,14 @@ export default function AppNavigator() {
         <Stack.Screen
           name="VideoDetail"
           component={VideoDetailScreen}
+        />
+        <Stack.Screen
+          name="Subscription"
+          component={SubscriptionScreen}
+        />
+        <Stack.Screen
+          name="Wallet"
+          component={WalletScreen}
         />
         <Stack.Screen
           name="StoryViewer"

@@ -30,13 +30,13 @@ export const VideoDetailScreen = ({ route, navigation }) => {
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [activeId]);
 
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Watch this reel on FunFlick! https://funflick-theta.vercel.app/video/${id}`,
-        url: `https://funflick-theta.vercel.app/video/${id}`,
+        message: `Watch this reel on FunFlick! https://funflick-theta.vercel.app/video/${activeId}`,
+        url: `https://funflick-theta.vercel.app/video/${activeId}`,
       });
     } catch (e) {}
   };
@@ -45,7 +45,7 @@ export const VideoDetailScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.centerContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading video #{id}...</Text>
+        <Text style={styles.loadingText}>Loading video #{activeId}...</Text>
       </SafeAreaView>
     );
   }
@@ -58,7 +58,7 @@ export const VideoDetailScreen = ({ route, navigation }) => {
         </View>
         <Text style={styles.errorTitle}>Post Unavailable</Text>
         <Text style={styles.errorDesc}>This video or post may have been removed or the link is incorrect.</Text>
-        <TouchableOpacity style={styles.homeBtn} onPress={() => navigation.navigate('Home')}>
+        <TouchableOpacity style={styles.homeBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}>
           <Home size={18} color="#fff" />
           <Text style={styles.homeBtnText}>Go to Feed</Text>
         </TouchableOpacity>

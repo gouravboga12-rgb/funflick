@@ -11,6 +11,9 @@ export const EditProfileModal = ({ isOpen, onClose }) => {
   const [name, setName] = useState(currentUser.name || '');
   const [username, setUsername] = useState(currentUser.username || '');
   const [bio, setBio] = useState(currentUser.bio || '');
+  const [email, setEmail] = useState(currentUser.email || '');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [avatarPreview, setAvatarPreview] = useState(() => getSafeAvatar(currentUser));
   const [avatarFile, setAvatarFile] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -38,6 +41,17 @@ export const EditProfileModal = ({ isOpen, onClose }) => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (password) {
+      if (password.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+      }
+      if (password !== confirmPassword) {
+        showToast('New passwords do not match', 'error');
+        return;
+      }
+    }
+
     setSaving(true);
 
     let savedAvatarUrl = avatarPreview;
@@ -52,13 +66,12 @@ export const EditProfileModal = ({ isOpen, onClose }) => {
           }
         } catch (s3Err) {
           console.warn('S3 upload fallback:', s3Err);
-          // Keep base64 data preview if direct S3 failed
         }
       }
 
       // 2. Persist to AWS MySQL database
       const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
-      const token = localStorage.getItem('funflick_token');
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
 
       if (token) {
         try {
@@ -66,11 +79,16 @@ export const EditProfileModal = ({ isOpen, onClose }) => {
             name: name.trim(),
             username: cleanUsername,
             bio: bio.trim(),
-            avatar_url: savedAvatarUrl
+            avatar_url: savedAvatarUrl,
+            email: email.trim(),
+            ...(password ? { password } : {})
           });
 
           if (res?.user) {
             savedAvatarUrl = res.user.avatar_url || savedAvatarUrl;
+            if (res.token) {
+              localStorage.setItem('funflick_token', res.token);
+            }
           }
         } catch (dbErr) {
           console.warn('Database profile update fallback:', dbErr);
@@ -84,7 +102,8 @@ export const EditProfileModal = ({ isOpen, onClose }) => {
         username: cleanUsername,
         bio: bio.trim(),
         avatar: savedAvatarUrl,
-        avatar_url: savedAvatarUrl
+        avatar_url: savedAvatarUrl,
+        email: email.trim()
       };
 
       setCurrentUser(updatedUser);
@@ -161,14 +180,55 @@ export const EditProfileModal = ({ isOpen, onClose }) => {
           </div>
 
           <div className="space-y-1">
+            <label className="text-[11px] font-bold text-gray-400 uppercase">Email Address</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={saving}
+              placeholder="you@example.com"
+              className="w-full bg-[#18122f] text-white text-xs px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500"
+            />
+          </div>
+
+          <div className="space-y-1">
             <label className="text-[11px] font-bold text-gray-400 uppercase">Bio</label>
             <textarea
-              rows={3}
+              rows={2}
               value={bio}
               onChange={e => setBio(e.target.value)}
               disabled={saving}
               className="w-full bg-[#18122f] text-white text-xs px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500"
             />
+          </div>
+
+          {/* Change Password (Optional) */}
+          <div className="p-3 rounded-2xl bg-white/5 border border-white/5 space-y-2">
+            <span className="text-[11px] font-bold text-pink-400 uppercase tracking-wider block">
+              Change Password (Optional)
+            </span>
+            <div className="space-y-1">
+              <label className="text-[10px] text-gray-400">New Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                disabled={saving}
+                placeholder="Leave blank to keep current"
+                className="w-full bg-[#18122f] text-white text-xs px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] text-gray-400">Confirm Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                disabled={saving}
+                placeholder="Repeat new password"
+                className="w-full bg-[#18122f] text-white text-xs px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500"
+              />
+            </div>
           </div>
 
           <button

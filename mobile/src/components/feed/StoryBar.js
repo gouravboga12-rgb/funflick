@@ -5,6 +5,32 @@ import { Plus } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
+function StoryAvatar({ avatar, name, username }) {
+  const [hasError, setHasError] = React.useState(false);
+  const initial = (name || username || 'F').charAt(0).toUpperCase();
+  const isDefaultOrMissing = !avatar || String(avatar).includes('default-avatar') || hasError;
+
+  if (isDefaultOrMissing) {
+    const colorsList = ['#059669', '#0284c7', '#7c3aed', '#db2777', '#d97706', '#16a34a'];
+    const charCode = (name || username || 'A').charCodeAt(0);
+    const bgColor = colorsList[charCode % colorsList.length];
+
+    return (
+      <View style={[styles.avatar, styles.initialFallback, { backgroundColor: bgColor }]}>
+        <Text style={styles.initialText}>{initial}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri: avatar }}
+      style={styles.avatar}
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
 export const StoryBar = ({ onAddStory, onStoryPress }) => {
   const { currentUser, posts, stories } = useApp();
 
@@ -18,45 +44,22 @@ export const StoryBar = ({ onAddStory, onStoryPress }) => {
     hasStories: stories?.find(s => s.isUser)?.stories?.length > 0,
   };
 
-  // 2. Add other stories from API if available
+  // 2. Add other stories from API if available (strictly real stories from followed accounts)
   const apiStories = (stories || [])
-    .filter(s => !s.isUser)
+    .filter(s => !s.isUser && s.stories && s.stories.length > 0)
     .map(s => ({
       id: s.id,
       isMe: false,
-      name: s.username?.replace('_official', '') || 'Creator',
+      name: s.name || s.username?.replace('_official', '') || 'Creator',
       username: s.username,
-      avatar: s.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+      avatar: s.avatar || '',
       hasUnseen: s.hasUnseen !== false,
       stories: s.stories || [],
     }));
 
-  // 3. If API stories is empty, derive distinct unique creators from posts
-  const uniqueCreatorStories = [];
-  if (apiStories.length === 0) {
-    const seenUsernames = new Set([currentUser?.username]);
-    for (const p of posts) {
-      const u = p.creator?.username;
-      if (u && !seenUsernames.has(u)) {
-        seenUsernames.add(u);
-        uniqueCreatorStories.push({
-          id: `creator-${u}`,
-          isMe: false,
-          name: p.creator?.name || u,
-          username: u,
-          avatar: p.creator?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-          hasUnseen: true,
-          mediaUrl: p.mediaUrl,
-          title: p.title,
-        });
-      }
-      if (uniqueCreatorStories.length >= 10) break;
-    }
-  }
-
   const allStoryItems = [
     myStoryItem,
-    ...(apiStories.length > 0 ? apiStories : uniqueCreatorStories),
+    ...apiStories,
   ];
 
   return (
@@ -83,12 +86,12 @@ export const StoryBar = ({ onAddStory, onStoryPress }) => {
                     style={styles.gradientRing}
                   >
                     <View style={styles.innerRing}>
-                      <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                      <StoryAvatar avatar={item.avatar} name={item.name} username={item.username} />
                     </View>
                   </LinearGradient>
                 ) : (
                   <View style={styles.plainRing}>
-                    <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                    <StoryAvatar avatar={item.avatar} name={item.name} username={item.username} />
                   </View>
                 )}
                 <View style={styles.plusBadge}>
@@ -103,7 +106,7 @@ export const StoryBar = ({ onAddStory, onStoryPress }) => {
                 style={styles.gradientRing}
               >
                 <View style={styles.innerRing}>
-                  <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                  <StoryAvatar avatar={item.avatar} name={item.name} username={item.username} />
                 </View>
               </LinearGradient>
             )}
@@ -191,5 +194,14 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textAlign: 'center',
     maxWidth: 72,
+  },
+  initialFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initialText: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '800',
   },
 });

@@ -69,6 +69,13 @@ export const SubmitAdRequestModal = ({ isOpen, onClose }) => {
       return;
     }
 
+    const maxBytes = isVideo ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+    const maxLabel = isVideo ? '10MB' : '5MB';
+    if (file.size > maxBytes) {
+      showToast(`File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds the ${maxLabel} limit. Please select a ${isVideo ? 'video' : 'photo'} under ${maxLabel}.`, 'error');
+      return;
+    }
+
     setSelectedFile(file);
     setMediaPreview(URL.createObjectURL(file));
 
@@ -443,7 +450,7 @@ export const SubmitAdRequestModal = ({ isOpen, onClose }) => {
                         Tap to upload {adType === 'video' ? 'Video (MP4 / MOV)' : 'Photo (JPG / PNG)'}
                       </span>
                       <span className="text-[10px] text-gray-400 mt-0.5 block">
-                        Files are securely stored directly on AWS S3
+                        Direct upload to AWS S3 • Max {adType === 'video' ? '10 MB' : '5 MB'}
                       </span>
                     </>
                   )}

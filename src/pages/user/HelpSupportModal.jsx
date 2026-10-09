@@ -83,19 +83,27 @@ export const HelpSupportModal = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Contact info cards */}
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/5 space-y-1">
-            <Mail className="w-4 h-4 text-pink-400" />
-            <span className="font-bold text-white block">Email Desk</span>
-            <span className="text-[10px] text-gray-400 block">support@funflick.tv</span>
+        {/* Contact info card with funflick0308@gmail.com */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-cyan-950/40 to-blue-950/40 border border-cyan-500/20 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Official Support Email</span>
+              <span className="font-bold text-white text-sm select-all">funflick0308@gmail.com</span>
+            </div>
           </div>
-
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/5 space-y-1">
-            <Phone className="w-4 h-4 text-emerald-400" />
-            <span className="font-bold text-white block">Helpline</span>
-            <span className="text-[10px] text-gray-400 block">1800-FUN-FLICK</span>
-          </div>
+          <p className="text-[11px] text-gray-300 leading-relaxed">
+            For technical support, account assistance, monetization inquiries, or reports, reach out directly to our support team at <span className="text-cyan-400 font-semibold">funflick0308@gmail.com</span>.
+          </p>
+          <a
+            href="mailto:funflick0308@gmail.com?subject=FunFlick%20Support%20Request"
+            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 hover:opacity-95 transition active:scale-95"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Send Email to funflick0308@gmail.com</span>
+          </a>
         </div>
 
         {/* FAQs */}
@@ -117,37 +125,6 @@ export const HelpSupportModal = ({ isOpen, onClose }) => {
             ))}
           </div>
         </div>
-
-        {/* Quick Ticket form */}
-        <form onSubmit={handleSubmitTicket} className="space-y-2.5 pt-2 border-t border-white/10">
-          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
-            Send Support Message
-          </span>
-          <input
-            type="text"
-            required
-            placeholder="Issue or question title..."
-            value={ticketSubject}
-            onChange={e => setTicketSubject(e.target.value)}
-            className="w-full bg-[#18122c] text-white text-xs px-3 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-cyan-500"
-          />
-          <textarea
-            rows={2}
-            required
-            placeholder="Describe what you need help with..."
-            value={ticketMessage}
-            onChange={e => setTicketMessage(e.target.value)}
-            className="w-full bg-[#18122c] text-white text-xs p-3 rounded-xl border border-white/10 focus:outline-none focus:border-cyan-500"
-          />
-          <button
-            type="submit"
-            disabled={sent}
-            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>{sent ? 'Submitting...' : 'Send to FunFlick Care'}</span>
-          </button>
-        </form>
       </motion.div>
     </div>
   );

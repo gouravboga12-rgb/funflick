@@ -418,61 +418,77 @@ export const UploadVideoScreen = () => {
 
         {/* Video Player & Media Preview Box (Instagram Reel Style) */}
         <div className="space-y-2">
-          <div className="relative w-full aspect-[9/16] max-h-[340px] rounded-3xl overflow-hidden bg-black border border-white/10 shadow-2xl mx-auto flex items-center justify-center group">
-            
-            <video
-              ref={videoRef}
-              src={videoSrc}
-              poster={thumbnailUrl}
-              loop
-              playsInline
-              muted={isMuted}
-              onLoadedMetadata={handleLoadedMetadata}
-              onTimeUpdate={handleTimeUpdate}
-              className="w-full h-full object-cover cursor-pointer"
-              onClick={togglePlay}
-            />
-
-            {/* Platform Showcase Limit Badge */}
-            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[10px] font-bold text-pink-300 flex items-center gap-1 pointer-events-none">
-              <Clock className="w-3 h-3 text-pink-400" />
-              <span>Showcase Limit: {maxReelLimit}s</span>
-            </div>
-
-            {/* Play/Pause Overlay */}
-            <button
-              onClick={togglePlay}
-              className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors"
+          {!videoSrc ? (
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="relative w-full aspect-[9/16] max-h-[300px] rounded-3xl overflow-hidden bg-gradient-to-b from-[#18122c] to-[#120a22] border-2 border-dashed border-white/15 hover:border-pink-500/60 transition cursor-pointer flex flex-col items-center justify-center p-6 text-center group"
             >
-              {!isPlaying && (
-                <div className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-xl scale-100 hover:scale-105 transition-transform">
-                  <Play className="w-6 h-6 fill-current ml-0.5 text-pink-400" />
-                </div>
-              )}
-            </button>
-
-            {/* Video Controls Pill */}
-            <div className="absolute top-3 right-3 flex items-center gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsMuted(!isMuted);
-                }}
-                className="p-2 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/10 hover:bg-black/80 transition"
-              >
-                {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-pink-400" />}
-              </button>
-            </div>
-
-            {/* Bottom sound indicator */}
-            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-white bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-              <div className="flex items-center gap-1.5 truncate">
-                <Music2 className="w-3.5 h-3.5 text-pink-400 animate-spin" style={{ animationDuration: '4s' }} />
-                <span className="truncate">{selectedSound}</span>
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-500/20 to-purple-600/20 border border-pink-500/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <UploadCloud className="w-8 h-8 text-pink-400" />
               </div>
-              <span className="text-[10px] text-gray-300 shrink-0">Reel Preview</span>
+              <span className="text-sm font-bold text-white mb-1">
+                Choose Video from Device / Gallery
+              </span>
+              <span className="text-xs text-gray-400 max-w-[240px]">
+                MP4, WebM, MOV up to 10MB • Max 30s • 100% Free
+              </span>
             </div>
-          </div>
+          ) : (
+            <div className="relative w-full aspect-[9/16] max-h-[340px] rounded-3xl overflow-hidden bg-black border border-white/10 shadow-2xl mx-auto flex items-center justify-center group">
+              <video
+                ref={videoRef}
+                src={videoSrc}
+                poster={thumbnailUrl}
+                loop
+                playsInline
+                muted={isMuted}
+                onLoadedMetadata={handleLoadedMetadata}
+                onTimeUpdate={handleTimeUpdate}
+                className="w-full h-full object-cover cursor-pointer"
+                onClick={togglePlay}
+              />
+
+              {/* Platform Showcase Limit Badge */}
+              <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[10px] font-bold text-pink-300 flex items-center gap-1 pointer-events-none">
+                <Clock className="w-3 h-3 text-pink-400" />
+                <span>Showcase Limit: {maxReelLimit}s</span>
+              </div>
+
+              {/* Play/Pause Overlay */}
+              <button
+                onClick={togglePlay}
+                className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors"
+              >
+                {!isPlaying && (
+                  <div className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-xl scale-100 hover:scale-105 transition-transform">
+                    <Play className="w-6 h-6 fill-current ml-0.5 text-pink-400" />
+                  </div>
+                )}
+              </button>
+
+              {/* Video Controls Pill */}
+              <div className="absolute top-3 right-3 flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMuted(!isMuted);
+                  }}
+                  className="p-2 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/10 hover:bg-black/80 transition"
+                >
+                  {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-pink-400" />}
+                </button>
+              </div>
+
+              {/* Bottom sound indicator */}
+              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-white bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Music2 className="w-3.5 h-3.5 text-pink-400 animate-spin" style={{ animationDuration: '4s' }} />
+                  <span className="truncate">{selectedSound}</span>
+                </div>
+                <span className="text-[10px] text-gray-300 shrink-0">Reel Preview</span>
+              </div>
+            </div>
+          )}
 
           {/* Video Duration Notice for Lengthy Uploads */}
           {videoDuration > maxReelLimit && (
@@ -659,153 +675,52 @@ export const UploadVideoScreen = () => {
           )}
         </div>
 
-        {/* Category & Audio Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-300">Category</label>
-            <select
-              value={category}
-              onChange={e => setCategory(e.target.value)}
-              className="w-full bg-[#150f2c] text-white text-xs px-3 py-2.5 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500"
-            >
-              <option value="Comedy">Comedy</option>
-              <option value="Stand-up">Stand-up</option>
-              <option value="Memes">Memes</option>
-              <option value="Dance">Dance</option>
-              <option value="Regional Comedy">Regional Comedy</option>
-              <option value="Entertainment">Entertainment</option>
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-300">Audio Track</label>
-            <select
-              value={selectedSound}
-              onChange={e => setSelectedSound(e.target.value)}
-              className="w-full bg-[#150f2c] text-white text-xs px-3 py-2.5 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500 truncate"
-            >
-              {POPULAR_SOUNDS.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Tag People (Search-driven, optional) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-pink-400" />
-              <span>Tag People / Creators</span>
-              <span className="text-[10px] text-gray-500 font-normal">(optional)</span>
-            </label>
-            <span className="text-[10px] text-pink-300 font-semibold">{taggedUsers.length} tagged</span>
-          </div>
-
-          {/* User Search Input */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-3 pointer-events-none" />
-            <input
-              type="text"
-              value={tagSearchQuery}
-              onChange={e => setTagSearchQuery(e.target.value)}
-              placeholder="Search by username or name to tag..."
-              className="w-full bg-[#150f2c] text-white text-xs pl-8 pr-3 py-2.5 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500 placeholder-gray-500"
-            />
-            {isSearchingUsers && (
-              <span className="text-[10px] text-pink-400 absolute right-3 top-3 animate-pulse">Searching...</span>
-            )}
-          </div>
-
-          {/* Search Results Dropdown */}
-          {tagSearchQuery.trim() && (
-            <div className="bg-[#120a24] rounded-2xl p-2 border border-white/10 space-y-1 shadow-lg max-h-48 overflow-y-auto no-scrollbar">
-              {tagSearchResults.length > 0 ? (
-                tagSearchResults.map(u => (
-                  <div
-                    key={u.id || u.username}
-                    onClick={() => handleAddTagUser(u)}
-                    className="p-2 rounded-xl hover:bg-white/10 cursor-pointer flex items-center justify-between transition group"
-                  >
-                    <div className="flex items-center gap-2">
-                      <img
-                        src={u.avatar || '/brand/default-avatar.svg'}
-                        alt=""
-                        className="w-6 h-6 rounded-full object-cover border border-white/10"
-                      />
-                      <div>
-                        <span className="text-xs font-bold text-white group-hover:text-pink-300 block">
-                          @{u.username}
-                        </span>
-                        {u.name && u.name !== u.username && (
-                          <span className="text-[10px] text-gray-400 block">{u.name}</span>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-[10px] font-semibold group-hover:bg-pink-500 group-hover:text-white"
-                    >
-                      + Add
-                    </button>
-                  </div>
-                ))
-              ) : (
-                !isSearchingUsers && (
-                  <div className="p-2 text-center text-xs text-gray-400">
-                    No users found matching "{tagSearchQuery}"
-                  </div>
-                )
-              )}
-            </div>
-          )}
-
-          {/* Tagged Users Selected List (with delete button) */}
-          {taggedUsers.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {taggedUsers.map(username => {
-                const userObj = taggedUserObjects.find(u => u.username === username);
-                return (
-                  <span
-                    key={username}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-pink-500/20 border border-pink-500/30 text-white text-xs font-medium"
-                  >
-                    <img
-                      src={userObj?.avatar || '/brand/default-avatar.svg'}
-                      alt=""
-                      className="w-4 h-4 rounded-full object-cover"
-                    />
-                    <span>@{username}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTagUser(username)}
-                      title="Remove tag"
-                      className="p-0.5 rounded-full hover:bg-pink-500/40 text-pink-300 hover:text-white transition"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Add Location */}
+        {/* Category */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-pink-400" />
-            <span>Add Location</span>
-          </label>
+          <label className="text-xs font-bold text-gray-300">Category</label>
           <select
-            value={selectedLocation}
-            onChange={e => setSelectedLocation(e.target.value)}
+            value={category}
+            onChange={e => setCategory(e.target.value)}
             className="w-full bg-[#150f2c] text-white text-xs px-3 py-2.5 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500"
           >
-            {POPULAR_LOCATIONS.map(loc => (
-              <option key={loc} value={loc}>{loc}</option>
-            ))}
+            <option value="Comedy">Comedy</option>
+            <option value="Stand-up">Stand-up</option>
+            <option value="Memes">Memes</option>
+            <option value="Dance">Dance</option>
+            <option value="Regional Comedy">Regional Comedy</option>
+            <option value="Entertainment">Entertainment</option>
           </select>
+        </div>
+
+
+
+        {/* Location Section with Search */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-pink-400" />
+              <span>Location</span>
+              <span className="text-[10px] text-gray-500 font-normal">(optional)</span>
+            </label>
+            {selectedLocation && (
+              <button
+                type="button"
+                onClick={() => setSelectedLocation('')}
+                className="text-[10px] text-pink-400 hover:underline cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              value={selectedLocation}
+              onChange={e => setSelectedLocation(e.target.value)}
+              placeholder="Search area, colony, mandal, district, pincode (e.g. Madhapur, Hyderabad - 500081)..."
+              className="w-full bg-[#150f2c] text-white placeholder-gray-500 text-xs px-3.5 py-2.5 rounded-2xl border border-white/10 focus:outline-none focus:border-pink-500 transition"
+            />
+          </div>
         </div>
 
         {/* Admin Verification Notice (Workflow Info) */}

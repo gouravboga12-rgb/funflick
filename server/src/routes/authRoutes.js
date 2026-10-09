@@ -13,6 +13,7 @@ import {
   googleSignupComplete,
   updateContactInfo,
   updateUserProfile,
+  deleteAccount,
   adminLogin,
   getAdminMe
 } from '../controllers/authController.js';
@@ -51,6 +52,9 @@ router.put('/profile', authenticateToken, updateUserProfile);
 
 // Update email & phone from Account Settings
 router.put('/profile/contact', authenticateToken, updateContactInfo);
+
+// Permanently delete user account
+router.delete('/account', authenticateToken, deleteAccount);
 
 export default router;
 

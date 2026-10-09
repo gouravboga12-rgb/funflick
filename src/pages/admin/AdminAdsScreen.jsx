@@ -680,8 +680,8 @@ export const AdminAdsScreen = () => {
                           </span>
                           <span className="text-[10px] text-gray-400 block">
                             {currentAd.type === 'video' 
-                              ? 'Supported: MP4, WebM (Recommended vertical/landscape, max 50MB)'
-                              : 'Supported: PNG, JPG, WEBP (High resolution, max 15MB)'}
+                              ? 'Supported: MP4, WebM (Recommended vertical/landscape, max 10MB)'
+                              : 'Supported: PNG, JPG, WEBP (High resolution, max 5MB)'}
                           </span>
                         </div>
                       </>

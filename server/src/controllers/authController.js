@@ -563,11 +563,11 @@ export async function getCurrentUser(req, res) {
  */
 export async function updateUserProfile(req, res) {
   try {
-    const { name, username, bio, avatar_url } = req.body;
+    const { name, username, bio, avatar_url, email, phone, password } = req.body;
     const userId = req.user.id;
 
     // Check if user exists
-    const [existing] = await pool.query('SELECT id, username, avatar_url FROM users WHERE id = ?', [userId]);
+    const [existing] = await pool.query('SELECT id, username, email, phone, avatar_url, password_hash FROM users WHERE id = ?', [userId]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -587,20 +587,40 @@ export async function updateUserProfile(req, res) {
       }
     }
 
+    let newEmail = current.email;
+    if (email && email.trim() !== '') {
+      const cleanEmail = email.trim().toLowerCase();
+      if (cleanEmail !== current.email) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+          return res.status(400).json({ error: 'Please enter a valid email address.' });
+        }
+        newEmail = cleanEmail;
+      }
+    }
+
     const newName = name !== undefined && name.trim() !== '' ? name.trim() : null;
     const newBio = bio !== undefined ? bio.trim() : null;
+    const newPhone = phone !== undefined ? phone.trim() : current.phone;
     const newAvatar = (avatar_url !== undefined && avatar_url !== '' && !avatar_url.startsWith('blob:')) 
       ? avatar_url 
       : current.avatar_url;
+
+    let newPasswordHash = current.password_hash;
+    if (password && password.trim().length >= 6) {
+      newPasswordHash = await bcrypt.hash(password.trim(), 10);
+    }
 
     await pool.query(
       `UPDATE users 
        SET name = COALESCE(?, name), 
            username = ?, 
+           email = ?,
+           phone = ?,
            bio = ?, 
-           avatar_url = ? 
+           avatar_url = ?,
+           password_hash = ?
        WHERE id = ?`,
-      [newName, newUsername, newBio, newAvatar, userId]
+      [newName, newUsername, newEmail, newPhone, newBio, newAvatar, newPasswordHash, userId]
     );
 
     const [rows] = await pool.query(
@@ -615,10 +635,46 @@ export async function updateUserProfile(req, res) {
       avatar_url: u.avatar_url || '/brand/default-avatar.svg'
     };
 
-    return res.json({ success: true, message: 'Profile updated successfully', user });
+    // Generate fresh JWT with updated username / email
+    const token = jwt.sign(
+      { id: user.id, username: user.username, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'funflick_secret',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    return res.json({ success: true, message: 'Profile updated successfully', user, token });
   } catch (err) {
     console.error('Update profile error:', err);
     return res.status(500).json({ error: 'Failed to update profile' });
+  }
+}
+
+/**
+ * Permanently Delete Account (Cascading cleanup)
+ */
+export async function deleteAccount(req, res) {
+  try {
+    const userId = req.user.id;
+    if (!userId || userId === 999999) {
+      return res.status(400).json({ error: 'Cannot delete Super Admin account' });
+    }
+
+    // Clean up dependent tables
+    await pool.query('DELETE FROM likes WHERE user_id = ?', [userId]);
+    await pool.query('DELETE FROM comments WHERE user_id = ?', [userId]);
+    await pool.query('DELETE FROM videos WHERE user_id = ?', [userId]);
+    await pool.query('DELETE FROM stories WHERE user_id = ?', [userId]);
+    await pool.query('DELETE FROM messages WHERE sender_id = ? OR recipient_id = ?', [userId, userId]);
+    await pool.query('DELETE FROM follows WHERE follower_id = ? OR following_id = ?', [userId, userId]);
+    await pool.query('DELETE FROM notifications WHERE user_id = ? OR actor_id = ?', [userId, userId]);
+    await pool.query('DELETE FROM creator_payout_details WHERE user_id = ?', [userId]);
+    await pool.query('DELETE FROM blocked_users WHERE user_id = ? OR blocked_user_id = ?', [userId, userId]);
+    await pool.query('DELETE FROM users WHERE id = ?', [userId]);
+
+    return res.json({ success: true, message: 'Account permanently deleted' });
+  } catch (err) {
+    console.error('Delete account error:', err);
+    return res.status(500).json({ error: 'Failed to delete account' });
   }
 }
 
@@ -866,10 +922,10 @@ export async function adminLogin(req, res) {
       });
     }
 
-    // Check database users with role = 'admin'
+    // Check database users with role = 'admin' or 'moderator'
     const [rows] = await pool.query(
-      'SELECT id, name, username, email, password_hash, role, avatar_url FROM users WHERE (email = ? OR username = ?) AND role = ?',
-      [clean, clean, 'admin']
+      'SELECT id, name, username, email, password_hash, role, avatar_url FROM users WHERE (email = ? OR username = ?) AND role IN (?, ?)',
+      [clean, clean, 'admin', 'moderator']
     );
 
     if (rows.length === 0) {
@@ -883,21 +939,21 @@ export async function adminLogin(req, res) {
     }
 
     const token = jwt.sign(
-      { id: admin.id, username: admin.username, email: admin.email, role: 'admin', isAdminSession: true },
+      { id: admin.id, username: admin.username, email: admin.email, role: admin.role, isAdminSession: true },
       process.env.JWT_SECRET || 'funflick_secret',
-      { expiresIn: '1d' }
+      { expiresIn: '7d' }
     );
 
     return res.json({
       success: true,
-      message: 'Admin authentication successful',
+      message: `${admin.role === 'moderator' ? 'Moderator' : 'Admin'} authentication successful`,
       token,
       adminUser: {
         id: admin.id,
         name: admin.name,
         username: admin.username,
         email: admin.email,
-        role: 'admin',
+        role: admin.role,
         avatar_url: admin.avatar_url || '/brand/funflick-logo.png'
       }
     });
@@ -909,7 +965,7 @@ export async function adminLogin(req, res) {
 
 export async function getAdminMe(req, res) {
   try {
-    if (!req.user || req.user.role !== 'admin' || !req.user.isAdminSession) {
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'moderator') || !req.user.isAdminSession) {
       return res.status(403).json({ error: 'Unauthorized administrator session' });
     }
     return res.json({

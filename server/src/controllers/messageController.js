@@ -141,16 +141,22 @@ export async function sendMessage(req, res) {
   try {
     const senderId = req.user.id;
     const { partnerId } = req.params;
-    const { text, media } = req.body;
+    const { text, media, recipientId: bodyRecipientId, mediaUrl, mediaType, mediaName, mediaSize } = req.body;
 
-    if (!text?.trim() && !media?.url) {
+    const effectivePartner = partnerId || bodyRecipientId;
+    if (!effectivePartner) {
+      return res.status(400).json({ error: 'Recipient is required' });
+    }
+
+    const hasMedia = (media && media.url) || mediaUrl;
+    if (!text?.trim() && !hasMedia) {
       return res.status(400).json({ error: 'Message content or media is required' });
     }
 
     // Determine target user ID
-    let recipientId = parseInt(partnerId, 10);
+    let recipientId = parseInt(effectivePartner, 10);
     if (isNaN(recipientId)) {
-      const [uRows] = await pool.query('SELECT id, name, username FROM users WHERE username = ? LIMIT 1', [partnerId]);
+      const [uRows] = await pool.query('SELECT id, name, username FROM users WHERE username = ? LIMIT 1', [effectivePartner]);
       if (uRows.length === 0) {
         return res.status(404).json({ error: 'Recipient user not found' });
       }
@@ -159,6 +165,11 @@ export async function sendMessage(req, res) {
 
     // Allow self-chat (saved messages / notes to self)
     const isSelfChat = recipientId === senderId;
+
+    const finalMediaUrl = media?.url || mediaUrl || null;
+    const finalMediaType = media?.type || mediaType || null;
+    const finalMediaName = media?.name || mediaName || null;
+    const finalMediaSize = (media?.size || mediaSize) ? String(media?.size || mediaSize) : null;
 
     // Insert into messages table
     const [result] = await pool.query(
@@ -170,10 +181,10 @@ export async function sendMessage(req, res) {
         senderId,
         recipientId,
         text?.trim() || '',
-        media?.url || null,
-        media?.type || null,
-        media?.name || null,
-        media?.size ? String(media.size) : null,
+        finalMediaUrl,
+        finalMediaType,
+        finalMediaName,
+        finalMediaSize,
         isSelfChat ? 1 : 0
       ]
     );
@@ -185,7 +196,7 @@ export async function sendMessage(req, res) {
     // Insert notification for recipient (if not self-chat)
     if (!isSelfChat) {
       try {
-        const notifSnippet = text?.trim() ? text.trim().slice(0, 50) : (media?.type === 'video' ? 'Sent a video' : 'Sent a photo');
+        const notifSnippet = text?.trim() ? text.trim().slice(0, 50) : (finalMediaType === 'video' ? 'Sent a video' : 'Sent a photo');
         await pool.query(
           `
           INSERT INTO notifications (user_id, actor_id, type, title, message)
@@ -202,11 +213,11 @@ export async function sendMessage(req, res) {
       senderId,
       recipientId,
       text: text?.trim() || '',
-      media: media?.url ? {
-        url: media.url,
-        type: media.type || 'image',
-        name: media.name || 'attachment',
-        size: media.size ? String(media.size) : ''
+      media: finalMediaUrl ? {
+        url: finalMediaUrl,
+        type: finalMediaType || 'image',
+        name: finalMediaName || 'attachment',
+        size: finalMediaSize || ''
       } : null,
       time: 'Just now',
       createdAt: new Date().toISOString(),
@@ -217,5 +228,31 @@ export async function sendMessage(req, res) {
   } catch (err) {
     console.error('Send message error:', err);
     return res.status(500).json({ error: 'Failed to send message' });
+  }
+}
+
+// 4. Delete or Unsend a message (Instagram style)
+export async function deleteMessage(req, res) {
+  try {
+    const currentUserId = req.user.id;
+    const { id } = req.params;
+
+    // Check message existence and that current user is sender (or admin)
+    const [rows] = await pool.query('SELECT * FROM messages WHERE id = ?', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    const message = rows[0];
+    if (message.sender_id !== currentUserId && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'You can only unsend messages you sent' });
+    }
+
+    await pool.query('DELETE FROM messages WHERE id = ?', [id]);
+
+    return res.json({ success: true, messageId: Number(id) });
+  } catch (err) {
+    console.error('Delete message error:', err);
+    return res.status(500).json({ error: 'Failed to unsend message' });
   }
 }

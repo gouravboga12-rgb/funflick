@@ -8,7 +8,7 @@ export async function getUploadUrl(req, res) {
       return res.status(400).json({ error: 'fileName and fileType are required' });
     }
 
-    const validFolders = ['videos', 'thumbnails', 'avatars', 'images', 'chat'];
+    const validFolders = ['videos', 'thumbnails', 'avatars', 'images', 'chat', 'ads', 'stories'];
     const targetFolder = validFolders.includes(folder) ? folder : 'videos';
 
     const presignedData = await generatePresignedUploadUrl(fileName, fileType, targetFolder);

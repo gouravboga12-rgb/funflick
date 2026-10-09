@@ -198,7 +198,8 @@ export async function initDatabase() {
       { name: 'hashtags', def: 'TEXT DEFAULT NULL' },
       { name: 'location', def: 'VARCHAR(150) DEFAULT NULL' },
       { name: 'audio_title', def: 'VARCHAR(150) DEFAULT NULL' },
-      { name: 'status', def: "ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending'" }
+      { name: 'status', def: "ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending'" },
+      { name: 'moderation_status', def: "VARCHAR(50) DEFAULT 'Pending'" }
     ];
     for (const col of videoCols) {
       try {

@@ -48,8 +48,11 @@ export const CreateStoryScreen = () => {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        showToast(`⚠️ File size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Stories must be under 10MB!`, 'error');
+      const isImage = file.type?.startsWith('image/');
+      const maxBytes = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+      const maxLabel = isImage ? '5MB' : '10MB';
+      if (file.size > maxBytes) {
+        showToast(`⚠️ File size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. ${isImage ? 'Photos' : 'Videos'} must be under ${maxLabel}!`, 'error');
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }

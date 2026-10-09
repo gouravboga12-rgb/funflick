@@ -11,7 +11,8 @@ export const AppProvider = ({ children }) => {
   const [posts, setPosts] = useState([]);
   const [stories, setStories] = useState([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
-  const [isReelsMuted, setIsReelsMuted] = useState(false);
+  // Mute audio by default on app launch (matching web & standard social feeds)
+  const [isReelsMuted, setIsReelsMuted] = useState(true);
   const [activePlayingVideoId, setActivePlayingVideoId] = useState(null);
   const [blockedUsers, setBlockedUsers] = useState([]);
 
@@ -56,7 +57,16 @@ export const AppProvider = ({ children }) => {
     (async () => {
       try {
         const token = await getToken();
-        const user = await getStoredUser();
+        let user = await getStoredUser();
+        if (token && !user) {
+          try {
+            const meData = await apiRequest('/auth/me');
+            if (meData?.user) {
+              user = meData.user;
+              await setStoredUser(user);
+            }
+          } catch (e) {}
+        }
         if (token && user) {
           setCurrentUser(user);
           setIsAuthenticated(true);
@@ -259,6 +269,224 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Conversations State
+  const [conversations, setConversations] = useState([]);
+  const [userSubmissions, setUserSubmissions] = useState([]);
+
+  // Fetch live conversations from EC2 backend (merges cleanly without erasing loaded messages)
+  const fetchLiveConversations = useCallback(async () => {
+    try {
+      const data = await apiRequest('/messages/conversations');
+      if (data && data.conversations && Array.isArray(data.conversations)) {
+        setConversations(prev => {
+          const seenIds = new Set();
+          const merged = [];
+
+          for (const dbConv of data.conversations) {
+            const existingLocal = prev.find(p =>
+              p.id === dbConv.id ||
+              (p.userId && String(p.userId) === String(dbConv.userId)) ||
+              (p.user?.username && p.user.username.toLowerCase() === dbConv.user?.username?.toLowerCase())
+            );
+            const mergedConv = {
+              ...dbConv,
+              messages: (existingLocal?.messages && existingLocal.messages.length > 0)
+                ? existingLocal.messages
+                : (dbConv.messages || [])
+            };
+            merged.push(mergedConv);
+            seenIds.add(dbConv.id);
+            if (dbConv.userId) seenIds.add(String(dbConv.userId));
+            if (dbConv.user?.username) seenIds.add(dbConv.user.username.toLowerCase());
+          }
+
+          // Append local conversations that haven't hit the DB list yet
+          for (const localConv of prev) {
+            const alreadyIn =
+              seenIds.has(localConv.id) ||
+              (localConv.userId && seenIds.has(String(localConv.userId))) ||
+              (localConv.user?.username && seenIds.has(localConv.user.username.toLowerCase()));
+            if (!alreadyIn) {
+              merged.push(localConv);
+            }
+          }
+
+          return merged;
+        });
+      }
+    } catch (e) {
+      console.warn('Could not fetch conversations in mobile:', e.message);
+    }
+  }, []);
+
+  // Fetch messages with specific partner
+  const fetchConversationMessages = useCallback(async (targetPartner) => {
+    try {
+      if (!targetPartner) return [];
+      const data = await apiRequest(`/messages/${targetPartner}`);
+      if (data && data.messages && Array.isArray(data.messages)) {
+        setConversations(prev =>
+          prev.map(conv => {
+            const matches =
+              conv.id === targetPartner ||
+              String(conv.userId) === String(targetPartner) ||
+              conv.user?.username?.toLowerCase() === String(targetPartner).toLowerCase() ||
+              conv.id === `conv_${targetPartner}`;
+            if (matches) {
+              return {
+                ...conv,
+                unreadCount: 0,
+                messages: data.messages,
+              };
+            }
+            return conv;
+          })
+        );
+        return data.messages;
+      }
+    } catch (e) {
+      console.warn('Could not fetch messages in mobile:', e.message);
+    }
+    return [];
+  }, []);
+
+  // Open or create conversation
+  const openOrCreateConversation = useCallback((targetUser) => {
+    if (!targetUser) return null;
+    const username = typeof targetUser === 'string' ? targetUser : targetUser.username;
+    const name = typeof targetUser === 'string' ? targetUser : (targetUser.name || targetUser.username);
+    const avatar = (typeof targetUser === 'object' && targetUser.avatar) ? targetUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+    const userId = (typeof targetUser === 'object' && targetUser.id) ? targetUser.id : null;
+
+    const existing = conversations.find(c =>
+      c.user?.username?.toLowerCase() === username?.toLowerCase() ||
+      (userId && c.userId === userId)
+    );
+    if (existing) return existing.id;
+
+    const newConvId = `conv_${userId || username}`;
+    const newConv = {
+      id: newConvId,
+      userId,
+      user: {
+        id: userId,
+        name,
+        username,
+        avatar,
+        isOnline: true,
+      },
+      lastMessage: 'Tap here to start chatting',
+      time: 'Just now',
+      unreadCount: 0,
+      messages: [],
+    };
+    setConversations(prev => [newConv, ...prev]);
+    return newConvId;
+  }, [conversations]);
+
+  // Send message
+  const sendMessage = useCallback(async (convId, text, media = null) => {
+    const conv = conversations.find(c => c.id === convId);
+    const targetUserId = conv?.userId || conv?.user?.id || conv?.user?.username;
+
+    // Optimistically update message stream
+    const tempMsgId = `msg_${Date.now()}`;
+    const tempMsg = {
+      id: tempMsgId,
+      sender: 'me',
+      text,
+      media,
+      time: 'Just now',
+    };
+
+    setConversations(prev =>
+      prev.map(c => {
+        if (c.id === convId || String(c.userId) === String(targetUserId) || c.user?.username === targetUserId) {
+          return {
+            ...c,
+            lastMessage: text || (media?.type === 'video' ? '🎥 Video' : '📷 Photo'),
+            time: 'Just now',
+            messages: [...(c.messages || []), tempMsg],
+          };
+        }
+        return c;
+      })
+    );
+
+    try {
+      const res = await apiRequest(`/messages/${targetUserId}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          recipientId: targetUserId,
+          text: text?.trim() || '',
+          media: media ? {
+            url: media.url,
+            type: media.type,
+            name: media.name,
+            size: media.size,
+          } : null,
+          mediaUrl: media?.url,
+          mediaType: media?.type,
+          mediaName: media?.name,
+          mediaSize: media?.size,
+        }),
+      });
+
+      if (res && res.message) {
+        setConversations(prev =>
+          prev.map(c => {
+            if (c.id === convId || String(c.userId) === String(targetUserId) || c.user?.username === targetUserId) {
+              return {
+                ...c,
+                messages: (c.messages || []).map(m => m.id === tempMsgId ? res.message : m),
+              };
+            }
+            return c;
+          })
+        );
+      }
+    } catch (e) {
+      console.warn('Send message error:', e);
+    }
+  }, [conversations]);
+
+  // Unsend message (Instagram style: removes message for everyone)
+  const unsendMessage = useCallback(async (convId, messageId) => {
+    if (!messageId) return;
+
+    // Optimistically remove from local state
+    setConversations(prev =>
+      prev.map(c => {
+        if (c.id === convId) {
+          const remaining = (c.messages || []).filter(m => m.id !== messageId);
+          const lastMsg = remaining.length > 0 ? remaining[remaining.length - 1] : null;
+          return {
+            ...c,
+            messages: remaining,
+            lastMessage: lastMsg ? (lastMsg.text || (lastMsg.media?.type === 'video' ? '🎥 Video' : '📷 Photo')) : 'No messages yet',
+          };
+        }
+        return c;
+      })
+    );
+
+    try {
+      if (typeof messageId === 'number' || !String(messageId).startsWith('msg_')) {
+        await apiRequest(`/messages/${messageId}`, { method: 'DELETE' });
+      }
+    } catch (e) {
+      console.warn('Unsend message error:', e);
+    }
+  }, []);
+
+  const deleteUserPost = useCallback(async (postId) => {
+    setPosts(prev => prev.filter(p => p.id !== postId));
+    setUserSubmissions(prev => prev.filter(s => s.id !== postId));
+    try {
+      await apiRequest(`/videos/${postId}`, { method: 'DELETE' });
+    } catch (e) {}
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
@@ -284,6 +512,14 @@ export const AppProvider = ({ children }) => {
         recordPostView,
         toggleFollowCreator,
         blockedUsers,
+        conversations,
+        fetchLiveConversations,
+        fetchConversationMessages,
+        openOrCreateConversation,
+        sendMessage,
+        unsendMessage,
+        userSubmissions,
+        deleteUserPost,
       }}
     >
       {children}

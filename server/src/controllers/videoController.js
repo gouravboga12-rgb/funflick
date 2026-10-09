@@ -139,8 +139,9 @@ export async function createVideo(req, res) {
 
     const videoTitle = (title && title.trim()) || (description && description.trim().slice(0, 40)) || 'Untitled Video';
 
-    // Normal users go to 'Pending' verification queue; admin goes straight to 'Approved'
-    const initialStatus = req.user.role === 'admin' ? 'Approved' : 'Pending';
+    // Directly publish to feed globally; queue in Admin Moderation Desk
+    const initialStatus = 'Approved';
+    const moderationStatus = req.user.role === 'admin' ? 'Approved' : 'Pending';
 
     // Safe thumbnail fallback
     let safeThumbnail = thumbnail_url || video_url;
@@ -149,8 +150,8 @@ export async function createVideo(req, res) {
     }
 
     const [result] = await pool.query(
-      `INSERT INTO videos (user_id, title, description, category, video_url, thumbnail_url, duration, media_type, hashtags, location, audio_title, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO videos (user_id, title, description, category, video_url, thumbnail_url, duration, media_type, hashtags, location, audio_title, status, moderation_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user.id,
         videoTitle,
@@ -163,21 +164,22 @@ export async function createVideo(req, res) {
         hashtags || '',
         location || '',
         audio_title || '',
-        initialStatus
+        initialStatus,
+        moderationStatus
       ]
     );
 
-    // Create in-app notification informing user of submission
+    // Create in-app notification confirming upload
     try {
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, message)
-         VALUES (?, 'system', 'Reel Submitted for Review', ?)`,
-        [req.user.id, `Your reel "${videoTitle}" has been submitted for Admin Verification.`]
+         VALUES (?, 'system', 'Reel Published Live! 🎉', ?)`,
+        [req.user.id, `Your reel "${videoTitle}" is now live on FunFlick! Admin Moderation will verify content standards.`]
       );
     } catch (e) {}
 
     return res.status(201).json({
-      message: initialStatus === 'Approved' ? 'Published live to FunFlick' : 'Submitted for Central Admin Verification',
+      message: 'Published live to FunFlick and sent to Admin Verification Queue',
       status: initialStatus,
       videoId: result.insertId,
       video: {

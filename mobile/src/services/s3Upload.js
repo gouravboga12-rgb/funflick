@@ -9,13 +9,19 @@ import { apiRequest } from './api';
  * @param {Function} onProgress Progress callback (0-100)
  * @returns {Promise<string>} Public permanent S3 URL
  */
-export async function uploadMediaToS3(localUri, fileName, mimeType, folder = 'videos', onProgress = () => {}) {
+export async function uploadMediaToS3(fileOrUri, fileName, mimeType, folder = 'videos', onProgress = () => {}) {
+  // Determine if it is an image or video
+  const isImage = folder === 'images' || folder === 'thumbnails' || folder === 'avatars' || (mimeType && mimeType.startsWith('image/'));
+  const effectiveMime = mimeType || (isImage ? 'image/jpeg' : 'video/mp4');
+  const defaultExt = isImage ? 'jpg' : 'mp4';
+  const effectiveFileName = fileName || `upload_${Date.now()}.${defaultExt}`;
+
   // 1. Request presigned upload URL from EC2 backend
   const data = await apiRequest('/media/upload-url', {
     method: 'POST',
     body: JSON.stringify({
-      fileName: fileName || `upload_${Date.now()}.${folder === 'videos' ? 'mp4' : 'jpg'}`,
-      fileType: mimeType || (folder === 'videos' ? 'video/mp4' : 'image/jpeg'),
+      fileName: effectiveFileName,
+      fileType: effectiveMime,
       folder,
     }),
   });
@@ -25,21 +31,35 @@ export async function uploadMediaToS3(localUri, fileName, mimeType, folder = 'vi
     throw new Error('Failed to obtain S3 upload authorization');
   }
 
-  // 2. Fetch local file URI as blob
-  const response = await fetch(localUri);
-  const blob = await response.blob();
+  // 2. Resolve binary payload (File, Blob, or local URI)
+  let uploadBlob = null;
+  if (fileOrUri instanceof Blob || (typeof File !== 'undefined' && fileOrUri instanceof File)) {
+    uploadBlob = fileOrUri;
+  } else if (fileOrUri && typeof fileOrUri === 'object' && fileOrUri.file) {
+    uploadBlob = fileOrUri.file;
+  } else if (fileOrUri && typeof fileOrUri === 'object' && fileOrUri.uri) {
+    const response = await fetch(fileOrUri.uri);
+    uploadBlob = await response.blob();
+  } else if (typeof fileOrUri === 'string') {
+    const response = await fetch(fileOrUri);
+    uploadBlob = await response.blob();
+  } else {
+    throw new Error('Invalid file provided for upload');
+  }
 
-  // Enforce 10MB maximum file size limit
-  const MAX_FILE_SIZE = 10 * 1024 * 1024;
-  if (blob && blob.size > MAX_FILE_SIZE) {
-    throw new Error(`Video file size (${(blob.size / (1024 * 1024)).toFixed(1)}MB) exceeds 10MB limit. Please choose a video under 10MB.`);
+  // Enforce size limits: 5MB for images, 10MB for videos
+  const maxBytes = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+  const maxLabel = isImage ? '5MB' : '10MB';
+  if (uploadBlob && uploadBlob.size && uploadBlob.size > maxBytes) {
+    const sizeMb = (uploadBlob.size / (1024 * 1024)).toFixed(1);
+    throw new Error(`${isImage ? 'Image' : 'Video'} file size (${sizeMb}MB) exceeds the ${maxLabel} limit. Please choose a ${isImage ? 'photo' : 'video'} under ${maxLabel}.`);
   }
 
   // 3. Upload directly to AWS S3 via XMLHttpRequest with real progress monitoring
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', uploadUrl, true);
-    xhr.setRequestHeader('Content-Type', mimeType || 'application/octet-stream');
+    xhr.setRequestHeader('Content-Type', effectiveMime);
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
@@ -60,6 +80,6 @@ export async function uploadMediaToS3(localUri, fileName, mimeType, folder = 'vi
     xhr.onerror = () => reject(new Error('Network error during S3 upload'));
     xhr.ontimeout = () => reject(new Error('S3 upload timed out'));
 
-    xhr.send(blob);
+    xhr.send(uploadBlob);
   });
 }
