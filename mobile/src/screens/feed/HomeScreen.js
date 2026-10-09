@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContent: {
-    paddingBottom: 24,
+    paddingBottom: 100,
   },
   cardWrapper: {
     paddingHorizontal: 12,

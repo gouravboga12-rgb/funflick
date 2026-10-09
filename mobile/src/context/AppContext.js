@@ -121,6 +121,50 @@ export const AppProvider = ({ children }) => {
     return data;
   };
 
+  // Google Login handler
+  const loginWithGoogle = async (email) => {
+    const data = await apiRequest('/auth/google-login', {
+      method: 'POST',
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    });
+
+    if (data.requiresAccountChoice) {
+      return data;
+    }
+
+    if (data.token && data.user) {
+      await setToken(data.token);
+      await setStoredUser(data.user);
+      setCurrentUser(data.user);
+      setIsAuthenticated(true);
+      registerForPushNotificationsAsync();
+      fetchFeed();
+      return data;
+    }
+
+    throw new Error(data.error || 'Google login failed');
+  };
+
+  // Google select account handler
+  const selectGoogleAccount = async (userId, email) => {
+    const data = await apiRequest('/auth/google-select-account', {
+      method: 'POST',
+      body: JSON.stringify({ userId, email: email.trim().toLowerCase() }),
+    });
+
+    if (data.token && data.user) {
+      await setToken(data.token);
+      await setStoredUser(data.user);
+      setCurrentUser(data.user);
+      setIsAuthenticated(true);
+      registerForPushNotificationsAsync();
+      fetchFeed();
+      return data;
+    }
+
+    throw new Error(data.error || 'Failed to select account');
+  };
+
   // Logout handler
   const logout = async () => {
     await setToken(null);
@@ -185,6 +229,8 @@ export const AppProvider = ({ children }) => {
         isLoadingAuth,
         login,
         register,
+        loginWithGoogle,
+        selectGoogleAccount,
         logout,
         posts,
         isLoadingFeed,

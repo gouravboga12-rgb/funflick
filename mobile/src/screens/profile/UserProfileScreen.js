@@ -69,7 +69,7 @@ export const UserProfileScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Profile Info */}
         <View style={styles.profileHeader}>
           <LinearGradient colors={['#ff007a', '#7928ca']} style={styles.avatarBorder}>

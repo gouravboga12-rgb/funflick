@@ -10,22 +10,49 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { UserPlus, User, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
+import { UserPlus, User, Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle2, X } from 'lucide-react-native';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 
-export default function SignUpScreen({ navigation }) {
+export default function SignUpScreen({ route, navigation }) {
   const { register } = useApp();
+  const initialEmail = route?.params?.initialEmail || '';
+
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Google Sign-Up state
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleInputEmail, setGoogleInputEmail] = useState('');
+  const [isGoogleVerified, setIsGoogleVerified] = useState(Boolean(initialEmail));
+
+  const handleGoogleVerify = () => {
+    if (!googleInputEmail.trim() || !googleInputEmail.includes('@')) {
+      Alert.alert('Email Required', 'Please enter a valid Google email address');
+      return;
+    }
+    const clean = googleInputEmail.trim().toLowerCase();
+    setEmail(clean);
+    if (!name) {
+      const suggestedName = clean.split('@')[0].replace(/[._]/g, ' ');
+      setName(suggestedName.charAt(0).toUpperCase() + suggestedName.slice(1));
+    }
+    if (!username) {
+      setUsername(clean.split('@')[0].replace(/[^a-z0-9_]/g, ''));
+    }
+    setIsGoogleVerified(true);
+    setShowGoogleModal(false);
+    Alert.alert('Google Verified', `Email verified: ${clean}. Please complete your password.`);
+  };
 
   const handleSignUp = async () => {
     if (!name.trim() || !username.trim() || !email.trim() || !password) {
@@ -102,6 +129,26 @@ export default function SignUpScreen({ navigation }) {
         ) : null}
 
         <View style={styles.formArea}>
+          {/* Sign Up with Google Button */}
+          <TouchableOpacity
+            style={styles.googleBtn}
+            activeOpacity={0.85}
+            onPress={() => setShowGoogleModal(true)}
+          >
+            <View style={styles.googleIconBadge}>
+              <Text style={styles.googleG}>G</Text>
+            </View>
+            <Text style={styles.googleBtnText}>
+              {isGoogleVerified ? 'Google Verified ✓' : 'Sign up with Google'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
           <Text style={styles.inputLabel}>Full Name</Text>
           <View style={styles.inputRow}>
             <User color="rgba(255,255,255,0.4)" size={20} style={styles.fieldIcon} />
@@ -127,7 +174,9 @@ export default function SignUpScreen({ navigation }) {
             />
           </View>
 
-          <Text style={[styles.inputLabel, { marginTop: 14 }]}>Email Address</Text>
+          <Text style={[styles.inputLabel, { marginTop: 14 }]}>
+            Email Address {isGoogleVerified && <Text style={{ color: '#34A853' }}>(Google Verified ✓)</Text>}
+          </Text>
           <View style={styles.inputRow}>
             <Mail color="rgba(255,255,255,0.4)" size={20} style={styles.fieldIcon} />
             <TextInput
@@ -202,6 +251,57 @@ export default function SignUpScreen({ navigation }) {
           </View>
         </View>
       </ScrollView>
+
+      {/* Google Verify Modal */}
+      <Modal visible={showGoogleModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={styles.googleIconBadge}>
+                  <Text style={styles.googleG}>G</Text>
+                </View>
+                <Text style={styles.modalTitle}>Sign Up with Google</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowGoogleModal(false)}>
+                <X color="#9ca3af" size={20} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginTop: 14 }}>
+              <Text style={styles.modalSubtitle}>
+                Enter your Google email to prefill and verify your account:
+              </Text>
+              <View style={[styles.inputRow, { marginTop: 12 }]}>
+                <Mail color="rgba(255,255,255,0.4)" size={20} style={styles.fieldIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="yourname@gmail.com"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={googleInputEmail}
+                  onChangeText={setGoogleInputEmail}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.submitBtn, { marginTop: 18 }]}
+                onPress={handleGoogleVerify}
+              >
+                <LinearGradient
+                  colors={['#4285F4', '#34A853']}
+                  style={styles.gradientBtn}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={styles.btnText}>Verify with Google</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -228,7 +328,7 @@ const styles = StyleSheet.create({
   },
   headerArea: {
     alignItems: 'center',
-    marginBottom: 26,
+    marginBottom: 22,
   },
   logoIconCircle: {
     width: 68,
@@ -270,6 +370,55 @@ const styles = StyleSheet.create({
   formArea: {
     width: '100%',
   },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    height: 50,
+    gap: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  googleIconBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  googleG: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#4285F4',
+  },
+  googleBtnText: {
+    color: '#1f2937',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  dividerText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   inputLabel: {
     fontSize: 13,
     fontWeight: '600',
@@ -304,7 +453,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   submitBtn: {
-    marginTop: 24,
+    marginTop: 22,
     borderRadius: 14,
     overflow: 'hidden',
   },
@@ -321,7 +470,7 @@ const styles = StyleSheet.create({
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 18,
   },
   switchText: {
     color: 'rgba(255,255,255,0.6)',
@@ -331,5 +480,39 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#18102d',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalSubtitle: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

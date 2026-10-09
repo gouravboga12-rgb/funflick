@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   },
   gridContainer: {
     paddingHorizontal: 12,
-    paddingBottom: 24,
+    paddingBottom: 100,
   },
   gridItem: {
     width: GRID_ITEM_WIDTH,

@@ -1,14 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video, Image, Zap, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 
 export const CreateChooserModal = ({ visible, onClose, onSelect }) => {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 20) + 16;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: bottomPadding }]}>
           <View style={styles.topBar}>
             <Text style={styles.title}>Create Content</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Compass, Plus, Film, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -19,7 +20,11 @@ function DummyCreateScreen() {
 }
 
 export default function BottomTabNavigator({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [isChooserVisible, setIsChooserVisible] = useState(false);
+
+  const bottomInset = Math.max(insets.bottom, 16);
+  const tabHeight = 58 + bottomInset;
 
   const handleSelectCreateType = (type) => {
     setIsChooserVisible(false);
@@ -33,13 +38,19 @@ export default function BottomTabNavigator({ navigation }) {
   };
 
   return (
-    <>
+    <View style={styles.outerContainer}>
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
-          tabBarStyle: styles.tabBar,
+          tabBarStyle: [
+            styles.tabBar,
+            {
+              height: tabHeight,
+              paddingBottom: bottomInset,
+            },
+          ],
           tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
+          tabBarInactiveTintColor: 'rgba(255,255,255,0.45)',
           tabBarShowLabel: true,
           tabBarLabelStyle: styles.tabLabel,
         }}
@@ -118,18 +129,21 @@ export default function BottomTabNavigator({ navigation }) {
         onClose={() => setIsChooserVisible(false)}
         onSelect={handleSelectCreateType}
       />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+    backgroundColor: '#0a0515',
+  },
   tabBar: {
     backgroundColor: '#0a0515',
     borderTopColor: 'rgba(255,255,255,0.08)',
     borderTopWidth: 1,
-    height: 60,
-    paddingBottom: 6,
-    paddingTop: 6,
+    paddingTop: 8,
+    elevation: 12,
   },
   tabLabel: {
     fontSize: 10,
@@ -137,21 +151,21 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   createBtnContainer: {
-    top: -10,
+    top: -12,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
   },
   createBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.55,
+    shadowRadius: 10,
+    elevation: 10,
   },
 });
