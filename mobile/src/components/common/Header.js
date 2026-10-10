@@ -6,6 +6,7 @@ import { colors } from '../../theme/colors';
 export const Header = ({
   tabs = ['For You', 'Trending', 'Latest'],
   activeTab = 'For You',
+  unreadCount = 0,
   onTabChange,
   onSearchPress,
   onNotificationsPress,
@@ -56,6 +57,7 @@ export const Header = ({
 
         <TouchableOpacity onPress={onNotificationsPress} style={styles.iconBtn}>
           <Bell size={19} color="#ffffff" strokeWidth={2.2} />
+          {unreadCount > 0 && <View style={styles.notifBadgeDot} />}
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onMessagesPress} style={styles.iconBtn}>
@@ -138,5 +140,17 @@ const styles = StyleSheet.create({
   },
   iconBtn: {
     padding: 4,
+    position: 'relative',
+  },
+  notifBadgeDot: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ff007a',
+    borderWidth: 1.5,
+    borderColor: '#090514',
   },
 });

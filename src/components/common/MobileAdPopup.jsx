@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const MobileAdPopup = () => {
-  const { activePopupAd, dismissMobileAd, showToast, isAuthenticated } = useApp();
+  const { activePopupAd, dismissMobileAd, showToast, isAuthenticated, currentUser } = useApp();
   const videoRef = useRef(null);
 
   // Sponsored Ads default to volume/sound ON
@@ -202,8 +202,13 @@ export const MobileAdPopup = () => {
 
   const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
   const isAdminAuth = Boolean(localStorage.getItem('funflick_admin_token')) || (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
+  const isPaidInfluencer = Boolean(
+    currentUser?.isInfluencer ||
+    currentUser?.role === 'influencer' ||
+    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+  );
 
-  if (!activePopupAd || (!isUserAuth && !isAdminAuth)) return null;
+  if (!activePopupAd || (!isUserAuth && !isAdminAuth) || (isPaidInfluencer && !isAdminAuth)) return null;
 
   const handleClose = () => {
     if (!canClose) {

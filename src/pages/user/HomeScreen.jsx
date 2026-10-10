@@ -14,8 +14,14 @@ import { Sparkles, TrendingUp, Flame, Video, Plus } from 'lucide-react';
 
 export const HomeScreen = () => {
   const navigate = useNavigate();
-  const { posts, blockedUsers, activePlayingVideoId, setActivePlayingVideoId, adsList, isAuthenticated } = useApp();
+  const { posts, blockedUsers, activePlayingVideoId, setActivePlayingVideoId, adsList, isAuthenticated, currentUser } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
+
+  const isPaidInfluencer = Boolean(
+    currentUser?.isInfluencer ||
+    currentUser?.role === 'influencer' ||
+    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+  );
 
   const filteredPosts = posts.filter(post => {
     // Exclude blocked users
@@ -91,8 +97,8 @@ export const HomeScreen = () => {
                 // Strictly 1 time per ad, never repeating the same ad
                 const adSlotIdx = idx === 4 ? 0 : idx === 9 ? 1 : idx === 14 ? 2 : -1;
                 const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
-                const targetAd = isUserAuth && adSlotIdx !== -1 && activeAds[adSlotIdx] ? activeAds[adSlotIdx] : null;
-                const shouldShowAd = Boolean(targetAd);
+                const targetAd = isUserAuth && !isPaidInfluencer && adSlotIdx !== -1 && activeAds[adSlotIdx] ? activeAds[adSlotIdx] : null;
+                const shouldShowAd = Boolean(targetAd) && !isPaidInfluencer;
 
                 return (
                   <React.Fragment key={post.id}>

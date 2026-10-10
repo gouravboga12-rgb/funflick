@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { sendPushNotification } from '../services/pushService.js';
 
 // Format time ago or relative timestamp
 function formatTime(dateStr) {
@@ -204,6 +205,13 @@ export async function sendMessage(req, res) {
           `,
           [recipientId, senderId, `${senderName}: ${notifSnippet}`]
         );
+
+        // Send instant device push notification
+        sendPushNotification(recipientId, {
+          title: `💬 ${senderName}`,
+          body: notifSnippet,
+          data: { type: 'chat', partnerId: senderId, senderUsername: senderRows[0]?.username }
+        });
       } catch (e) {}
     }
 

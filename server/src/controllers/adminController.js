@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import bcrypt from 'bcryptjs';
+import { sendPushNotification } from '../services/pushService.js';
 
 export async function getAdminUsers(req, res) {
   try {
@@ -574,17 +575,31 @@ export async function handleContentModeration(req, res) {
       );
       if (rows.length > 0) {
         if (action === 'approve') {
+          const msg = `Your ${itemType} "${rows[0].title || 'upload'}" has been approved by admin and is confirmed on FunFlick!`;
           await pool.query(
             `INSERT INTO notifications (user_id, type, title, message)
              VALUES (?, 'system', 'Content Approved & Published! 🎉', ?)`,
-            [rows[0].user_id, `Your ${itemType} "${rows[0].title || 'upload'}" has been approved by admin and is confirmed on FunFlick!`]
+            [rows[0].user_id, msg]
           );
+
+          sendPushNotification(rows[0].user_id, {
+            title: '🎉 Content Approved & Published!',
+            body: msg,
+            data: { type: 'moderation_approved', contentId: id, itemType }
+          });
         } else if (action === 'reject') {
+          const msg = `Your ${itemType} "${rows[0].title || 'upload'}" was rejected and removed from FunFlick by Admin Moderation.`;
           await pool.query(
             `INSERT INTO notifications (user_id, type, title, message)
              VALUES (?, 'system', 'Content Removed by Admin', ?)`,
-            [rows[0].user_id, `Your ${itemType} "${rows[0].title || 'upload'}" was rejected and removed from FunFlick by Admin Moderation.`]
+            [rows[0].user_id, msg]
           );
+
+          sendPushNotification(rows[0].user_id, {
+            title: '⚠️ Content Moderation Update',
+            body: msg,
+            data: { type: 'moderation_rejected', contentId: id, itemType }
+          });
         }
       }
     } catch (e) {}

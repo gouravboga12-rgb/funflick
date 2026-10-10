@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { calculateISTDaysRemaining, formatISTDate, formatISTDateTime } from '../utils/istDateUtils.js';
+import { sendPushNotification } from '../services/pushService.js';
 
 export async function getActivePlans(req, res) {
   try {
@@ -257,6 +258,12 @@ export async function subscribeUser(req, res) {
          VALUES (?, NULL, 'system', 'Subscription Updated', ?)`,
         [userId, notificationMsg]
       );
+
+      sendPushNotification(userId, {
+        title: isExtension ? '🔄 Subscription Extended!' : '🌟 Influencer Pass Activated!',
+        body: notificationMsg,
+        data: { type: 'subscription', planName: finalPlanName }
+      });
     } catch (e) {}
 
     return res.json({

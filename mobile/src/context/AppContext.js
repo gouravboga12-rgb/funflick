@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { apiRequest, getToken, setToken, getStoredUser, setStoredUser } from '../services/api';
 import { registerForPushNotificationsAsync } from '../services/pushService';
+import * as Notifications from 'expo-notifications';
 
 const AppContext = createContext();
 
@@ -497,6 +498,123 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
+  // Ads State
+  const [adsList, setAdsList] = useState([]);
+  const [activePopupAd, setActivePopupAd] = useState(null);
+  const hasTriggeredAdOnLaunchRef = useRef(false);
+
+  const isPaidInfluencer = Boolean(
+    currentUser?.isInfluencer ||
+    currentUser?.role === 'influencer' ||
+    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+  );
+
+  const fetchAds = useCallback(async () => {
+    try {
+      const data = await apiRequest('/ads');
+      if (data && Array.isArray(data.ads)) {
+        setAdsList(data.ads);
+        return data.ads;
+      }
+    } catch (e) {
+      console.warn('Fetch ads error:', e?.message);
+    }
+    return [];
+  }, []);
+
+  const recordAdMetric = useCallback(async (adId, action = 'impression') => {
+    if (!adId) return;
+    try {
+      await apiRequest(`/ads/${adId}/metric`, {
+        method: 'POST',
+        body: JSON.stringify({ action }),
+      });
+    } catch (e) {}
+  }, []);
+
+  const showMobileAd = useCallback((adId) => {
+    if (isPaidInfluencer) return; // Paid members NEVER see ads!
+    const target = adId ? adsList.find(a => a.id === adId) : adsList.find(a => a.active) || adsList[0];
+    if (target) {
+      setActivePopupAd(target);
+      recordAdMetric(target.id, 'impression');
+    }
+  }, [isPaidInfluencer, adsList, recordAdMetric]);
+
+  const dismissMobileAd = useCallback(() => {
+    setActivePopupAd(null);
+  }, []);
+
+  // Notifications State
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const data = await apiRequest('/notifications');
+      if (data && Array.isArray(data.notifications)) {
+        setNotifications(data.notifications);
+        setUnreadNotificationCount(data.notifications.filter(n => !n.is_read).length);
+      }
+    } catch (e) {}
+  }, []);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: 1 })));
+    setUnreadNotificationCount(0);
+    try {
+      await apiRequest('/notifications/mark-all-read', { method: 'POST' });
+    } catch (e) {}
+  }, []);
+
+  // Sync ads & notifications on auth or launch
+  useEffect(() => {
+    fetchAds();
+    if (isAuthenticated) {
+      fetchNotifications();
+    }
+  }, [isAuthenticated, fetchAds, fetchNotifications]);
+
+  // Automatic In-App Pop-up Ad trigger for unpaid users
+  useEffect(() => {
+    if (!isAuthenticated || isPaidInfluencer || hasTriggeredAdOnLaunchRef.current) return;
+    if (!adsList || adsList.length === 0) return;
+
+    const popupAd = adsList.find(a =>
+      a.active && (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'After 5 Reels')
+    );
+
+    if (popupAd) {
+      hasTriggeredAdOnLaunchRef.current = true;
+      const timer = setTimeout(() => {
+        showMobileAd(popupAd.id);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, isPaidInfluencer, adsList, showMobileAd]);
+
+  // Foreground push notification listener
+  useEffect(() => {
+    let notifSub;
+    let responseSub;
+    try {
+      notifSub = Notifications.addNotificationReceivedListener(() => {
+        fetchNotifications();
+        fetchFeed();
+        fetchLiveConversations();
+      });
+
+      responseSub = Notifications.addNotificationResponseReceivedListener(() => {
+        fetchNotifications();
+      });
+    } catch (e) {}
+
+    return () => {
+      if (notifSub) notifSub.remove();
+      if (responseSub) responseSub.remove();
+    };
+  }, [fetchNotifications, fetchFeed, fetchLiveConversations]);
+
   const deleteUserPost = useCallback(async (postId) => {
     setPosts(prev => prev.filter(p => p.id !== postId));
     setUserSubmissions(prev => prev.filter(s => s.id !== postId));
@@ -510,6 +628,7 @@ export const AppProvider = ({ children }) => {
       value={{
         currentUser,
         isAuthenticated,
+        isPaidInfluencer,
         isLoadingAuth,
         login,
         register,
@@ -539,6 +658,16 @@ export const AppProvider = ({ children }) => {
         unsendMessage,
         userSubmissions,
         deleteUserPost,
+        adsList,
+        activePopupAd,
+        fetchAds,
+        showMobileAd,
+        dismissMobileAd,
+        recordAdMetric,
+        notifications,
+        unreadNotificationCount,
+        fetchNotifications,
+        markAllNotificationsRead,
       }}
     >
       {children}

@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { sendPushNotification } from '../services/pushService.js';
 
 export async function followUser(req, res) {
   try {
@@ -50,6 +51,13 @@ export async function followUser(req, res) {
           [targetUser.id, currentUserId]
         );
       }
+
+      // Dispatch push notification to target user
+      sendPushNotification(targetUser.id, {
+        title: '👤 New Follower on FunFlick',
+        body: `@${req.user?.username || 'Someone'} started following you.`,
+        data: { type: 'follow', followerId: currentUserId, username: req.user?.username }
+      });
     } catch (e) {}
 
     return res.json({ success: true, following: true, message: `Now following @${targetUser.username}` });

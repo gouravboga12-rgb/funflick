@@ -5,11 +5,22 @@ import { Bell, X, Sparkles, CheckCircle2 } from 'lucide-react-native';
 import { Header } from '../../components/common/Header';
 import { StoryBar } from '../../components/feed/StoryBar';
 import { VideoPostCard } from '../../components/feed/VideoPostCard';
+import { SponsoredAdCard } from '../../components/feed/SponsoredAdCard';
+import { MobileAdPopup } from '../../components/common/MobileAdPopup';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
 export const HomeScreen = ({ navigation }) => {
-  const { posts, isLoadingFeed, fetchFeed } = useApp();
+  const {
+    posts,
+    isLoadingFeed,
+    fetchFeed,
+    adsList,
+    isPaidInfluencer,
+    notifications,
+    unreadNotificationCount,
+    markAllNotificationsRead
+  } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
   const [activeVideoId, setActiveVideoId] = useState(null);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
@@ -48,6 +59,7 @@ export const HomeScreen = ({ navigation }) => {
       {/* 1-Line Top Header matching website (Logo | For You Trending Latest   Search Bell Inbox) */}
       <Header
         activeTab={activeTab}
+        unreadCount={unreadNotificationCount}
         onTabChange={setActiveTab}
         onSearchPress={() => navigation.navigate('Discover')}
         onNotificationsPress={() => setIsNotifModalOpen(true)}
@@ -65,15 +77,26 @@ export const HomeScreen = ({ navigation }) => {
             onStoryPress={(story) => navigation.navigate('StoryViewer', { story })}
           />
         }
-        renderItem={({ item, index }) => (
-          <View style={styles.cardWrapper}>
-            <VideoPostCard
-              post={item}
-              isActive={activeVideoId ? item.id === activeVideoId : index === 0}
-              navigation={navigation}
-            />
-          </View>
-        )}
+        renderItem={({ item, index }) => {
+          const showAdAfter = (index + 1) % 5 === 0;
+          const adIndex = Math.floor(index / 5) % Math.max(1, (adsList || []).length);
+          const feedAd = !isPaidInfluencer && adsList && adsList.length > 0 && showAdAfter ? adsList[adIndex] : null;
+
+          return (
+            <View style={styles.cardWrapper}>
+              <VideoPostCard
+                post={item}
+                isActive={activeVideoId ? item.id === activeVideoId : index === 0}
+                navigation={navigation}
+              />
+              {feedAd && (
+                <View style={{ marginTop: 8 }}>
+                  <SponsoredAdCard ad={feedAd} isActive={false} />
+                </View>
+              )}
+            </View>
+          );
+        }}
         refreshControl={
           <RefreshControl
             refreshing={isLoadingFeed}
@@ -111,31 +134,38 @@ export const HomeScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.notifContent}>
-              <View style={styles.notifItem}>
-                <View style={styles.notifDot} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.notifItemTitle}>Welcome to FunFlick! 🎉</Text>
-                  <Text style={styles.notifItemText}>
-                    Explore trending reels, comedy sketches, and connect with creators.
-                  </Text>
-                  <Text style={styles.notifItemTime}>Today</Text>
+              {notifications && notifications.length > 0 ? (
+                notifications.slice(0, 10).map((n) => (
+                  <View key={n.id} style={styles.notifItem}>
+                    <View style={[styles.notifDot, n.is_read ? { backgroundColor: '#64748b' } : {}]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.notifItemTitle}>{n.title || 'FunFlick Activity'}</Text>
+                      <Text style={styles.notifItemText}>{n.message || ''}</Text>
+                      <Text style={styles.notifItemTime}>
+                        {n.created_at ? new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.notifItem}>
+                  <View style={styles.notifDot} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.notifItemTitle}>Welcome to FunFlick! 🎉</Text>
+                    <Text style={styles.notifItemText}>
+                      Explore trending reels, comedy sketches, and connect with creators.
+                    </Text>
+                    <Text style={styles.notifItemTime}>Today</Text>
+                  </View>
                 </View>
-              </View>
-
-              <View style={styles.notifItem}>
-                <View style={[styles.notifDot, { backgroundColor: '#34d399' }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.notifItemTitle}>Publishing is Free for All Users</Text>
-                  <Text style={styles.notifItemText}>
-                    Share your talent directly with the world with our new direct publishing!
-                  </Text>
-                  <Text style={styles.notifItemTime}>Active</Text>
-                </View>
-              </View>
+              )}
 
               <TouchableOpacity
                 style={styles.doneBtn}
-                onPress={() => setIsNotifModalOpen(false)}
+                onPress={() => {
+                  setIsNotifModalOpen(false);
+                  if (markAllNotificationsRead) markAllNotificationsRead();
+                }}
               >
                 <Text style={styles.doneBtnText}>Close</Text>
               </TouchableOpacity>
@@ -143,6 +173,9 @@ export const HomeScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Global In-App Pop-up Ad for Unpaid Users */}
+      <MobileAdPopup />
     </SafeAreaView>
   );
 };

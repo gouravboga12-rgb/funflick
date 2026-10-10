@@ -1887,7 +1887,13 @@ export const AppProvider = ({ children }) => {
     // Strictly ensure user is logged in before any ad can be shown (admin portal preview allowed)
     const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
     const isAdminAuth = Boolean(localStorage.getItem('funflick_admin_token')) || window.location.pathname.startsWith('/admin');
-    if (!isUserAuth && !isAdminAuth) {
+    const isPaidInfluencer = Boolean(
+      currentUser?.isInfluencer ||
+      currentUser?.role === 'influencer' ||
+      (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+    );
+
+    if ((!isUserAuth && !isAdminAuth) || (isPaidInfluencer && !isAdminAuth)) {
       return;
     }
 
@@ -1916,10 +1922,16 @@ export const AppProvider = ({ children }) => {
     // immediately check if another active Pop-up Ad is in queue for this session!
     const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
     const isAdmin = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+    const isPaidInfluencer = Boolean(
+      currentUser?.isInfluencer ||
+      currentUser?.role === 'influencer' ||
+      (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+    );
 
     if (
       isUserAuth &&
       !isAdmin &&
+      !isPaidInfluencer &&
       dismissedAd &&
       (dismissedAd.frequency === 'Pop-up Ads' || dismissedAd.frequency === 'On App Open' || dismissedAd.frequency === 'Once per session')
     ) {
@@ -1949,6 +1961,12 @@ export const AppProvider = ({ children }) => {
     // Strictly require user to be logged in before automatic popup ads can appear
     const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
     if (!isUserAuth) return;
+    const isPaidInfluencer = Boolean(
+      currentUser?.isInfluencer ||
+      currentUser?.role === 'influencer' ||
+      (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+    );
+    if (isPaidInfluencer) return;
     if (!adsList || adsList.length === 0) return;
 
     // Do not trigger popups on admin center or auth/splash flow
