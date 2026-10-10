@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from '../screens/auth/SplashScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
+import AuthCallbackScreen from '../screens/auth/AuthCallbackScreen';
 import BottomTabNavigator from './BottomTabNavigator';
 import { UploadReelScreen } from '../screens/create/UploadReelScreen';
 import { CreatePostScreen } from '../screens/create/CreatePostScreen';
@@ -48,6 +49,7 @@ const linking = {
       },
       Login: 'login',
       SignUp: 'signup',
+      AuthCallback: 'auth/callback',
     },
   },
 };
@@ -64,6 +66,7 @@ export default function AppNavigator() {
         }}
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
+        <Stack.Screen name="AuthCallback" component={AuthCallbackScreen} />
         <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
         <Stack.Screen
           name="Login"

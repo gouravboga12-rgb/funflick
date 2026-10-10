@@ -964,6 +964,10 @@ export async function googleAuthCallback(req, res) {
     };
 
     const sendRedirectResponse = (deepLinkUrl) => {
+      if (deepLinkUrl.startsWith('http://') || deepLinkUrl.startsWith('https://')) {
+        return res.redirect(deepLinkUrl);
+      }
+
       return res.send(`
         <!DOCTYPE html>
         <html>
