@@ -328,61 +328,6 @@ export const UserProfileScreen = ({ navigation, route }) => {
     }
   };
 
-  // Save settings (Email, phone, and preferences)
-  const handleSaveContactSettings = async () => {
-    setIsSavingSettings(true);
-    try {
-      const updated = await apiRequest('/auth/profile/contact', {
-        method: 'PUT',
-        body: JSON.stringify({
-          email: (settingsEmail || currentUser?.email || '').trim(),
-          phone: (settingsPhone || currentUser?.phone || '').trim(),
-        }),
-      });
-
-      if (updated && updated.user) {
-        setCurrentUser(updated.user);
-        await setStoredUser(updated.user);
-      } else {
-        const nextUser = {
-          ...currentUser,
-          email: (settingsEmail || currentUser?.email || '').trim(),
-          phone: (settingsPhone || currentUser?.phone || '').trim(),
-        };
-        setCurrentUser(nextUser);
-        await setStoredUser(nextUser);
-      }
-
-      setIsSettingsModalOpen(false);
-      showAppAlert('Settings Saved', 'Your account settings and preferences have been updated!');
-    } catch (e) {
-      // Fallback: try /auth/profile
-      try {
-        const res = await apiRequest('/auth/profile', {
-          method: 'PUT',
-          body: JSON.stringify({
-            name: currentUser?.name || '',
-            username: currentUser?.username || '',
-            bio: currentUser?.bio || '',
-            avatar_url: currentUser?.avatar_url || currentUser?.avatar || '',
-            email: (settingsEmail || currentUser?.email || '').trim(),
-            phone: (settingsPhone || currentUser?.phone || '').trim(),
-          }),
-        });
-        if (res && res.user) {
-          setCurrentUser(res.user);
-          await setStoredUser(res.user);
-        }
-        setIsSettingsModalOpen(false);
-        showAppAlert('Settings Saved', 'Your account settings have been updated successfully!');
-      } catch (err2) {
-        showAppAlert('Update Failed', err2.message || 'Could not save settings.');
-      }
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
-
   // Permanent account deletion
   const handleDeleteAccount = () => {
     showAppConfirm(
@@ -515,15 +460,32 @@ export const UserProfileScreen = ({ navigation, route }) => {
   const handleSaveContactSettings = async () => {
     setIsSavingSettings(true);
     try {
-      const res = await apiRequest('/auth/profile/contact', {
-        method: 'PUT',
-        body: JSON.stringify({
-          email: settingsEmail.trim(),
-          phone: settingsPhone.trim(),
-          isPrivate: isPrivateAccount,
-          allowDMs: allowDMs,
-        }),
-      });
+      let res;
+      try {
+        res = await apiRequest('/auth/profile/contact', {
+          method: 'PUT',
+          body: JSON.stringify({
+            email: settingsEmail.trim(),
+            phone: settingsPhone.trim(),
+            isPrivate: isPrivateAccount,
+            allowDMs: allowDMs,
+          }),
+        });
+      } catch (err) {
+        // Fallback to /auth/profile
+        res = await apiRequest('/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: currentUser?.name || '',
+            username: currentUser?.username || '',
+            bio: currentUser?.bio || '',
+            avatar_url: currentUser?.avatar_url || currentUser?.avatar || '',
+            email: settingsEmail.trim(),
+            phone: settingsPhone.trim(),
+          }),
+        });
+      }
+
       if (res && res.user) {
         setCurrentUser(res.user);
         await setStoredUser(res.user);
