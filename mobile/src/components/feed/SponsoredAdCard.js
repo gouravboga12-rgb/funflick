@@ -20,8 +20,10 @@ const CARD_HEIGHT = Math.min(Math.round(SCREEN_WIDTH * 1.25), Math.round(SCREEN_
 
 export const SponsoredAdCard = ({ ad, isActive = false }) => {
   const isFocused = useIsFocused();
-  const { isReelsMuted, toggleMute, recordAdMetric } = useApp();
+  const { isReelsMuted, toggleMute, recordAdMetric, isPaidInfluencer } = useApp();
   const hasRecordedImpression = useRef(false);
+
+  if (!ad || isPaidInfluencer) return null;
 
   const isVideo = Boolean(
     ad && (

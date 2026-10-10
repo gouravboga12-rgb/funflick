@@ -14,8 +14,16 @@ import {
 import { motion } from 'framer-motion';
 
 export const SponsoredAdCard = ({ ad }) => {
-  const { recordAdImpression, recordAdClick, showMobileAd, theme, activePopupAd } = useApp();
+  const { recordAdImpression, recordAdClick, showMobileAd, theme, activePopupAd, currentUser } = useApp();
   const isLight = theme === 'light';
+
+  const isPaidInfluencer = Boolean(
+    currentUser?.isInfluencer ||
+    currentUser?.role === 'influencer' ||
+    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+  );
+
+  if (!ad || isPaidInfluencer) return null;
 
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
