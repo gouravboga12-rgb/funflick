@@ -101,7 +101,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
       // Single tap -> Toggle Play/Pause reliably
       if (player) {
         try {
-          if (!isUserPaused && isPlaying) {
+          if (!isUserPaused) {
             player.pause();
             setIsUserPaused(true);
             setIsPlaying(false);
@@ -137,6 +137,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
             style={styles.videoPlayer}
             contentFit="cover"
             nativeControls={false}
+            pointerEvents="none"
           />
         ) : (
           <Image

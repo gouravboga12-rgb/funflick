@@ -63,6 +63,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
     : (mediaLimits?.maxReelDuration || 30);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isUserPaused, setIsUserPaused] = useState(false);
   const [showAudioBadge, setShowAudioBadge] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -145,6 +146,12 @@ export const VideoPostCard = ({ post, isReel = true }) => {
     }
 
     if (isCardActive && !isLocked) {
+      if (isUserPaused) {
+        video.pause();
+        setIsPlaying(false);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setHasError(false);
       video.muted = isReelsMuted;
@@ -180,13 +187,14 @@ export const VideoPostCard = ({ post, isReel = true }) => {
           });
       }
     } else {
-      // Immediately pause and stop audio completely
+      // Reel scrolled out of view: pause, reset time and reset user pause state
       video.pause();
       video.currentTime = 0;
       setIsPlaying(false);
       setIsLoading(false);
+      setIsUserPaused(false);
     }
-  }, [isCardActive, isLocked, post.mediaType, post.mediaUrl, isReelsMuted, activePopupAd]);
+  }, [isCardActive, isLocked, post.mediaType, post.mediaUrl, isReelsMuted, activePopupAd, isUserPaused]);
 
   // Synchronize mute state in real-time when isReelsMuted changes
   useEffect(() => {
@@ -244,10 +252,20 @@ export const VideoPostCard = ({ post, isReel = true }) => {
       setShowHeartBurst(true);
       setTimeout(() => setShowHeartBurst(false), 900);
     } else {
-      // Single tap: toggle audio (like Instagram) and guarantee playing
-      toggleAudio();
-      if (videoRef.current && videoRef.current.paused) {
-        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+      // Single tap: toggle pause / play
+      const video = videoRef.current;
+      if (video) {
+        if (!isUserPaused && !video.paused) {
+          video.pause();
+          setIsUserPaused(true);
+          setIsPlaying(false);
+        } else {
+          setIsUserPaused(false);
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise.then(() => setIsPlaying(true)).catch(() => {});
+          }
+        }
       }
     }
     lastTapRef.current = now;
@@ -393,7 +411,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/90 pointer-events-none" />
 
         {/* Center Pause/Play overlay indicator when paused */}
-        {!isPlaying && !isLoading && !hasError && (
+        {(!isPlaying || isUserPaused) && !isLoading && !hasError && (
           <div className="absolute z-10 w-16 h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white/90 border border-white/20 pointer-events-none shadow-xl">
             <Play className="w-8 h-8 fill-current ml-1" />
           </div>

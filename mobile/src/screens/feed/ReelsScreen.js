@@ -47,6 +47,13 @@ function ReelItem({
     }
   });
 
+  // Reset paused state when scrolling away to another reel
+  useEffect(() => {
+    if (!isActive) {
+      setIsPaused(false);
+    }
+  }, [isActive]);
+
   useEffect(() => {
     if (!player) return;
     try {
@@ -85,7 +92,7 @@ function ReelItem({
     } else {
       if (player) {
         try {
-          if (player.playing) {
+          if (!isPaused) {
             player.pause();
             setIsPaused(true);
           } else {
@@ -107,6 +114,7 @@ function ReelItem({
             style={styles.fullscreenVideo}
             contentFit="cover"
             nativeControls={false}
+            pointerEvents="none"
           />
         ) : (
           <Image
