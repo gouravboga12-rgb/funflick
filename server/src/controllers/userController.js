@@ -39,13 +39,23 @@ export async function searchUsers(req, res) {
         (currentUserId && r.id === currentUserId) ||
         (req.user?.username && r.username?.toLowerCase() === req.user.username.toLowerCase())
       );
+      let userAvatar = r.avatar_url;
+      if (r.username === 'super_admin') {
+        userAvatar = (userAvatar && !userAvatar.includes('default-avatar'))
+          ? userAvatar
+          : 'https://funflick-theta.vercel.app/brand/funflick-logo.png';
+      } else {
+        userAvatar = userAvatar || 'https://funflick-theta.vercel.app/brand/default-avatar.svg';
+      }
+      if (userAvatar && userAvatar.startsWith('/')) {
+        userAvatar = `https://funflick-theta.vercel.app${userAvatar}`;
+      }
+
       return {
         id: r.id,
         name: r.name,
         username: r.username,
-        avatar: (r.username === 'super_admin')
-          ? (r.avatar_url && !r.avatar_url.includes('default-avatar') ? r.avatar_url : '/brand/funflick-logo.png')
-          : (r.avatar_url || '/brand/default-avatar.svg'),
+        avatar: userAvatar,
         role: r.role,
         isInfluencer: Boolean(r.is_influencer),
         followersCount: r.followers_count || 0,

@@ -44,9 +44,32 @@ const STATIC_HASHTAGS = [
 function CreatorAvatarCircle({ avatar, name, username, size = 64 }) {
   const [hasError, setHasError] = useState(false);
   const initial = (name || username || 'F').charAt(0).toUpperCase();
-  const isDefaultOrMissing = !avatar || String(avatar).includes('default-avatar') || hasError;
+
+  // If super_admin, always use the official FunFlick logo image
+  let imageUri = avatar;
+  if (username === 'super_admin') {
+    imageUri = (avatar && !String(avatar).includes('default-avatar'))
+      ? avatar
+      : 'https://funflick-theta.vercel.app/brand/funflick-logo.png';
+  }
+
+  // Ensure relative URLs are converted to absolute public URLs
+  if (imageUri && typeof imageUri === 'string' && imageUri.startsWith('/')) {
+    imageUri = `https://funflick-theta.vercel.app${imageUri}`;
+  }
+
+  const isDefaultOrMissing = !imageUri || String(imageUri).includes('default-avatar') || hasError;
 
   if (isDefaultOrMissing) {
+    if (username === 'super_admin') {
+      return (
+        <Image
+          source={{ uri: 'https://funflick-theta.vercel.app/brand/funflick-logo.png' }}
+          style={[styles.avatarCircle, { width: size, height: size, borderRadius: size / 2, backgroundColor: '#18122c' }]}
+          resizeMode="cover"
+        />
+      );
+    }
     const colorsList = ['#059669', '#0284c7', '#7c3aed', '#db2777', '#d97706', '#16a34a'];
     const charCode = (name || username || 'A').charCodeAt(0);
     const bgColor = colorsList[charCode % colorsList.length];
@@ -60,8 +83,9 @@ function CreatorAvatarCircle({ avatar, name, username, size = 64 }) {
 
   return (
     <Image
-      source={{ uri: avatar }}
-      style={[styles.avatarCircle, { width: size, height: size, borderRadius: size / 2 }]}
+      source={{ uri: imageUri }}
+      style={[styles.avatarCircle, { width: size, height: size, borderRadius: size / 2, backgroundColor: '#18122c' }]}
+      resizeMode="cover"
       onError={() => setHasError(true)}
     />
   );

@@ -497,7 +497,7 @@ export const DiscoverScreen = () => {
                       <img
                         src={creatorAvatar}
                         alt={creator.name || creator.username}
-                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/brand/default-avatar.svg'; }}
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = creator.username === 'super_admin' ? '/brand/funflick-logo.png' : '/brand/default-avatar.svg'; }}
                         className="w-full h-full rounded-full object-cover border border-[#18122c]"
                       />
                     </div>
