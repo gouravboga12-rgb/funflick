@@ -219,6 +219,10 @@ export async function updatePushToken(req, res) {
       return res.status(400).json({ error: 'Valid pushToken is required' });
     }
 
+    try {
+      await pool.query('ALTER TABLE users ADD COLUMN push_token VARCHAR(255) DEFAULT NULL');
+    } catch (e) {}
+
     await pool.query('UPDATE users SET push_token = ? WHERE id = ?', [pushToken, userId]);
     return res.json({ success: true, message: 'Push token updated successfully' });
   } catch (err) {

@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from '../screens/auth/SplashScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import AuthCallbackScreen from '../screens/auth/AuthCallbackScreen';
 import BottomTabNavigator from './BottomTabNavigator';
 import { UploadReelScreen } from '../screens/create/UploadReelScreen';
@@ -14,6 +15,7 @@ import { VideoDetailScreen } from '../screens/media/VideoDetailScreen';
 import StoryViewerScreen from '../screens/feed/StoryViewerScreen';
 import { SubscriptionScreen } from '../screens/subscription/SubscriptionScreen';
 import { WalletScreen } from '../screens/wallet/WalletScreen';
+import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
 import { colors } from '../theme/colors';
 
 import * as Linking from 'expo-linking';
@@ -48,6 +50,7 @@ const linking = {
         },
       },
       Login: 'login',
+      ForgotPassword: 'forgot-password',
       SignUp: 'signup',
       AuthCallback: 'auth/callback',
     },
@@ -71,6 +74,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Login"
           component={LoginScreen}
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="ForgotPassword"
+          component={ForgotPasswordScreen}
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
@@ -108,6 +116,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Wallet"
           component={WalletScreen}
+        />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ presentation: 'card', animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="StoryViewer"

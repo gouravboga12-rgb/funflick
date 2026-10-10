@@ -65,16 +65,29 @@ export const InboxScreen = ({ navigation, route }) => {
     return () => clearInterval(interval);
   }, [fetchLiveConversations]);
 
-  // Handle route param to open direct chat with username
+  // Reset active conversation when user switches to Inbox tab from another tab
   useEffect(() => {
-    if (route?.params?.user) {
-      const convId = openOrCreateConversation(route.params.user);
+    const unsubscribe = navigation?.addListener?.('focus', () => {
+      if (!route?.params?.user && !route?.params?.targetUser) {
+        setActiveConvId(null);
+      }
+    });
+    return unsubscribe;
+  }, [navigation, route?.params]);
+
+  // Handle route param to open direct chat with target user
+  useEffect(() => {
+    const target = route?.params?.targetUser || route?.params?.user;
+    if (target) {
+      const convId = openOrCreateConversation(target);
       if (convId) {
         setActiveConvId(convId);
-        fetchConversationMessages(route.params.user);
+        const partner = target.username || target;
+        fetchConversationMessages(partner);
       }
+      navigation?.setParams?.({ user: null, targetUser: null });
     }
-  }, [route?.params?.user, openOrCreateConversation, fetchConversationMessages]);
+  }, [route?.params, openOrCreateConversation, fetchConversationMessages, navigation]);
 
   // Load message history when entering active conversation
   useEffect(() => {
@@ -250,11 +263,12 @@ export const InboxScreen = ({ navigation, route }) => {
 
   const handleUnsendMessage = (item) => {
     const isMe = item.sender === 'me';
-    const title = isMe ? 'Unsend Message?' : 'Delete Message?';
-    const message = isMe
-      ? 'Unsending will remove the message for everyone in this chat. People may have already seen it.'
-      : 'Deleting will remove this message from your chat history.';
-    const actionText = isMe ? 'Unsend' : 'Delete';
+    // Strictly restrict delete option: users can ONLY delete/unsend messages they sent themselves!
+    if (!isMe) return;
+
+    const title = 'Unsend Message?';
+    const message = 'Unsending will remove this message from the conversation.';
+    const actionText = 'Unsend';
 
     if (Platform.OS === 'web') {
       const confirmed = typeof window !== 'undefined' && window.confirm
@@ -285,7 +299,7 @@ export const InboxScreen = ({ navigation, route }) => {
   // Render Active Chat View
   if (activeConv) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         {/* Chat Top Header */}
         <View style={styles.chatHeader}>
           <TouchableOpacity
@@ -375,13 +389,15 @@ export const InboxScreen = ({ navigation, route }) => {
                   <View style={styles.msgMetaRow}>
                     <Text style={styles.msgTime}>{item.time || 'Just now'}</Text>
                     {isMe && <CheckCheck size={12} color="#ff007a" style={{ marginLeft: 3 }} />}
-                    <TouchableOpacity
-                      onPress={() => handleUnsendMessage(item)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={{ marginLeft: 6, opacity: 0.7 }}
-                    >
-                      <Trash2 size={11} color="#f43f5e" />
-                    </TouchableOpacity>
+                    {isMe && (
+                      <TouchableOpacity
+                        onPress={() => handleUnsendMessage(item)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{ marginLeft: 6, opacity: 0.7 }}
+                      >
+                        <Trash2 size={11} color="#f43f5e" />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
@@ -1029,9 +1045,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 22,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
     color: '#ffffff',
     fontSize: 14,
+    minHeight: 40,
   },
   sendBtn: {
     width: 40,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { Search, Bell, MessageSquare } from 'lucide-react-native';
 import { colors } from '../../theme/colors';
 
@@ -29,8 +29,13 @@ export const Header = ({
       {/* Vertical Divider */}
       <View style={styles.divider} />
 
-      {/* Center: Inline Tabs (For You | Trending | Latest) */}
-      <View style={styles.tabsWrap}>
+      {/* Center: Scrollable Inline Tabs (For You | Trending | Latest) */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabsScrollView}
+        contentContainerStyle={styles.tabsScrollContent}
+      >
         {tabs.map((tab) => {
           const isActive = activeTab === tab;
           return (
@@ -47,7 +52,7 @@ export const Header = ({
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
 
       {/* Right Actions: Search, Bell, Inbox */}
       <View style={styles.actions}>
@@ -103,11 +108,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
     marginHorizontal: 10,
   },
-  tabsWrap: {
+  tabsScrollView: {
     flex: 1,
+    marginHorizontal: 4,
+  },
+  tabsScrollContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    paddingRight: 6,
   },
   tabBtn: {
     paddingVertical: 6,

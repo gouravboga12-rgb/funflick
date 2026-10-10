@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { apiRequest, getToken, setToken, getStoredUser, setStoredUser } from '../services/api';
-import { registerForPushNotificationsAsync } from '../services/pushService';
+import { registerForPushNotificationsAsync, scheduleLocalNotification } from '../services/pushService';
 import * as Notifications from 'expo-notifications';
 
 const AppContext = createContext();
@@ -265,23 +265,85 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
   };
 
+  // Following graph state
+  const [followingUsernames, setFollowingUsernames] = useState(new Set());
+
+  const fetchMyFollowing = useCallback(async () => {
+    if (!currentUser?.username) return;
+    try {
+      const data = await apiRequest(`/follows/${currentUser.username}/following`);
+      if (data && Array.isArray(data.following)) {
+        const set = new Set(data.following.map(u => (u.username || '').toLowerCase()));
+        setFollowingUsernames(set);
+      }
+    } catch (e) {}
+  }, [currentUser?.username]);
+
+  useEffect(() => {
+    fetchMyFollowing();
+  }, [fetchMyFollowing]);
+
   // Toggle follow
-  const toggleFollowCreator = async (username) => {
+  const toggleFollowCreator = useCallback(async (username) => {
+    if (!username) return;
+    const cleanUser = username.toLowerCase();
+
+    let willFollow = false;
+    setFollowingUsernames(prev => {
+      const next = new Set(prev);
+      if (next.has(cleanUser)) {
+        next.delete(cleanUser);
+        willFollow = false;
+      } else {
+        next.add(cleanUser);
+        willFollow = true;
+      }
+      return next;
+    });
+
     setPosts(prev =>
       prev.map(p => {
-        if (p.creator?.username === username) {
-          return { ...p, isFollowing: !p.isFollowing };
+        if (p.creator?.username?.toLowerCase() === cleanUser) {
+          return { ...p, isFollowing: willFollow };
         }
         return p;
       })
     );
 
     try {
-      await apiRequest(`/follows/${username}/toggle`, { method: 'POST' });
+      const endpoint = willFollow ? `/follows/${username}/follow` : `/follows/${username}/unfollow`;
+      const res = await apiRequest(endpoint, { method: 'POST' });
+      if (res && typeof res.following === 'boolean') {
+        setFollowingUsernames(prev => {
+          const next = new Set(prev);
+          if (res.following) {
+            next.add(cleanUser);
+          } else {
+            next.delete(cleanUser);
+          }
+          return next;
+        });
+      }
     } catch (e) {
-      console.warn('Toggle follow error:', e);
+      // Fallback: try /toggle if available
+      try {
+        const res2 = await apiRequest(`/follows/${username}/toggle`, { method: 'POST' });
+        if (res2 && typeof res2.following === 'boolean') {
+          setFollowingUsernames(prev => {
+            const next = new Set(prev);
+            if (res2.following) {
+              next.add(cleanUser);
+            } else {
+              next.delete(cleanUser);
+            }
+            return next;
+          });
+        }
+      } catch (err2) {
+        console.warn('Toggle follow error:', err2);
+      }
     }
-  };
+  }, []);
 
   // Conversations State
   const [conversations, setConversations] = useState([]);
@@ -550,11 +612,31 @@ export const AppProvider = ({ children }) => {
   // Notifications State
   const [notifications, setNotifications] = useState([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const seenNotificationIdsRef = useRef(new Set());
+  const isInitialNotificationFetchRef = useRef(true);
 
   const fetchNotifications = useCallback(async () => {
     try {
       const data = await apiRequest('/notifications');
       if (data && Array.isArray(data.notifications)) {
+        // Trigger banner alert for any new incoming unread notification
+        if (!isInitialNotificationFetchRef.current) {
+          for (const n of data.notifications) {
+            if (!n.is_read && !seenNotificationIdsRef.current.has(n.id)) {
+              scheduleLocalNotification({
+                title: n.title || 'FunFlick Activity',
+                body: n.message || 'You have a new notification',
+                data: n,
+              });
+              break;
+            }
+          }
+        }
+
+        const ids = new Set(data.notifications.map(n => n.id));
+        seenNotificationIdsRef.current = ids;
+        isInitialNotificationFetchRef.current = false;
+
         setNotifications(data.notifications);
         setUnreadNotificationCount(data.notifications.filter(n => !n.is_read).length);
       }
@@ -569,11 +651,22 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
   }, []);
 
-  // Sync ads & notifications on auth or launch
+  const clearAllNotifications = useCallback(async () => {
+    setNotifications([]);
+    setUnreadNotificationCount(0);
+    try {
+      await apiRequest('/notifications/clear-all', { method: 'POST' });
+    } catch (e) {}
+  }, []);
+
+  // Sync ads & notifications on auth or launch + periodic polling
   useEffect(() => {
     fetchAds();
     if (isAuthenticated) {
       fetchNotifications();
+      registerForPushNotificationsAsync();
+      const interval = setInterval(fetchNotifications, 8000);
+      return () => clearInterval(interval);
     }
   }, [isAuthenticated, fetchAds, fetchNotifications]);
 
@@ -651,6 +744,8 @@ export const AppProvider = ({ children }) => {
         toggleLikePost,
         recordPostView,
         toggleFollowCreator,
+        followingUsernames,
+        fetchMyFollowing,
         blockedUsers,
         conversations,
         fetchLiveConversations,
@@ -670,6 +765,7 @@ export const AppProvider = ({ children }) => {
         unreadNotificationCount,
         fetchNotifications,
         markAllNotificationsRead,
+        clearAllNotifications,
       }}
     >
       {children}

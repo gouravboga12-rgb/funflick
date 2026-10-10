@@ -130,7 +130,8 @@ export async function initDatabase() {
       { name: 'status', def: "ENUM('Active', 'Suspended') DEFAULT 'Active'" },
       { name: 'suspended_at', def: 'TIMESTAMP NULL DEFAULT NULL' },
       { name: 'suspended_until', def: 'TIMESTAMP NULL DEFAULT NULL' },
-      { name: 'suspension_reason', def: 'VARCHAR(255) DEFAULT NULL' }
+      { name: 'suspension_reason', def: 'VARCHAR(255) DEFAULT NULL' },
+      { name: 'push_token', def: 'VARCHAR(255) DEFAULT NULL' }
     ];
     for (const col of userCols) {
       try {

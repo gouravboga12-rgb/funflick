@@ -67,6 +67,78 @@ export async function followUser(req, res) {
   }
 }
 
+export async function toggleFollowUser(req, res) {
+  try {
+    const targetUsername = req.params.username;
+    const currentUserId = req.user.id;
+
+    const [targetRows] = await pool.query(
+      'SELECT id, name, username, role FROM users WHERE username = ? OR id = ?',
+      [targetUsername, targetUsername]
+    );
+
+    if (targetRows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const targetUser = targetRows[0];
+
+    if (targetUser.role === 'moderator' || targetUser.role === 'admin' || targetUser.username === 'super_admin' || targetUser.username?.toLowerCase().startsWith('moderator')) {
+      return res.status(400).json({ error: 'Staff moderator accounts cannot be followed' });
+    }
+
+    if (targetUser.id === currentUserId) {
+      return res.status(400).json({ error: 'You cannot follow yourself' });
+    }
+
+    const [existing] = await pool.query(
+      'SELECT id FROM follows WHERE follower_id = ? AND following_id = ?',
+      [currentUserId, targetUser.id]
+    );
+
+    if (existing.length > 0) {
+      await pool.query(
+        'DELETE FROM follows WHERE follower_id = ? AND following_id = ?',
+        [currentUserId, targetUser.id]
+      );
+      return res.json({ success: true, following: false, message: `Unfollowed @${targetUser.username}` });
+    } else {
+      await pool.query(
+        'INSERT IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)',
+        [currentUserId, targetUser.id]
+      );
+      try {
+        const [existingNotif] = await pool.query(
+          'SELECT id FROM notifications WHERE user_id = ? AND actor_id = ? AND type = "follow" LIMIT 1',
+          [targetUser.id, currentUserId]
+        );
+        if (existingNotif.length > 0) {
+          await pool.query(
+            'UPDATE notifications SET created_at = CURRENT_TIMESTAMP, is_read = 0 WHERE id = ?',
+            [existingNotif[0].id]
+          );
+        } else {
+          await pool.query(
+            `INSERT INTO notifications (user_id, actor_id, type, title, message)
+             VALUES (?, ?, 'follow', 'New Follower', 'started following you.')`,
+            [targetUser.id, currentUserId]
+          );
+        }
+        sendPushNotification(targetUser.id, {
+          title: '👤 New Follower on FunFlick',
+          body: `@${req.user?.username || 'Someone'} started following you.`,
+          data: { type: 'follow', followerId: currentUserId, username: req.user?.username }
+        });
+      } catch (e) {}
+
+      return res.json({ success: true, following: true, message: `Now following @${targetUser.username}` });
+    }
+  } catch (err) {
+    console.error('Toggle follow user error:', err);
+    return res.status(500).json({ error: 'Failed to toggle follow user' });
+  }
+}
+
 export async function unfollowUser(req, res) {
   try {
     const targetUsername = req.params.username;

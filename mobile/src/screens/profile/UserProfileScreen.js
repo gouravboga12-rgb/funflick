@@ -328,6 +328,61 @@ export const UserProfileScreen = ({ navigation, route }) => {
     }
   };
 
+  // Save settings (Email, phone, and preferences)
+  const handleSaveContactSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      const updated = await apiRequest('/auth/profile/contact', {
+        method: 'PUT',
+        body: JSON.stringify({
+          email: (settingsEmail || currentUser?.email || '').trim(),
+          phone: (settingsPhone || currentUser?.phone || '').trim(),
+        }),
+      });
+
+      if (updated && updated.user) {
+        setCurrentUser(updated.user);
+        await setStoredUser(updated.user);
+      } else {
+        const nextUser = {
+          ...currentUser,
+          email: (settingsEmail || currentUser?.email || '').trim(),
+          phone: (settingsPhone || currentUser?.phone || '').trim(),
+        };
+        setCurrentUser(nextUser);
+        await setStoredUser(nextUser);
+      }
+
+      setIsSettingsModalOpen(false);
+      showAppAlert('Settings Saved', 'Your account settings and preferences have been updated!');
+    } catch (e) {
+      // Fallback: try /auth/profile
+      try {
+        const res = await apiRequest('/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: currentUser?.name || '',
+            username: currentUser?.username || '',
+            bio: currentUser?.bio || '',
+            avatar_url: currentUser?.avatar_url || currentUser?.avatar || '',
+            email: (settingsEmail || currentUser?.email || '').trim(),
+            phone: (settingsPhone || currentUser?.phone || '').trim(),
+          }),
+        });
+        if (res && res.user) {
+          setCurrentUser(res.user);
+          await setStoredUser(res.user);
+        }
+        setIsSettingsModalOpen(false);
+        showAppAlert('Settings Saved', 'Your account settings have been updated successfully!');
+      } catch (err2) {
+        showAppAlert('Update Failed', err2.message || 'Could not save settings.');
+      }
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
   // Permanent account deletion
   const handleDeleteAccount = () => {
     showAppConfirm(
@@ -1897,66 +1952,27 @@ export const UserProfileScreen = ({ navigation, route }) => {
                 </TouchableOpacity>
               </View>
 
-              {/* SECTION 3: Change Theme (Dark / Light) */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 8 }}>
-                <Text style={[styles.settingsSectionTitle, { marginTop: 0, marginBottom: 0 }]}>CHANGE THEME</Text>
-                <View style={[styles.themePill, { backgroundColor: themeMode === 'dark' ? 'rgba(244,114,182,0.15)' : 'rgba(245,158,11,0.15)' }]}>
-                  <Text style={[styles.themePillText, { color: themeMode === 'dark' ? '#f472b6' : '#fbbf24' }]}>
-                    {themeMode === 'dark' ? '🌙 Dark Mode Active' : '☀️ Light Mode Active'}
-                  </Text>
+              {/* SECTION 3: Appearance & Theme */}
+              <Text style={styles.settingsSectionTitle}>APPEARANCE & THEME</Text>
+              <View style={styles.settingsSectionCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <LinearGradient
+                      colors={['#7928ca', '#ff007a']}
+                      style={styles.themeIconBox}
+                    >
+                      <Moon size={18} color="#ffffff" />
+                    </LinearGradient>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.settingsRowLabel}>Dark Mode (Default)</Text>
+                      <Text style={styles.settingsRowSub}>Cinematic dark appearance for feed and reels</Text>
+                    </View>
+                  </View>
+                  <View style={styles.themeActiveBadge}>
+                    <Check size={10} color="#ff007a" strokeWidth={3} />
+                    <Text style={styles.themeActiveBadgeText}>Active</Text>
+                  </View>
                 </View>
-              </View>
-
-              <View style={styles.themeCardsGrid}>
-                {/* Dark Mode Card */}
-                <TouchableOpacity
-                  style={[
-                    styles.themeCard,
-                    themeMode === 'dark' && styles.themeCardActive,
-                  ]}
-                  activeOpacity={0.8}
-                  onPress={() => setThemeMode('dark')}
-                >
-                  <LinearGradient
-                    colors={themeMode === 'dark' ? ['#7928ca', '#ff007a'] : ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
-                    style={styles.themeIconBox}
-                  >
-                    <Moon size={18} color="#ffffff" />
-                  </LinearGradient>
-                  <Text style={styles.themeCardTitle}>Dark Mode</Text>
-                  <Text style={styles.themeCardSub}>Cinematic & Deep</Text>
-                  {themeMode === 'dark' && (
-                    <View style={styles.themeActiveBadge}>
-                      <Check size={10} color="#ff007a" strokeWidth={3} />
-                      <Text style={styles.themeActiveBadgeText}>Active</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {/* Light Mode Card */}
-                <TouchableOpacity
-                  style={[
-                    styles.themeCard,
-                    themeMode === 'light' && styles.themeCardActive,
-                  ]}
-                  activeOpacity={0.8}
-                  onPress={() => setThemeMode('light')}
-                >
-                  <LinearGradient
-                    colors={themeMode === 'light' ? ['#f59e0b', '#ec4899'] : ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
-                    style={styles.themeIconBox}
-                  >
-                    <Sun size={18} color="#ffffff" />
-                  </LinearGradient>
-                  <Text style={styles.themeCardTitle}>Light Mode</Text>
-                  <Text style={styles.themeCardSub}>Clean & Vibrant</Text>
-                  {themeMode === 'light' && (
-                    <View style={styles.themeActiveBadge}>
-                      <Check size={10} color="#ff007a" strokeWidth={3} />
-                      <Text style={styles.themeActiveBadgeText}>Active</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
               </View>
 
               {/* SECTION 4: Privacy & Safety */}

@@ -92,11 +92,37 @@ function CreatorAvatarCircle({ avatar, name, username, size = 64 }) {
 }
 
 export const DiscoverScreen = ({ navigation }) => {
-  const { currentUser, posts, toggleFollowCreator } = useApp();
+  const { currentUser, posts, toggleFollowCreator, followingUsernames } = useApp();
   const { width: windowWidth } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState('');
   const [liveCreators, setLiveCreators] = useState([]);
   const [isLoadingCreators, setIsLoadingCreators] = useState(false);
+
+  // Optimistic follow toggle with live counter update
+  const handleFollowPress = (creator) => {
+    if (!creator?.username) return;
+    const cleanUser = creator.username.toLowerCase();
+    const currentlyFollowing = Boolean(
+      (followingUsernames && followingUsernames.has(cleanUser)) ||
+      creator.isFollowing
+    );
+
+    toggleFollowCreator(creator.username);
+
+    setLiveCreators(prev =>
+      prev.map(c => {
+        if (c.username?.toLowerCase() === cleanUser) {
+          const currentCount = Number(c.followersCount || c.stats?.followers || 0);
+          return {
+            ...c,
+            isFollowing: !currentlyFollowing,
+            followersCount: currentlyFollowing ? Math.max(0, currentCount - 1) : currentCount + 1,
+          };
+        }
+        return c;
+      })
+    );
+  };
 
   // Fetch real creators from AWS EC2 backend
   useEffect(() => {
@@ -396,7 +422,11 @@ export const DiscoverScreen = ({ navigation }) => {
             >
               {liveCreators.map(creator => {
                 const isSelf = creator.username === currentUser?.username;
-                const isFollowing = Boolean(creator.isFollowing);
+                const cleanCreatorUser = (creator.username || '').toLowerCase();
+                const isFollowing = Boolean(
+                  (followingUsernames && followingUsernames.has(cleanCreatorUser)) ||
+                  creator.isFollowing
+                );
 
                 return (
                   <View key={creator.id || creator.username} style={styles.creatorCard}>
@@ -452,7 +482,7 @@ export const DiscoverScreen = ({ navigation }) => {
                         <>
                           <TouchableOpacity
                             style={styles.followBtnWrap}
-                            onPress={() => toggleFollowCreator(creator.username)}
+                            onPress={() => handleFollowPress(creator)}
                             activeOpacity={0.8}
                           >
                             <LinearGradient

@@ -4,14 +4,14 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, Play, Music, Plus, Eye, Check } from 'lucide-react-native';
 import { useIsFocused } from '@react-navigation/native';
+import { CommentsModal } from './CommentsModal';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Standard Instagram Feed 4:5 aspect ratio constrained to standard mobile viewport
-// Height is capped at 65% of screen height so card fits completely on screen without 3 scrolls
-const CARD_HEIGHT = Math.min(Math.round(SCREEN_WIDTH * 1.25), Math.round(SCREEN_HEIGHT * 0.65));
+// Dynamic Reel Height: fills viewport like Instagram Reels without gaps
+const CARD_HEIGHT = Math.max(Math.round(SCREEN_WIDTH * (16 / 9)), Math.round(SCREEN_HEIGHT * 0.76));
 
 function formatCount(num) {
   if (!num) return '0';
@@ -27,6 +27,8 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const isFocused = useIsFocused();
   const { toggleLikePost, recordPostView, toggleFollowCreator, isReelsMuted, toggleMute, currentUser } = useApp();
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(Number(post.commentsCount) || 0);
   const [lastTap, setLastTap] = useState(0);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -281,10 +283,10 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
           <TouchableOpacity
             style={styles.actionBtn}
             activeOpacity={0.7}
-            onPress={() => navigation?.navigate('VideoDetail', { videoId: post.id })}
+            onPress={() => setIsCommentsOpen(true)}
           >
             <MessageCircle size={25} color="#fff" strokeWidth={2} />
-            <Text style={styles.actionCount}>{formatCount(post.commentsCount)}</Text>
+            <Text style={styles.actionCount}>{formatCount(commentsCount)}</Text>
           </TouchableOpacity>
 
           {/* Share */}
@@ -314,6 +316,14 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
           </View>
         </View>
       </TouchableOpacity>
+
+      {/* Instagram-style Comments Bottom Sheet */}
+      <CommentsModal
+        visible={isCommentsOpen}
+        onClose={() => setIsCommentsOpen(false)}
+        videoId={post.id}
+        onCommentAdded={() => setCommentsCount((c) => c + 1)}
+      />
     </View>
   );
 };

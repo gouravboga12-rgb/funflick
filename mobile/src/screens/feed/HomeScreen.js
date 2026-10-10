@@ -76,7 +76,7 @@ export const HomeScreen = ({ navigation }) => {
         unreadCount={unreadNotificationCount}
         onTabChange={setActiveTab}
         onSearchPress={() => navigation.navigate('Discover')}
-        onNotificationsPress={() => setIsNotifModalOpen(true)}
+        onNotificationsPress={() => navigation.navigate('Notifications')}
         onMessagesPress={() => navigation.navigate('Inbox')}
       />
 
@@ -124,70 +124,7 @@ export const HomeScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* In-App Notifications Modal */}
-      <Modal
-        visible={isNotifModalOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setIsNotifModalOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={styles.bellIconCircle}>
-                  <Bell size={18} color="#ffffff" />
-                </View>
-                <View>
-                  <Text style={styles.modalTitle}>Notifications</Text>
-                  <Text style={styles.modalSub}>Recent activity & updates</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => setIsNotifModalOpen(false)} style={styles.modalCloseBtn}>
-                <X size={18} color="#cbd5e1" />
-              </TouchableOpacity>
-            </View>
 
-            <View style={styles.notifContent}>
-              {notifications && notifications.length > 0 ? (
-                notifications.slice(0, 10).map((n) => (
-                  <View key={n.id} style={styles.notifItem}>
-                    <View style={[styles.notifDot, n.is_read ? { backgroundColor: '#64748b' } : {}]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.notifItemTitle}>{n.title || 'FunFlick Activity'}</Text>
-                      <Text style={styles.notifItemText}>{n.message || ''}</Text>
-                      <Text style={styles.notifItemTime}>
-                        {n.created_at ? new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'}
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <View style={styles.notifItem}>
-                  <View style={styles.notifDot} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.notifItemTitle}>Welcome to FunFlick! 🎉</Text>
-                    <Text style={styles.notifItemText}>
-                      Explore trending reels, comedy sketches, and connect with creators.
-                    </Text>
-                    <Text style={styles.notifItemTime}>Today</Text>
-                  </View>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={styles.doneBtn}
-                onPress={() => {
-                  setIsNotifModalOpen(false);
-                  if (markAllNotificationsRead) markAllNotificationsRead();
-                }}
-              >
-                <Text style={styles.doneBtnText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Global In-App Pop-up Ad for Unpaid Users */}
       <MobileAdPopup />

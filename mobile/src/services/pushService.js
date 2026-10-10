@@ -29,11 +29,6 @@ function initNotificationHandlerSafe() {
 export async function registerForPushNotificationsAsync() {
   initNotificationHandlerSafe();
 
-  if (!Device.isDevice) {
-    console.log('Push notifications require a physical device');
-    return null;
-  }
-
   try {
     const isGranted = await ensureNotificationsPermission();
     if (!isGranted) {
@@ -57,7 +52,8 @@ export async function registerForPushNotificationsAsync() {
 
     const projectId =
       Constants?.expoConfig?.extra?.eas?.projectId ||
-      Constants?.easConfig?.projectId;
+      Constants?.easConfig?.projectId ||
+      'e7907d3d-a083-4787-bc7d-4dd0302f8516';
 
     const tokenResponse = await Notifications.getExpoPushTokenAsync({
       projectId,
@@ -81,5 +77,26 @@ export async function registerForPushNotificationsAsync() {
   } catch (error) {
     console.warn('Push notification setup gracefully handled:', error?.message);
     return null;
+  }
+}
+
+/**
+ * Trigger an immediate local push notification banner
+ */
+export async function scheduleLocalNotification({ title, body, data = {} }) {
+  initNotificationHandlerSafe();
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: title || 'FunFlick',
+        body: body || '',
+        data: data,
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.MAX,
+      },
+      trigger: null,
+    });
+  } catch (e) {
+    console.warn('Local notification error:', e?.message);
   }
 }
