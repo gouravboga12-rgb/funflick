@@ -287,16 +287,16 @@ export const DiscoverScreen = ({ navigation }) => {
               <Text style={styles.emptyVideosSub}>Try another keyword or hashtag.</Text>
             </View>
           ) : (
-            <View style={[styles.trendingGrid, displayedTrendingVideos.length === 1 && { flexDirection: 'column' }]}>
+            <View style={styles.trendingGrid}>
               {displayedTrendingVideos.map((video, idx) => {
-                const isSingle = displayedTrendingVideos.length === 1;
-                const dynamicCardWidth = isSingle ? '100%' : Math.max(140, Math.floor((windowWidth - 42) / 2));
+                const dynamicCardWidth = Math.min(240, Math.max(150, Math.floor((windowWidth - 42) / 2)));
+                const dynamicCardHeight = Math.floor(dynamicCardWidth * 1.45);
                 return (
                   <TouchableOpacity
                     key={video.id}
                     style={[
                       styles.gridVideoCard,
-                      { width: dynamicCardWidth, height: isSingle ? 210 : 200 }
+                      { width: dynamicCardWidth, height: dynamicCardHeight }
                     ]}
                     activeOpacity={0.85}
                     onPress={() => navigation.navigate('VideoDetail', { videoId: video.id })}
@@ -308,7 +308,7 @@ export const DiscoverScreen = ({ navigation }) => {
                     />
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.92)']}
-                      style={[styles.gridVideoGradient, isSingle && { height: 90 }]}
+                      style={styles.gridVideoGradient}
                     />
                     <View style={styles.rankBadge}>
                       <Text style={styles.rankBadgeText}>#{idx + 1}</Text>
@@ -317,18 +317,16 @@ export const DiscoverScreen = ({ navigation }) => {
                       <Eye size={10} color="#f472b6" />
                       <Text style={styles.viewsBadgeText}>{video.viewsCount || '0'}</Text>
                     </View>
-                    {isSingle && (
-                      <View style={styles.singlePlayOverlay} pointerEvents="none">
-                        <View style={styles.singlePlayCircle}>
-                          <Play size={18} color="#ffffff" fill="#ffffff" />
-                        </View>
+                    <View style={styles.singlePlayOverlay} pointerEvents="none">
+                      <View style={styles.singlePlayCircle}>
+                        <Play size={16} color="#ffffff" fill="#ffffff" />
                       </View>
-                    )}
+                    </View>
                     <View style={styles.gridVideoMeta}>
-                      <Text style={[styles.gridVideoTitle, isSingle && { fontSize: 13, fontWeight: '800' }]} numberOfLines={1}>
+                      <Text style={styles.gridVideoTitle} numberOfLines={1}>
                         {video.title}
                       </Text>
-                      <Text style={[styles.gridVideoAuthor, isSingle && { fontSize: 11, fontWeight: '700' }]} numberOfLines={1}>
+                      <Text style={styles.gridVideoAuthor} numberOfLines={1}>
                         @{video.creator?.username || 'user'}
                       </Text>
                     </View>
