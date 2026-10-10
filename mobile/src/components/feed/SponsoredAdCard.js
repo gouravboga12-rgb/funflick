@@ -16,7 +16,7 @@ import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_HEIGHT = Math.min(Math.round(SCREEN_WIDTH * 1.25), Math.round(SCREEN_HEIGHT * 0.65));
+
 
 export const SponsoredAdCard = ({ ad, isActive = false }) => {
   const isFocused = useIsFocused();
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   },
   mediaWrapper: {
     width: '100%',
-    height: CARD_HEIGHT,
+    aspectRatio: 9 / 16,
     position: 'relative',
   },
   muteBtn: {

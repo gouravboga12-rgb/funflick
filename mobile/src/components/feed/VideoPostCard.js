@@ -10,8 +10,7 @@ import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Dynamic Reel Height: fills viewport like Instagram Reels without gaps
-const CARD_HEIGHT = Math.max(Math.round(SCREEN_WIDTH * (16 / 9)), Math.round(SCREEN_HEIGHT * 0.76));
+
 
 function formatCount(num) {
   if (!num) return '0';
@@ -349,10 +348,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
+    width: '100%',
+    aspectRatio: 9 / 16,
   },
   playerContainer: {
     width: '100%',
-    height: CARD_HEIGHT,
+    height: '100%',
     backgroundColor: '#000000',
     position: 'relative',
     justifyContent: 'center',

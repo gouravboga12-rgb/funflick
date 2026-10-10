@@ -284,7 +284,7 @@ export const VideoPostCard = ({ post, isReel = true }) => {
   if (!post) return null;
 
   return (
-    <article ref={cardRef} className="relative w-full aspect-[4/5] sm:aspect-[9/16] max-h-[calc(100dvh-130px)] sm:max-h-[720px] bg-black overflow-hidden select-none border-b border-white/10 sm:rounded-3xl sm:mb-4 sm:border sm:border-white/10 shadow-2xl">
+    <article ref={cardRef} className="relative w-full aspect-[9/16] bg-black overflow-hidden select-none border-b border-white/10 sm:rounded-3xl sm:mb-4 sm:border sm:border-white/10 shadow-2xl">
       {/* Video / Media Player */}
       <div 
         className="absolute inset-0 z-0 cursor-pointer flex items-center justify-center bg-black"
