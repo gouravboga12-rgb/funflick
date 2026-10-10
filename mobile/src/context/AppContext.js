@@ -505,8 +505,10 @@ export const AppProvider = ({ children }) => {
 
   const isPaidInfluencer = Boolean(
     currentUser?.isInfluencer ||
+    currentUser?.is_influencer ||
     currentUser?.role === 'influencer' ||
-    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date()) ||
+    (currentUser?.subscription_expires_at && new Date(currentUser.subscription_expires_at) > new Date())
   );
 
   const fetchAds = useCallback(async () => {

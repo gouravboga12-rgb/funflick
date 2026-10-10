@@ -19,11 +19,25 @@ export const HomeScreen = ({ navigation }) => {
     isPaidInfluencer,
     notifications,
     unreadNotificationCount,
-    markAllNotificationsRead
+    markAllNotificationsRead,
+    showMobileAd,
   } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
   const [activeVideoId, setActiveVideoId] = useState(null);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
+  const hasTriggeredPopupRef = useRef(false);
+
+  // Auto trigger popup ad once for unpaid users upon landing on HomeScreen
+  useEffect(() => {
+    if (isPaidInfluencer) return;
+    if (!hasTriggeredPopupRef.current && adsList && adsList.length > 0) {
+      hasTriggeredPopupRef.current = true;
+      const timer = setTimeout(() => {
+        showMobileAd();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isPaidInfluencer, adsList, showMobileAd]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems && viewableItems.length > 0) {
@@ -78,8 +92,9 @@ export const HomeScreen = ({ navigation }) => {
           />
         }
         renderItem={({ item, index }) => {
-          const showAdAfter = (index + 1) % 5 === 0;
-          const adIndex = Math.floor(index / 5) % Math.max(1, (adsList || []).length);
+          // If total reels is 1-3, show sponsored ad immediately under reel 1; otherwise every 4 reels
+          const showAdAfter = (filteredPosts.length <= 3 && index === 0) || ((index + 1) % 4 === 0);
+          const adIndex = Math.floor(index / 4) % Math.max(1, (adsList || []).length);
           const feedAd = !isPaidInfluencer && adsList && adsList.length > 0 && showAdAfter ? adsList[adIndex] : null;
 
           return (

@@ -19,29 +19,9 @@ import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export const MobileAdPopup = () => {
-  const { activePopupAd, dismissMobileAd, recordAdMetric, currentUser } = useApp();
-
-  const isPaidInfluencer = Boolean(
-    currentUser?.isInfluencer ||
-    currentUser?.role === 'influencer' ||
-    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
-  );
-
-  const [muted, setMuted] = useState(false);
-  const [secondsRemaining, setSecondsRemaining] = useState(0);
-  const [canClose, setCanClose] = useState(false);
-
-  const ad = activePopupAd;
-  const isVideo = Boolean(
-    ad && (
-      ad.type === 'video' ||
-      /\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.mediaUrl || '')
-    )
-  );
-
-  // Set up expo-video player for video ads
-  const player = useVideoPlayer(isVideo ? ad?.mediaUrl : null, p => {
+// Dedicated Video Player subcomponent to safely invoke useVideoPlayer only when video is active
+function AdVideoPlayer({ mediaUrl, muted }) {
+  const player = useVideoPlayer(mediaUrl, p => {
     if (!p) return;
     p.loop = true;
     p.muted = muted;
@@ -55,6 +35,41 @@ export const MobileAdPopup = () => {
       } catch (e) {}
     }
   }, [muted, player]);
+
+  if (!player) return null;
+
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFillObject}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
+}
+
+export const MobileAdPopup = () => {
+  const { activePopupAd, dismissMobileAd, recordAdMetric, currentUser } = useApp();
+
+  const isPaidInfluencer = Boolean(
+    currentUser?.isInfluencer ||
+    currentUser?.is_influencer ||
+    currentUser?.role === 'influencer' ||
+    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date()) ||
+    (currentUser?.subscription_expires_at && new Date(currentUser.subscription_expires_at) > new Date())
+  );
+
+  const [muted, setMuted] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState(0);
+  const [canClose, setCanClose] = useState(false);
+
+  const ad = activePopupAd;
+  const isVideo = Boolean(
+    ad && (
+      ad.type === 'video' ||
+      /\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.mediaUrl || '')
+    )
+  );
 
   // Countdown timer before close is permitted
   useEffect(() => {
@@ -100,11 +115,6 @@ export const MobileAdPopup = () => {
 
   const handleClose = () => {
     if (!canClose) return;
-    if (player) {
-      try {
-        player.pause();
-      } catch (e) {}
-    }
     dismissMobileAd();
   };
 
@@ -159,13 +169,8 @@ export const MobileAdPopup = () => {
 
           {/* Ad Media Display */}
           <View style={styles.mediaContainer}>
-            {isVideo && player ? (
-              <VideoView
-                player={player}
-                style={StyleSheet.absoluteFillObject}
-                contentFit="cover"
-                nativeControls={false}
-              />
+            {isVideo ? (
+              <AdVideoPlayer key={ad.id} mediaUrl={ad.mediaUrl} muted={muted} />
             ) : (
               <Image
                 source={{ uri: ad.mediaUrl || ad.thumbnailUrl }}

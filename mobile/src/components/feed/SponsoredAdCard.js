@@ -36,7 +36,7 @@ export const SponsoredAdCard = ({ ad, isActive = false }) => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
-    if (isActive && isFocused) {
+    if (isFocused) {
       p.play();
     }
   });
@@ -44,13 +44,13 @@ export const SponsoredAdCard = ({ ad, isActive = false }) => {
   useEffect(() => {
     if (!player) return;
     try {
-      if (isActive && isFocused) {
+      if (isFocused) {
         player.play();
       } else {
         player.pause();
       }
     } catch (e) {}
-  }, [isActive, isFocused, player]);
+  }, [isFocused, player]);
 
   useEffect(() => {
     if (player) {

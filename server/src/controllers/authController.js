@@ -289,6 +289,10 @@ export async function login(req, res) {
           avatar_url: user.avatar_url || '/brand/default-avatar.svg',
           bio: user.bio,
           role: user.role,
+          isInfluencer: Boolean(user.is_influencer),
+          is_influencer: Boolean(user.is_influencer),
+          subscriptionExpiresAt: user.subscription_expires_at,
+          subscription_expires_at: user.subscription_expires_at,
         },
       });
     }
@@ -378,6 +382,10 @@ export async function selectAccountLogin(req, res) {
         avatar_url: user.avatar_url || '/brand/default-avatar.svg',
         bio: user.bio,
         role: user.role,
+        isInfluencer: Boolean(user.is_influencer),
+        is_influencer: Boolean(user.is_influencer),
+        subscriptionExpiresAt: user.subscription_expires_at,
+        subscription_expires_at: user.subscription_expires_at,
       }
     });
   } catch (err) {
@@ -536,7 +544,7 @@ export async function getCurrentUser(req, res) {
     }
 
     const [rows] = await pool.query(
-      'SELECT id, name, username, email, phone, avatar_url, bio, role, created_at FROM users WHERE id = ?',
+      'SELECT id, name, username, email, phone, avatar_url, bio, role, is_influencer, subscription_expires_at, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
 
@@ -548,7 +556,11 @@ export async function getCurrentUser(req, res) {
     const user = {
       ...u,
       avatar: u.avatar_url || '/brand/default-avatar.svg',
-      avatar_url: u.avatar_url || '/brand/default-avatar.svg'
+      avatar_url: u.avatar_url || '/brand/default-avatar.svg',
+      isInfluencer: Boolean(u.is_influencer),
+      is_influencer: Boolean(u.is_influencer),
+      subscriptionExpiresAt: u.subscription_expires_at,
+      subscription_expires_at: u.subscription_expires_at,
     };
 
     return res.json({ user });
