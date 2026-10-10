@@ -13,14 +13,16 @@ import {
   Alert,
   Linking,
   Modal,
+  Keyboard,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Search,
   Send,
   ChevronLeft,
   Paperclip,
+  Smile,
   X,
   MessageCircle,
   CheckCheck,
@@ -46,6 +48,7 @@ export const InboxScreen = ({ navigation, route }) => {
     unsendMessage,
   } = useApp();
 
+  const insets = useSafeAreaInsets();
   const [activeConvId, setActiveConvId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [inputText, setInputText] = useState('');
@@ -55,6 +58,8 @@ export const InboxScreen = ({ navigation, route }) => {
   const [attachedMedia, setAttachedMedia] = useState(null);
   const [viewingMedia, setViewingMedia] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const flatListRef = useRef(null);
 
@@ -127,6 +132,42 @@ export const InboxScreen = ({ navigation, route }) => {
   }, [searchQuery]);
 
   const activeConv = conversations.find(c => c.id === activeConvId);
+
+  // Automatically hide bottom tab bar when inside a direct chat conversation so chat floats cleanly
+  useEffect(() => {
+    const parent = navigation?.getParent?.();
+    if (parent) {
+      if (activeConv) {
+        parent.setOptions({ tabBarStyle: { display: 'none' } });
+      } else {
+        parent.setOptions({ tabBarStyle: undefined });
+      }
+    }
+    return () => {
+      navigation?.getParent?.()?.setOptions({ tabBarStyle: undefined });
+    };
+  }, [activeConv, navigation]);
+
+  // Track keyboard events to position input bar right above soft keyboard
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 120);
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const filteredConvs = conversations.filter(c =>
     c.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -428,33 +469,77 @@ export const InboxScreen = ({ navigation, route }) => {
             </View>
           )}
 
-          {/* Input Bar */}
-          <View style={styles.inputBar}>
-            <TouchableOpacity onPress={handlePickMedia} style={styles.attachBtn}>
-              <Paperclip size={20} color="#9ca3af" />
-            </TouchableOpacity>
+          {/* Quick Emoji Bar (Toggled via Smile button) */}
+          {showEmojiPicker && (
+            <View style={styles.quickEmojiBar}>
+              {['❤️', '😂', '🔥', '👍', '😍', '👏', '🙌', '✨', '💯', '🙏', '😊', '🎉'].map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  style={styles.emojiBtn}
+                  onPress={() => {
+                    setInputText(prev => prev + emoji);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.emojiText}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
-            <TextInput
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="Message..."
-              placeholderTextColor="#6b7280"
-              style={styles.textInput}
-              onSubmitEditing={handleSend}
-            />
+          {/* WhatsApp-Style Input Bar matching Reference image copy 53.png */}
+          <View
+            style={[
+              styles.inputContainer,
+              { paddingBottom: keyboardVisible ? 6 : Math.max(insets.bottom, 10) },
+            ]}
+          >
+            {/* Rounded Pill Container: [Smile] [Message TextInput] [Paperclip] */}
+            <View style={styles.inputPill}>
+              <TouchableOpacity
+                onPress={() => setShowEmojiPicker(prev => !prev)}
+                style={styles.pillIconBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+              >
+                <Smile size={23} color={showEmojiPicker ? '#ff007a' : '#9ca3af'} />
+              </TouchableOpacity>
 
+              <TextInput
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Message..."
+                placeholderTextColor="#6b7280"
+                style={styles.pillInput}
+                multiline
+                maxHeight={110}
+                onFocus={() => setShowEmojiPicker(false)}
+              />
+
+              <TouchableOpacity
+                onPress={handlePickMedia}
+                style={styles.pillIconBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+              >
+                <Paperclip size={22} color="#9ca3af" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Circular Send Action Button */}
             <TouchableOpacity
               onPress={handleSend}
               disabled={(!inputText.trim() && !attachedMedia) || isSending}
+              activeOpacity={0.8}
               style={[
-                styles.sendBtn,
-                (!inputText.trim() && !attachedMedia) && styles.sendBtnDisabled,
+                styles.sendCircle,
+                (!inputText.trim() && !attachedMedia) && styles.sendCircleDisabled,
               ]}
             >
               {isSending ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Send size={18} color="#fff" />
+                <Send size={19} color="#fff" style={{ marginLeft: 2 }} />
               )}
             </TouchableOpacity>
           </View>
@@ -1027,38 +1112,68 @@ const styles = StyleSheet.create({
     color: '#f472b6',
     fontSize: 12,
   },
-  inputBar: {
+  quickEmojiBar: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#0d081f',
+    paddingHorizontal: 8,
+    backgroundColor: '#120b29',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  emojiBtn: {
+    padding: 6,
+  },
+  emojiText: {
+    fontSize: 22,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    backgroundColor: '#090514',
     gap: 8,
   },
-  attachBtn: {
-    padding: 8,
-  },
-  textInput: {
+  inputPill: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-    color: '#ffffff',
-    fontSize: 14,
-    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1b1236',
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 8,
+    minHeight: 48,
   },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#ff007a',
+  pillIconBtn: {
+    padding: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sendBtnDisabled: {
+  pillInput: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 15,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
+    paddingHorizontal: 6,
+    maxHeight: 110,
+  },
+  sendCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ff007a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#ff007a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.45,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  sendCircleDisabled: {
     opacity: 0.4,
   },
   mediaModalOverlay: {

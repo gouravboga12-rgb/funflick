@@ -17,6 +17,7 @@
       }
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "package": "com.funflick.app",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",

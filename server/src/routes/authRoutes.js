@@ -3,6 +3,7 @@ import {
   checkUsername,
   sendRegistrationOtp,
   verifyRegistrationOtp,
+  directRegister,
   login, 
   selectAccountLogin,
   forgotPasswordLookup,
@@ -27,6 +28,7 @@ const router = Router();
 router.get('/check-username', checkUsername);
 router.post('/send-otp', sendRegistrationOtp);
 router.post('/verify-otp', verifyRegistrationOtp);
+router.post('/register', directRegister);
 
 // Login flows (Instagram-style multi-account resolution)
 router.post('/login', login);

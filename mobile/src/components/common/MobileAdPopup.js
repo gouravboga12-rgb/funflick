@@ -49,12 +49,18 @@ function AdVideoPlayer({ mediaUrl, muted }) {
 }
 
 export const MobileAdPopup = () => {
-  const { activePopupAd, dismissMobileAd, recordAdMetric, currentUser } = useApp();
+  const { activePopupAd, dismissMobileAd, recordAdMetric, currentUser, isPaidInfluencer: ctxIsPaidInfluencer } = useApp();
 
   const isPaidInfluencer = Boolean(
+    ctxIsPaidInfluencer ||
     currentUser?.isInfluencer ||
     currentUser?.is_influencer ||
     currentUser?.role === 'influencer' ||
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'super_admin' ||
+    currentUser?.username === 'super_admin' ||
+    (currentUser?.subscription_plan && currentUser?.subscription_plan !== 'Free Member') ||
+    (currentUser?.subscriptionPlan && currentUser?.subscriptionPlan !== 'Free Member') ||
     (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date()) ||
     (currentUser?.subscription_expires_at && new Date(currentUser.subscription_expires_at) > new Date())
   );

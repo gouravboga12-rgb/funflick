@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { apiRequest, getToken, setToken, getStoredUser, setStoredUser } from '../services/api';
 import { registerForPushNotificationsAsync, scheduleLocalNotification } from '../services/pushService';
 import * as Notifications from 'expo-notifications';
+import { navigate } from '../navigation/navigationService';
 
 const AppContext = createContext();
 
@@ -569,6 +570,11 @@ export const AppProvider = ({ children }) => {
     currentUser?.isInfluencer ||
     currentUser?.is_influencer ||
     currentUser?.role === 'influencer' ||
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'super_admin' ||
+    currentUser?.username === 'super_admin' ||
+    (currentUser?.subscription_plan && currentUser?.subscription_plan !== 'Free Member') ||
+    (currentUser?.subscriptionPlan && currentUser?.subscriptionPlan !== 'Free Member') ||
     (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date()) ||
     (currentUser?.subscription_expires_at && new Date(currentUser.subscription_expires_at) > new Date())
   );
@@ -597,8 +603,13 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const showMobileAd = useCallback((adId) => {
-    if (isPaidInfluencer) return; // Paid members NEVER see ads!
-    const target = adId ? adsList.find(a => a.id === adId) : adsList.find(a => a.active) || adsList[0];
+    if (isPaidInfluencer) return; // Paid / Influencer members NEVER see any ads!
+    const target = adId
+      ? adsList.find(a => a.id === adId)
+      : adsList.find(a =>
+          a.active &&
+          (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session')
+        );
     if (target) {
       setActivePopupAd(target);
       recordAdMetric(target.id, 'impression');
@@ -676,7 +687,7 @@ export const AppProvider = ({ children }) => {
     if (!adsList || adsList.length === 0) return;
 
     const popupAd = adsList.find(a =>
-      a.active && (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'After 5 Reels')
+      a.active && (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session')
     );
 
     if (popupAd) {
@@ -688,19 +699,89 @@ export const AppProvider = ({ children }) => {
     }
   }, [isAuthenticated, isPaidInfluencer, adsList, showMobileAd]);
 
-  // Foreground push notification listener
+  // Direct Redirection for External Notifications (Chats, Payments, Violations, Activities)
+  const handleNotificationClick = useCallback((notifData) => {
+    if (!notifData) return;
+    const type = String(notifData.type || '').toLowerCase();
+    const message = String(notifData.message || notifData.body || '').toLowerCase();
+    const title = String(notifData.title || '').toLowerCase();
+
+    // 1. Direct Messages / Chat
+    if (
+      type === 'message' ||
+      type === 'chat' ||
+      type === 'direct_message' ||
+      notifData.sender_username ||
+      notifData.sender ||
+      title.includes('message') ||
+      title.includes('chat')
+    ) {
+      const partner = notifData.sender_username || notifData.sender || notifData.username;
+      navigate('MainTabs', {
+        screen: 'Inbox',
+        params: partner ? {
+          targetUser: {
+            username: partner,
+            name: notifData.sender_name || notifData.name || partner,
+            avatar: notifData.sender_avatar || notifData.avatar,
+          },
+        } : undefined,
+      });
+      return;
+    }
+
+    // 2. Payment / Payout / Wallet Updates from Admin
+    if (
+      type === 'payment' ||
+      type === 'payout' ||
+      type === 'wallet' ||
+      type === 'withdrawal' ||
+      message.includes('payment') ||
+      message.includes('payout') ||
+      message.includes('wallet') ||
+      title.includes('payment') ||
+      title.includes('payout')
+    ) {
+      navigate('Wallet');
+      return;
+    }
+
+    // 3. Creator Profile
+    if (type === 'creator' || type === 'profile') {
+      const target = notifData.creator || notifData.user;
+      if (target) {
+        navigate('CreatorProfile', { user: target });
+        return;
+      }
+    }
+
+    // 4. Activity, Violations, Media removal by admin, Likes, Comments, System Updates
+    navigate('Notifications');
+  }, []);
+
+  // Push notification listener (Foreground & External click response)
   useEffect(() => {
     let notifSub;
     let responseSub;
     try {
+      // Check if app was opened directly from an external notification
+      Notifications.getLastNotificationResponseAsync().then(response => {
+        if (response?.notification?.request?.content?.data) {
+          handleNotificationClick(response.notification.request.content.data);
+        }
+      }).catch(() => {});
+
       notifSub = Notifications.addNotificationReceivedListener(() => {
         fetchNotifications();
         fetchFeed();
         fetchLiveConversations();
       });
 
-      responseSub = Notifications.addNotificationResponseReceivedListener(() => {
+      responseSub = Notifications.addNotificationResponseReceivedListener(response => {
         fetchNotifications();
+        if (response?.notification?.request?.content?.data) {
+          handleNotificationClick(response.notification.request.content.data);
+        }
       });
     } catch (e) {}
 
@@ -708,7 +789,7 @@ export const AppProvider = ({ children }) => {
       if (notifSub) notifSub.remove();
       if (responseSub) responseSub.remove();
     };
-  }, [fetchNotifications, fetchFeed, fetchLiveConversations]);
+  }, [fetchNotifications, fetchFeed, fetchLiveConversations, handleNotificationClick]);
 
   const deleteUserPost = useCallback(async (postId) => {
     setPosts(prev => prev.filter(p => p.id !== postId));

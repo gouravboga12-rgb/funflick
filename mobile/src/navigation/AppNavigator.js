@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { navigationRef } from './navigationService';
 
 import SplashScreen from '../screens/auth/SplashScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -59,7 +60,7 @@ const linking = {
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer theme={CustomDarkTheme} linking={linking}>
+    <NavigationContainer ref={navigationRef} theme={CustomDarkTheme} linking={linking}>
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{

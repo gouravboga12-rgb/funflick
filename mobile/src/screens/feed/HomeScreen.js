@@ -92,10 +92,20 @@ export const HomeScreen = ({ navigation }) => {
           />
         }
         renderItem={({ item, index }) => {
-          // If total reels is 1-3, show sponsored ad immediately under reel 1; otherwise every 4 reels
-          const showAdAfter = (filteredPosts.length <= 3 && index === 0) || ((index + 1) % 4 === 0);
-          const adIndex = Math.floor(index / 4) % Math.max(1, (adsList || []).length);
-          const feedAd = !isPaidInfluencer && adsList && adsList.length > 0 && showAdAfter ? adsList[adIndex] : null;
+          // In-feed sponsored ads:
+          // 1. Paid / Subscribed influencer accounts NEVER see any ads!
+          // 2. Only show ads specifically configured in admin panel with frequency === 'After 5 Reels'
+          // 3. Only appear every 5 reels ((index + 1) % 5 === 0)
+          const inFeedAds = (adsList || []).filter(a =>
+            a.active &&
+            a.frequency !== 'Pop-up Ads' &&
+            a.frequency !== 'On App Open' &&
+            a.frequency !== 'Once per session' &&
+            (a.frequency === 'After 5 Reels' || (a.frequency && a.frequency.toLowerCase().includes('reel')))
+          );
+          const showFeedAd = !isPaidInfluencer && inFeedAds.length > 0 && ((index + 1) % 5 === 0);
+          const adIndex = Math.floor(index / 5) % Math.max(1, inFeedAds.length);
+          const feedAd = showFeedAd ? inFeedAds[adIndex] : null;
 
           return (
             <View style={styles.cardWrapper}>

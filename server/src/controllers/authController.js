@@ -203,6 +203,70 @@ export async function verifyRegistrationOtp(req, res) {
 }
 
 /**
+ * Direct Mobile & Quick Registration Handler
+ * Registers user without OTP requirement
+ */
+export async function directRegister(req, res) {
+  try {
+    const { name, username, email, phone, password } = req.body;
+
+    if (!name || !username || !email || !password) {
+      return res.status(400).json({ error: 'Full name, username, email and password are required' });
+    }
+
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone ? phone.trim() : null;
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // Check username uniqueness
+    const [existingUser] = await pool.query(
+      'SELECT id FROM users WHERE username = ? LIMIT 1',
+      [cleanUsername]
+    );
+
+    if (existingUser.length > 0) {
+      return res.status(400).json({ error: 'This username is already taken. Please choose another.' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const defaultAvatar = `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80`;
+
+    const [insertResult] = await pool.query(
+      `INSERT INTO users (name, username, email, phone, password_hash, avatar_url, role)
+       VALUES (?, ?, ?, ?, ?, ?, 'user')`,
+      [name.trim(), cleanUsername, cleanEmail, cleanPhone, passwordHash, defaultAvatar]
+    );
+
+    const token = jwt.sign(
+      { id: insertResult.insertId, username: cleanUsername, email: cleanEmail, role: 'user' },
+      process.env.JWT_SECRET || 'funflick_secret',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    return res.status(201).json({
+      message: 'Account registered successfully!',
+      token,
+      user: {
+        id: insertResult.insertId,
+        name: name.trim(),
+        username: cleanUsername,
+        email: cleanEmail,
+        phone: cleanPhone,
+        avatar_url: defaultAvatar,
+        role: 'user',
+      },
+    });
+  } catch (err) {
+    console.error('Direct register error:', err);
+    return res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
+}
+
+/**
  * Instagram-Style Login:
  * Accepts Identifier (Username, Email, or Phone Number) + Password.
  * If multiple accounts exist on the same email/phone:
@@ -486,9 +550,9 @@ export async function forgotPasswordReset(req, res) {
     // Verify OTP
     const [records] = await pool.query(
       `SELECT * FROM email_verifications 
-       WHERE email = ? AND otp_code = ? AND type = 'forgot_password' AND expires_at > NOW() 
+       WHERE (email = ? OR target_username = ?) AND otp_code = ? AND type = 'forgot_password' AND expires_at > NOW() 
        ORDER BY id DESC LIMIT 1`,
-      [cleanEmail, cleanOtp]
+      [cleanEmail, cleanUsername, cleanOtp]
     );
 
     if (records.length === 0) {
