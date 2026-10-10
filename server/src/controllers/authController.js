@@ -973,20 +973,31 @@ export async function googleAuthCallback(req, res) {
           <title>Redirecting to FunFlick...</title>
           <style>
             body { background: #07040d; color: #fff; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
-            .btn { background: #ff007a; color: #fff; padding: 12px 24px; border-radius: 24px; text-decoration: none; font-weight: bold; margin-top: 16px; display: inline-block; }
+            .btn { background: #ff007a; color: #fff; padding: 12px 28px; border-radius: 24px; text-decoration: none; font-weight: bold; margin-top: 18px; display: inline-block; font-size: 15px; }
           </style>
           <script>
-            window.location.href = ${JSON.stringify(deepLinkUrl)};
-            setTimeout(function() {
-              var btn = document.getElementById('openBtn');
-              if (btn) btn.style.display = 'inline-block';
-            }, 1500);
+            // 1. If in a web popup opened via window.open / Expo WebBrowser, postMessage to opener
+            try {
+              if (window.opener) {
+                window.opener.postMessage({ type: 'expo-auth-session', url: ${JSON.stringify(deepLinkUrl)} }, '*');
+                setTimeout(function() {
+                  window.close();
+                }, 300);
+              }
+            } catch (e) {}
+
+            // 2. Immediate navigation for custom app schemes and web
+            try {
+              window.location.replace(${JSON.stringify(deepLinkUrl)});
+            } catch (e) {
+              window.location.href = ${JSON.stringify(deepLinkUrl)};
+            }
           </script>
         </head>
         <body>
           <h2 style="margin: 0 0 8px 0;">Returning to FunFlick...</h2>
-          <p style="color: #9ca3af; font-size: 14px; margin: 0;">If you are not redirected automatically, tap below:</p>
-          <a id="openBtn" href="${deepLinkUrl}" class="btn" style="display: none;">Open FunFlick</a>
+          <p style="color: #9ca3af; font-size: 14px; margin: 0;">Opening your app now...</p>
+          <a id="openBtn" href="${deepLinkUrl}" class="btn">Open FunFlick</a>
         </body>
         </html>
       `);
