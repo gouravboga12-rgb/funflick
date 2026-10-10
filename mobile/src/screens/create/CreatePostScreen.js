@@ -25,7 +25,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { ensureMediaLibraryPermission } from '../../services/permissionsService';
 import { uploadMediaToS3 } from '../../services/s3Upload';
-import { apiRequest } from '../../services/api';
+import { apiRequest, getToken } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
@@ -51,7 +51,7 @@ const TRENDING_TAGS = ['#funflick', '#post', '#comedy', '#bts', '#shootday', '#t
 
 export const CreatePostScreen = ({ navigation, route }) => {
   const isStory = route?.name === 'CreateStory';
-  const { fetchFeed, fetchLiveStories } = useApp();
+  const { fetchFeed, fetchLiveStories, isAuthenticated, currentUser } = useApp();
   const [imageUri, setImageUri] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [caption, setCaption] = useState('');
@@ -107,6 +107,15 @@ export const CreatePostScreen = ({ navigation, route }) => {
       return;
     }
 
+    const token = await getToken();
+    if (!token && !currentUser) {
+      Alert.alert('Login Required', 'Please log in to your FunFlick account to share a story.', [
+        { text: 'Log In', onPress: () => navigation.navigate('Login') },
+        { text: 'Cancel', style: 'cancel' }
+      ]);
+      return;
+    }
+
     setIsUploading(true);
     setProgress(0);
 
@@ -127,7 +136,9 @@ export const CreatePostScreen = ({ navigation, route }) => {
           body: JSON.stringify({
             media_url: s3ImageUrl,
             media_type: 'image',
-            caption: caption.trim(),
+            caption: caption ? caption.trim() : '',
+            music: '',
+            sticker: '',
           }),
         });
         if (fetchLiveStories) await fetchLiveStories();

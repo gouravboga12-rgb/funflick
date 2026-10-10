@@ -1235,14 +1235,18 @@ export async function adminLogin(req, res) {
 
     // Check master admin credentials first
     if ((cleanRaw === 'funflick0308@gmail.com' || cleanHandle === 'admin' || cleanHandle === 'super_admin') && password === 'FunFlicks@12') {
+      const [admRows] = await pool.query(
+        "SELECT id, name, username, email, role, status, avatar_url FROM users WHERE email = 'funflick0308@gmail.com' OR username = 'super_admin' LIMIT 1"
+      );
+      const dbAdmin = admRows[0] || {};
       const adminUser = {
-        id: 999999,
-        name: 'FunFlick Super Administrator',
-        username: 'super_admin',
-        email: 'funflick0308@gmail.com',
+        id: dbAdmin.id || 8,
+        name: dbAdmin.name || 'FunFlick Super Administrator',
+        username: dbAdmin.username || 'super_admin',
+        email: dbAdmin.email || 'funflick0308@gmail.com',
         role: 'admin',
-        status: 'Active',
-        avatar_url: '/brand/funflick-logo.png'
+        status: dbAdmin.status || 'Active',
+        avatar_url: dbAdmin.avatar_url || '/brand/funflick-logo.png'
       };
 
       const token = jwt.sign(

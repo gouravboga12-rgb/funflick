@@ -8,6 +8,7 @@ const pool = mysql.createPool({
   user: process.env.DB_USER || 'funflick_user',
   password: process.env.DB_PASSWORD || 'FunFlick2026!SecurePass',
   database: process.env.DB_NAME || 'funflick_db',
+  charset: 'utf8mb4',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

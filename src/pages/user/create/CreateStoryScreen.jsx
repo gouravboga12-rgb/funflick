@@ -91,7 +91,16 @@ export const CreateStoryScreen = () => {
         throw new Error('Please wait for the story media to upload to AWS S3 storage before submitting.');
       }
 
-      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const token = localStorage.getItem('funflick_token') || 
+                    localStorage.getItem('funflick_admin_token') || 
+                    sessionStorage.getItem('funflick_token');
+
+      if (!token) {
+        showToast('Please log in to your account to share stories!', 'error');
+        navigate('/login');
+        return;
+      }
+
       const isVideo = selectedFile?.type?.startsWith('video');
 
       const res = await fetch('/api/stories', {
@@ -103,15 +112,15 @@ export const CreateStoryScreen = () => {
         body: JSON.stringify({
           media_url: finalMediaUrl,
           media_type: isVideo ? 'video' : 'image',
-          caption,
-          music: selectedMusic,
-          sticker: selectedSticker
+          caption: caption ? caption.trim() : '',
+          music: selectedMusic || '',
+          sticker: selectedSticker || ''
         })
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to save story');
+        throw new Error(err.error || `Failed to save story (${res.status})`);
       }
 
       const resData = await res.json();
