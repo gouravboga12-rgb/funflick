@@ -28,7 +28,7 @@ import {
 import { SuspendAccountModal } from '../../components/admin/SuspendAccountModal';
 
 export const AdminContentScreen = () => {
-  const { showToast, fetchAdminStats, pendingApprovals } = useApp();
+  const { showToast, fetchAdminStats, fetchLiveVideos, pendingApprovals } = useApp();
   const [tab, setTab] = useState('Pending'); // 'Pending' | 'Approved' | 'Rejected' | 'All'
   const [contentList, setContentList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,6 +56,7 @@ export const AdminContentScreen = () => {
         showToast('🗑️ Content deleted successfully from platform!', 'success');
         setContentList(prev => prev.filter(c => c.id !== itemId));
         if (previewItem?.id === itemId) setPreviewItem(null);
+        if (fetchLiveVideos) fetchLiveVideos();
         if (fetchAdminStats) fetchAdminStats();
       } else {
         showToast('Failed to delete content', 'error');
@@ -154,7 +155,8 @@ export const AdminContentScreen = () => {
           setPreviewItem(prev => ({ ...prev, status: nextStatus }));
         }
 
-        // Refresh stats & list
+        // Refresh stats & list & live feed
+        if (fetchLiveVideos) fetchLiveVideos();
         if (fetchAdminStats) fetchAdminStats();
         setTimeout(() => fetchContent(tab), 500);
       } else {

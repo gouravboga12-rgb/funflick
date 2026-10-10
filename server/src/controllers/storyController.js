@@ -22,9 +22,16 @@ export async function listStories(req, res) {
       WHERE (s.expires_at IS NULL OR s.expires_at > NOW()) 
         AND (s.status = 'Approved' OR s.status IS NULL) 
         AND (u.status IS NULL OR u.status != 'Suspended')
+        AND s.media_url NOT LIKE '%unsplash.com%'
+        AND (s.caption IS NULL OR (s.caption NOT LIKE 'Testing user%' AND s.caption NOT LIKE 'Test Story%'))
+        AND (
+          COALESCE(u.is_private, 0) = 0
+          OR s.user_id = ?
+          OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ? AND f.following_id = s.user_id)
+        )
       ORDER BY follow_priority DESC, s.created_at DESC
       LIMIT 100
-    `, [currentUserId, currentUserId, currentUserId]);
+    `, [currentUserId, currentUserId, currentUserId, currentUserId, currentUserId]);
 
     // Group stories by creator
     const grouped = {};
@@ -144,19 +151,23 @@ export async function createStory(req, res) {
           userExists = true;
         }
       }
-
-      // 3. Fallback: first active user
-      if (!userExists) {
-        const [anyUser] = await pool.query("SELECT id FROM users WHERE status != 'Suspended' ORDER BY id ASC LIMIT 1");
-        if (anyUser.length > 0) {
-          userId = anyUser[0].id;
-          userExists = true;
-        }
-      }
     }
 
     if (!userId || !userExists) {
-      return res.status(401).json({ error: 'Valid user account required to post a story' });
+      return res.status(401).json({ error: 'Your session is out of date. Please log out and log in again to post a story.' });
+    }
+
+    // Deduplication check: prevent duplicate inserts if client submitted twice within 15 seconds
+    const [recentDupeStory] = await pool.query(
+      'SELECT id FROM stories WHERE user_id = ? AND media_url = ? AND created_at >= NOW() - INTERVAL 15 SECOND LIMIT 1',
+      [userId, media_url]
+    );
+    if (recentDupeStory.length > 0) {
+      return res.status(200).json({
+        success: true,
+        storyId: recentDupeStory[0].id,
+        message: 'Story published successfully'
+      });
     }
 
     // Clean strings and sanitize

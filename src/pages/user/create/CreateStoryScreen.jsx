@@ -32,9 +32,10 @@ export const CreateStoryScreen = () => {
   const [mediaUrl, setMediaUrl] = useState('');
   const [caption, setCaption] = useState('');
   const [selectedMusic, setSelectedMusic] = useState('🎵 Telugu Comedy Beats - Trending');
-  const [selectedSticker, setSelectedSticker] = useState('😂');
+  const [selectedSticker, setSelectedSticker] = useState('');
 
   const [isUploading, setIsUploading] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [progress, setProgress] = useState(0);
   const [submittedItem, setSubmittedItem] = useState(null);
 
@@ -64,6 +65,8 @@ export const CreateStoryScreen = () => {
 
   const handlePublish = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isSubmittingRef.current || isUploading) return;
+
     if (!selectedFile && !mediaUrl) {
       showToast('Please select a photo or video from your device first!', 'error');
       return;
@@ -75,6 +78,7 @@ export const CreateStoryScreen = () => {
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsUploading(true);
     setProgress(5);
 
@@ -148,6 +152,7 @@ export const CreateStoryScreen = () => {
       console.error('Story upload error:', err);
       showToast(err.message || 'Story upload failed', 'error');
     } finally {
+      isSubmittingRef.current = false;
       setIsUploading(false);
     }
   };
@@ -181,8 +186,8 @@ export const CreateStoryScreen = () => {
         </button>
       </div>
 
-      {/* Center Story Visual Canvas */}
-      <div className="relative flex-1 m-3 rounded-3xl overflow-hidden bg-gray-900 border border-white/10 flex items-center justify-center shadow-2xl">
+      {/* Center Story Visual Canvas (9:16 Instagram aspect ratio) */}
+      <div className="relative flex-1 w-full max-w-[420px] aspect-[9/16] self-center m-3 rounded-3xl overflow-hidden bg-gray-900 border border-white/10 flex items-center justify-center shadow-2xl">
         {mediaUrl ? (
           <>
             <img

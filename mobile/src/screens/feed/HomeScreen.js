@@ -98,10 +98,7 @@ export const HomeScreen = ({ navigation }) => {
           // 3. Only appear every 5 reels ((index + 1) % 5 === 0)
           const inFeedAds = (adsList || []).filter(a =>
             a.active &&
-            a.frequency !== 'Pop-up Ads' &&
-            a.frequency !== 'On App Open' &&
-            a.frequency !== 'Once per session' &&
-            (a.frequency === 'After 5 Reels' || (a.frequency && a.frequency.toLowerCase().includes('reel')))
+            a.frequency === 'After 5 Reels'
           );
           const showFeedAd = !isPaidInfluencer && inFeedAds.length > 0 && ((index + 1) % 5 === 0);
           const adIndex = Math.floor(index / 5) % Math.max(1, inFeedAds.length);
@@ -133,11 +130,6 @@ export const HomeScreen = ({ navigation }) => {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
-
-
-
-      {/* Global In-App Pop-up Ad for Unpaid Users */}
-      <MobileAdPopup />
     </SafeAreaView>
   );
 };

@@ -23,6 +23,9 @@ function initNotificationHandlerSafe() {
   }
 }
 
+// Initialize handler eagerly on module load
+initNotificationHandlerSafe();
+
 /**
  * Register device for Expo Push Notifications and sync token with FunFlick backend
  */

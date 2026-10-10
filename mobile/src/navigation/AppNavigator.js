@@ -11,6 +11,7 @@ import AuthCallbackScreen from '../screens/auth/AuthCallbackScreen';
 import BottomTabNavigator from './BottomTabNavigator';
 import { UploadReelScreen } from '../screens/create/UploadReelScreen';
 import { CreatePostScreen } from '../screens/create/CreatePostScreen';
+import { CreateStoryScreen } from '../screens/create/CreateStoryScreen';
 import CreatorProfileScreen from '../screens/profile/CreatorProfileScreen';
 import { VideoDetailScreen } from '../screens/media/VideoDetailScreen';
 import StoryViewerScreen from '../screens/feed/StoryViewerScreen';
@@ -99,8 +100,8 @@ export default function AppNavigator() {
         />
         <Stack.Screen
           name="CreateStory"
-          component={CreatePostScreen}
-          options={{ presentation: 'card' }}
+          component={CreateStoryScreen}
+          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
           name="CreatorProfile"

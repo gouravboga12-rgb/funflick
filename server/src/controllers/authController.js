@@ -594,7 +594,7 @@ export async function getCurrentUser(req, res) {
     if (req.user && (req.user.id === 999999 || req.user.username === 'super_admin' || req.user.email === 'funflick0308@gmail.com')) {
       return res.json({
         user: {
-          id: 999999,
+          id: req.user.id || 999999,
           name: req.user.name || 'FunFlick Super Administrator',
           username: req.user.username || 'super_admin',
           email: req.user.email || 'funflick0308@gmail.com',
@@ -608,7 +608,7 @@ export async function getCurrentUser(req, res) {
     }
 
     const [rows] = await pool.query(
-      'SELECT id, name, username, email, phone, avatar_url, bio, role, is_influencer, subscription_expires_at, created_at FROM users WHERE id = ?',
+      'SELECT id, name, username, email, phone, avatar_url, bio, role, is_influencer, is_private, subscription_expires_at, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
 
@@ -623,6 +623,8 @@ export async function getCurrentUser(req, res) {
       avatar_url: u.avatar_url || '/brand/default-avatar.svg',
       isInfluencer: Boolean(u.is_influencer),
       is_influencer: Boolean(u.is_influencer),
+      isPrivate: Boolean(u.is_private),
+      is_private: Boolean(u.is_private),
       subscriptionExpiresAt: u.subscription_expires_at,
       subscription_expires_at: u.subscription_expires_at,
     };
@@ -639,11 +641,11 @@ export async function getCurrentUser(req, res) {
  */
 export async function updateUserProfile(req, res) {
   try {
-    const { name, username, bio, avatar_url, email, phone, password } = req.body;
+    const { name, username, bio, avatar_url, email, phone, password, is_private, isPrivate } = req.body;
     const userId = req.user.id;
 
     // Check if user exists
-    const [existing] = await pool.query('SELECT id, username, email, phone, avatar_url, password_hash FROM users WHERE id = ?', [userId]);
+    const [existing] = await pool.query('SELECT id, username, email, phone, avatar_url, password_hash, is_private FROM users WHERE id = ?', [userId]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -686,6 +688,9 @@ export async function updateUserProfile(req, res) {
       newPasswordHash = await bcrypt.hash(password.trim(), 10);
     }
 
+    const targetIsPrivate = (is_private !== undefined ? is_private : isPrivate);
+    const newIsPrivate = targetIsPrivate !== undefined ? (targetIsPrivate ? 1 : 0) : current.is_private;
+
     await pool.query(
       `UPDATE users 
        SET name = COALESCE(?, name), 
@@ -694,13 +699,14 @@ export async function updateUserProfile(req, res) {
            phone = ?,
            bio = ?, 
            avatar_url = ?,
-           password_hash = ?
+           password_hash = ?,
+           is_private = ?
        WHERE id = ?`,
-      [newName, newUsername, newEmail, newPhone, newBio, newAvatar, newPasswordHash, userId]
+      [newName, newUsername, newEmail, newPhone, newBio, newAvatar, newPasswordHash, newIsPrivate, userId]
     );
 
     const [rows] = await pool.query(
-      'SELECT id, name, username, email, phone, avatar_url, bio, role FROM users WHERE id = ?',
+      'SELECT id, name, username, email, phone, avatar_url, bio, role, is_private, is_influencer, subscription_expires_at FROM users WHERE id = ?',
       [userId]
     );
 
@@ -708,7 +714,13 @@ export async function updateUserProfile(req, res) {
     const user = {
       ...u,
       avatar: u.avatar_url || '/brand/default-avatar.svg',
-      avatar_url: u.avatar_url || '/brand/default-avatar.svg'
+      avatar_url: u.avatar_url || '/brand/default-avatar.svg',
+      isPrivate: Boolean(u.is_private),
+      is_private: Boolean(u.is_private),
+      isInfluencer: Boolean(u.is_influencer),
+      is_influencer: Boolean(u.is_influencer),
+      subscriptionExpiresAt: u.subscription_expires_at,
+      subscription_expires_at: u.subscription_expires_at
     };
 
     // Generate fresh JWT with updated username / email
@@ -731,7 +743,7 @@ export async function updateUserProfile(req, res) {
 export async function deleteAccount(req, res) {
   try {
     const userId = req.user.id;
-    if (!userId || userId === 999999) {
+    if (!userId || userId === 999999 || req.user.username === 'super_admin' || req.user.legacyId === 999999) {
       return res.status(400).json({ error: 'Cannot delete Super Admin account' });
     }
 

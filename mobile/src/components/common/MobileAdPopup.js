@@ -53,16 +53,26 @@ export const MobileAdPopup = () => {
 
   const isPaidInfluencer = Boolean(
     ctxIsPaidInfluencer ||
-    currentUser?.isInfluencer ||
-    currentUser?.is_influencer ||
+    currentUser?.isInfluencer === true ||
+    currentUser?.isInfluencer === 1 ||
+    currentUser?.is_influencer === true ||
+    currentUser?.is_influencer === 1 ||
     currentUser?.role === 'influencer' ||
     currentUser?.role === 'admin' ||
     currentUser?.role === 'super_admin' ||
     currentUser?.username === 'super_admin' ||
-    (currentUser?.subscription_plan && currentUser?.subscription_plan !== 'Free Member') ||
-    (currentUser?.subscriptionPlan && currentUser?.subscriptionPlan !== 'Free Member') ||
-    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date()) ||
-    (currentUser?.subscription_expires_at && new Date(currentUser.subscription_expires_at) > new Date())
+    (
+      currentUser?.subscription_plan &&
+      !['Free Member', 'Free User', 'free', 'Free Creator'].includes(currentUser.subscription_plan) &&
+      currentUser?.subscription_expires_at &&
+      new Date(currentUser.subscription_expires_at) > new Date()
+    ) ||
+    (
+      currentUser?.subscriptionPlan &&
+      !['Free Member', 'Free User', 'free', 'Free Creator'].includes(currentUser.subscriptionPlan) &&
+      currentUser?.subscriptionExpiresAt &&
+      new Date(currentUser.subscriptionExpiresAt) > new Date()
+    )
   );
 
   const [muted, setMuted] = useState(false);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ArrowLeft,
-  Image as ImageIcon,
+  ImageIcon,
   UploadCloud,
   Check,
   MapPin,
@@ -49,22 +49,48 @@ const SUGGESTED_LOCATIONS = [
 
 const TRENDING_TAGS = ['#funflick', '#post', '#comedy', '#bts', '#shootday', '#teluguhumor'];
 
-export const CreatePostScreen = ({ navigation, route }) => {
-  const isStory = route?.name === 'CreateStory';
-  const { fetchFeed, fetchLiveStories, isAuthenticated, currentUser } = useApp();
+// Cross-platform alert helper that works seamlessly on Mobile and Web
+const showAppAlert = (title, message, buttons) => {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') {
+      window.alert(`${title}\n\n${message}`);
+    }
+    if (buttons && buttons.length > 0) {
+      const primaryBtn = buttons.find(b => b.style !== 'cancel') || buttons[0];
+      if (primaryBtn && primaryBtn.onPress) {
+        primaryBtn.onPress();
+      }
+    }
+  } else {
+    Alert.alert(title, message, buttons);
+  }
+};
+
+export const CreatePostScreen = ({ navigation }) => {
+  const { fetchFeed, isAuthenticated, currentUser } = useApp();
+
+  const handleExitScreen = () => {
+    if (navigation.canGoBack && navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('MainTabs', { screen: 'Feed' });
+    }
+  };
+
   const [imageUri, setImageUri] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [caption, setCaption] = useState('');
-  const [category, setCategory] = useState(isStory ? 'BTS' : 'Comedy');
-  const [selectedTags, setSelectedTags] = useState(['#funflick', isStory ? '#story' : '#post']);
+  const [category, setCategory] = useState('Comedy');
+  const [selectedTags, setSelectedTags] = useState(['#funflick', '#post']);
   const [location, setLocation] = useState('Hyderabad Film City');
   const [isUploading, setIsUploading] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [progress, setProgress] = useState(0);
 
   const handleProcessPhoto = (fileOrAsset) => {
     const size = fileOrAsset.size || fileOrAsset.fileSize || 0;
     if (size > 5 * 1024 * 1024) {
-      Alert.alert('File Too Large', `The selected photo is ${(size / (1024 * 1024)).toFixed(1)}MB. Photos must be 5MB or less. Please select a smaller photo.`);
+      showAppAlert('File Too Large', `The selected photo is ${(size / (1024 * 1024)).toFixed(1)}MB. Photos must be 5MB or less. Please select a smaller photo.`);
       return;
     }
     const uri = fileOrAsset.uri || (typeof window !== 'undefined' && window.URL ? window.URL.createObjectURL(fileOrAsset) : null);
@@ -89,7 +115,7 @@ export const CreatePostScreen = ({ navigation, route }) => {
         handleProcessPhoto(asset.file || asset);
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to pick photo from device');
+      showAppAlert('Error', 'Failed to pick photo from device');
     }
   };
 
@@ -102,20 +128,23 @@ export const CreatePostScreen = ({ navigation, route }) => {
   };
 
   const handlePublish = async () => {
+    if (isSubmittingRef.current || isUploading) return;
+
     if (!imageUri && !selectedFile) {
-      Alert.alert('Photo Required', 'Please select a photo first.');
+      showAppAlert('Photo Required', 'Please select a photo first.');
       return;
     }
 
     const token = await getToken();
     if (!token && !currentUser) {
-      Alert.alert('Login Required', 'Please log in to your FunFlick account to share a story.', [
+      showAppAlert('Login Required', 'Please log in to your FunFlick account to share a post.', [
         { text: 'Log In', onPress: () => navigation.navigate('Login') },
         { text: 'Cancel', style: 'cancel' }
       ]);
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsUploading(true);
     setProgress(0);
 
@@ -123,52 +152,36 @@ export const CreatePostScreen = ({ navigation, route }) => {
       // 1. Upload to S3
       const s3ImageUrl = await uploadMediaToS3(
         selectedFile || imageUri,
-        `${isStory ? 'story' : 'post'}_${Date.now()}.jpg`,
+        `post_${Date.now()}.jpg`,
         'image/jpeg',
-        isStory ? 'stories' : 'images',
+        'images',
         (pct) => setProgress(pct)
       );
 
       // 2. Persist to database on AWS EC2
-      if (isStory) {
-        await apiRequest('/stories', {
-          method: 'POST',
-          body: JSON.stringify({
-            media_url: s3ImageUrl,
-            media_type: 'image',
-            caption: caption ? caption.trim() : '',
-            music: '',
-            sticker: '',
-          }),
-        });
-        if (fetchLiveStories) await fetchLiveStories();
-        Alert.alert('Story Shared! ✨', 'Your story is live for 24 hours on FunFlick!', [
-          { text: 'OK', onPress: () => navigation.navigate('MainTabs', { screen: 'Feed' }) },
-        ]);
-      } else {
-        await apiRequest('/videos', {
-          method: 'POST',
-          body: JSON.stringify({
-            title: caption.trim().slice(0, 50) || 'New Photo Post',
-            description: caption.trim(),
-            category,
-            video_url: s3ImageUrl,
-            thumbnail_url: s3ImageUrl,
-            duration: 0,
-            media_type: 'image',
-            hashtags: selectedTags.join(' '),
-            location,
-          }),
-        });
+      await apiRequest('/videos', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: caption.trim().slice(0, 50) || 'New Photo Post',
+          description: caption.trim(),
+          category,
+          video_url: s3ImageUrl,
+          thumbnail_url: s3ImageUrl,
+          duration: 0,
+          media_type: 'image',
+          hashtags: selectedTags.join(' '),
+          location,
+        }),
+      });
 
-        await fetchFeed();
-        Alert.alert('Published!', 'Your photo post is live on FunFlick!', [
-          { text: 'OK', onPress: () => navigation.navigate('MainTabs', { screen: 'Feed' }) },
-        ]);
-      }
+      await fetchFeed();
+      showAppAlert('Published! 📸', 'Your photo post is live on FunFlick!', [
+        { text: 'OK', onPress: handleExitScreen },
+      ]);
     } catch (err) {
-      Alert.alert('Publish Failed', err.message || `Could not upload ${isStory ? 'story' : 'photo post'}`);
+      showAppAlert('Publish Failed', err.message || 'Could not upload photo post');
     } finally {
+      isSubmittingRef.current = false;
       setIsUploading(false);
     }
   };
@@ -177,14 +190,12 @@ export const CreatePostScreen = ({ navigation, route }) => {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={handleExitScreen} style={styles.backBtn}>
           <ArrowLeft size={22} color="#fff" />
         </TouchableOpacity>
         <View style={{ alignItems: 'center' }}>
-          <Text style={styles.headerTitle}>{isStory ? 'Create Story' : 'Create Post'}</Text>
-          <Text style={styles.headerSub}>
-            {isStory ? 'Share a 24-hour photo moment' : 'Share a photo or comedy clip to your feed'}
-          </Text>
+          <Text style={styles.headerTitle}>Create Post</Text>
+          <Text style={styles.headerSub}>Share a photo or comedy clip to your feed</Text>
         </View>
         <TouchableOpacity
           onPress={handlePublish}
@@ -197,7 +208,7 @@ export const CreatePostScreen = ({ navigation, route }) => {
             end={{ x: 1, y: 0 }}
             style={styles.publishHeaderGradient}
           >
-            <Text style={styles.publishHeaderText}>{isStory ? 'Share' : 'Post'}</Text>
+            <Text style={styles.publishHeaderText}>Post</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -371,7 +382,7 @@ export const CreatePostScreen = ({ navigation, route }) => {
             {isUploading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.publishBtnText}>{isStory ? 'Share Story' : 'Publish Photo Post'}</Text>
+              <Text style={styles.publishBtnText}>Publish Photo Post</Text>
             )}
           </LinearGradient>
         </TouchableOpacity>

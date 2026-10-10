@@ -17,36 +17,46 @@ export const AppProvider = ({ children }) => {
   const [isReelsMuted, setIsReelsMuted] = useState(true);
   const [activePlayingVideoId, setActivePlayingVideoId] = useState(null);
   const [blockedUsers, setBlockedUsers] = useState([]);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Fetch live stories from EC2 MySQL backend
   const fetchLiveStories = useCallback(async () => {
     try {
       const data = await apiRequest('/stories');
       if (data && data.stories && Array.isArray(data.stories)) {
+        const userGroup = data.stories.find(s => 
+          (currentUser?.id && String(s.userId) === String(currentUser.id)) ||
+          (currentUser?.username && s.username?.toLowerCase() === currentUser.username?.toLowerCase())
+        );
+
         const myStory = {
-          id: 'my-story',
+          id: userGroup?.id || 'my-story',
           isUser: true,
-          username: 'Your Story',
+          userId: currentUser?.id || userGroup?.userId,
+          username: currentUser?.username || 'Your Story',
           name: 'Your Story',
-          avatar: currentUser?.avatar_url || currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+          avatar: currentUser?.avatar_url || currentUser?.avatar || userGroup?.avatar || '/brand/default-avatar.svg',
           hasUnseen: false,
-          stories: [],
+          stories: userGroup?.stories || [],
         };
-        const userGroup = data.stories.find(s => s.userId === currentUser?.id || s.username === currentUser?.username);
-        if (userGroup) {
-          myStory.stories = userGroup.stories || [];
-        }
+
         const others = data.stories
-          .filter(s => s.userId !== currentUser?.id && s.username !== currentUser?.username)
+          .filter(s => {
+            const isMe = (currentUser?.id && String(s.userId) === String(currentUser.id)) ||
+                         (currentUser?.username && s.username?.toLowerCase() === currentUser.username?.toLowerCase());
+            return !isMe && s.stories && s.stories.length > 0;
+          })
           .map(s => ({
-            id: s.id || `st_${s.username}`,
+            id: s.id || `st_${s.userId || s.username}`,
+            userId: s.userId,
             isUser: false,
             username: s.username,
             name: s.name || s.username,
-            avatar: s.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+            avatar: s.avatar || '/brand/default-avatar.svg',
             hasUnseen: true,
             stories: s.stories || [],
           }));
+
         setStories([myStory, ...others]);
       }
     } catch (e) {
@@ -79,6 +89,7 @@ export const AppProvider = ({ children }) => {
         console.warn('Auth restore error:', err);
       } finally {
         setIsLoadingAuth(false);
+        fetchLiveStories();
       }
     })();
   }, []);
@@ -131,6 +142,11 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     fetchFeed();
     fetchLiveStories();
+    const interval = setInterval(() => {
+      fetchFeed();
+      fetchLiveStories();
+    }, 10000);
+    return () => clearInterval(interval);
   }, [fetchFeed, fetchLiveStories]);
 
   // Login handler
@@ -147,6 +163,11 @@ export const AppProvider = ({ children }) => {
       setIsAuthenticated(true);
       registerForPushNotificationsAsync();
       fetchFeed();
+      // Trigger login pop-up ad for normal users
+      hasTriggeredAdOnLaunchRef.current = false;
+      setTimeout(() => {
+        showMobileAd();
+      }, 1200);
       return data.user;
     }
     throw new Error('Invalid login response');
@@ -166,6 +187,10 @@ export const AppProvider = ({ children }) => {
       setIsAuthenticated(true);
       registerForPushNotificationsAsync();
       fetchFeed();
+      hasTriggeredAdOnLaunchRef.current = false;
+      setTimeout(() => {
+        showMobileAd();
+      }, 1200);
       return data.user;
     }
     return data;
@@ -189,6 +214,10 @@ export const AppProvider = ({ children }) => {
       setIsAuthenticated(true);
       registerForPushNotificationsAsync();
       fetchFeed();
+      hasTriggeredAdOnLaunchRef.current = false;
+      setTimeout(() => {
+        showMobileAd();
+      }, 1200);
       return data;
     }
 
@@ -209,6 +238,10 @@ export const AppProvider = ({ children }) => {
       setIsAuthenticated(true);
       registerForPushNotificationsAsync();
       fetchFeed();
+      hasTriggeredAdOnLaunchRef.current = false;
+      setTimeout(() => {
+        showMobileAd();
+      }, 1200);
       return data;
     }
 
@@ -587,16 +620,26 @@ export const AppProvider = ({ children }) => {
   const hasTriggeredAdOnLaunchRef = useRef(false);
 
   const isPaidInfluencer = Boolean(
-    currentUser?.isInfluencer ||
-    currentUser?.is_influencer ||
+    currentUser?.isInfluencer === true ||
+    currentUser?.isInfluencer === 1 ||
+    currentUser?.is_influencer === true ||
+    currentUser?.is_influencer === 1 ||
     currentUser?.role === 'influencer' ||
     currentUser?.role === 'admin' ||
     currentUser?.role === 'super_admin' ||
     currentUser?.username === 'super_admin' ||
-    (currentUser?.subscription_plan && currentUser?.subscription_plan !== 'Free Member') ||
-    (currentUser?.subscriptionPlan && currentUser?.subscriptionPlan !== 'Free Member') ||
-    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date()) ||
-    (currentUser?.subscription_expires_at && new Date(currentUser.subscription_expires_at) > new Date())
+    (
+      currentUser?.subscription_plan &&
+      !['Free Member', 'Free User', 'free', 'Free Creator'].includes(currentUser.subscription_plan) &&
+      currentUser?.subscription_expires_at &&
+      new Date(currentUser.subscription_expires_at) > new Date()
+    ) ||
+    (
+      currentUser?.subscriptionPlan &&
+      !['Free Member', 'Free User', 'free', 'Free Creator'].includes(currentUser.subscriptionPlan) &&
+      currentUser?.subscriptionExpiresAt &&
+      new Date(currentUser.subscriptionExpiresAt) > new Date()
+    )
   );
 
   const fetchAds = useCallback(async () => {
@@ -703,7 +746,7 @@ export const AppProvider = ({ children }) => {
 
   // Automatic In-App Pop-up Ad trigger for unpaid users
   useEffect(() => {
-    if (!isAuthenticated || isPaidInfluencer || hasTriggeredAdOnLaunchRef.current) return;
+    if (isPaidInfluencer || hasTriggeredAdOnLaunchRef.current) return;
     if (!adsList || adsList.length === 0) return;
 
     const popupAd = adsList.find(a =>
@@ -862,6 +905,8 @@ export const AppProvider = ({ children }) => {
         followingUsernames,
         fetchMyFollowing,
         blockedUsers,
+        isChatOpen,
+        setIsChatOpen,
         conversations,
         fetchLiveConversations,
         fetchConversationMessages,

@@ -14,6 +14,7 @@ import {
   Linking,
   Modal,
   Keyboard,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -46,6 +47,7 @@ export const InboxScreen = ({ navigation, route }) => {
     openOrCreateConversation,
     sendMessage,
     unsendMessage,
+    setIsChatOpen,
   } = useApp();
 
   const insets = useSafeAreaInsets();
@@ -79,6 +81,19 @@ export const InboxScreen = ({ navigation, route }) => {
     });
     return unsubscribe;
   }, [navigation, route?.params]);
+
+  // Handle hardware back press on Android when inside active chat view
+  useEffect(() => {
+    if (!activeConvId) return;
+    const backAction = () => {
+      setIsChatOpen?.(false);
+      setActiveConvId(null);
+      setAttachedMedia(null);
+      return true;
+    };
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [activeConvId, setIsChatOpen]);
 
   // Handle route param to open direct chat with target user
   useEffect(() => {
@@ -135,18 +150,15 @@ export const InboxScreen = ({ navigation, route }) => {
 
   // Automatically hide bottom tab bar when inside a direct chat conversation so chat floats cleanly
   useEffect(() => {
-    const parent = navigation?.getParent?.();
-    if (parent) {
-      if (activeConv) {
-        parent.setOptions({ tabBarStyle: { display: 'none' } });
-      } else {
-        parent.setOptions({ tabBarStyle: undefined });
-      }
+    if (activeConv) {
+      setIsChatOpen?.(true);
+    } else {
+      setIsChatOpen?.(false);
     }
     return () => {
-      navigation?.getParent?.()?.setOptions({ tabBarStyle: undefined });
+      setIsChatOpen?.(false);
     };
-  }, [activeConv, navigation]);
+  }, [activeConv, setIsChatOpen]);
 
   // Track keyboard events to position input bar right above soft keyboard
   useEffect(() => {
@@ -346,6 +358,7 @@ export const InboxScreen = ({ navigation, route }) => {
           <TouchableOpacity
             style={styles.backBtn}
             onPress={() => {
+              setIsChatOpen?.(false);
               setActiveConvId(null);
               setAttachedMedia(null);
             }}
@@ -375,14 +388,17 @@ export const InboxScreen = ({ navigation, route }) => {
 
         {/* Messages Stream */}
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
           style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
         >
           <FlatList
             ref={flatListRef}
             data={activeConv.messages || []}
             keyExtractor={(item, idx) => item.id || String(idx)}
             contentContainerStyle={styles.messagesList}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
             renderItem={({ item }) => {
               const isMe = item.sender === 'me';
@@ -513,7 +529,10 @@ export const InboxScreen = ({ navigation, route }) => {
                 style={styles.pillInput}
                 multiline
                 maxHeight={110}
-                onFocus={() => setShowEmojiPicker(false)}
+                onFocus={() => {
+                  setShowEmojiPicker(false);
+                  setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 150);
+                }}
               />
 
               <TouchableOpacity

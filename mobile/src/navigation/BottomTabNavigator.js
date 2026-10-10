@@ -21,7 +21,7 @@ function DummyCreateScreen() {
 
 export default function BottomTabNavigator({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { currentUser, conversations } = useApp();
+  const { currentUser, conversations, isChatOpen } = useApp();
   const [isChooserVisible, setIsChooserVisible] = useState(false);
 
   const bottomInset = Math.max(insets.bottom, 14);
@@ -50,13 +50,15 @@ export default function BottomTabNavigator({ navigation }) {
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
-          tabBarStyle: [
-            styles.tabBar,
-            {
-              height: tabHeight,
-              paddingBottom: bottomInset,
-            },
-          ],
+          tabBarStyle: isChatOpen
+            ? { display: 'none' }
+            : [
+                styles.tabBar,
+                {
+                  height: tabHeight,
+                  paddingBottom: bottomInset,
+                },
+              ],
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: 'rgba(255,255,255,0.45)',
           tabBarShowLabel: true,

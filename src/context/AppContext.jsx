@@ -50,11 +50,22 @@ export const AppProvider = ({ children }) => {
     return sessionStorage.getItem('funflick_authenticated') === 'true' || Boolean(localStorage.getItem('funflick_admin_token'));
   });
 
-  // Sync profile data and live feeds directly from AWS MySQL backend on app startup
+  // Sync profile data and live feeds directly from AWS MySQL backend on app startup + auto-sync
   useEffect(() => {
     fetchLiveVideos();
     fetchLiveStories();
     fetchLiveCreators();
+
+    const interval = setInterval(() => {
+      fetchLiveVideos();
+      fetchLiveStories();
+    }, 10000);
+
+    const onWindowFocus = () => {
+      fetchLiveVideos();
+      fetchLiveStories();
+    };
+    window.addEventListener('focus', onWindowFocus);
 
     // Check admin portal sync
     const adminTok = localStorage.getItem('funflick_admin_token');
@@ -116,6 +127,11 @@ export const AppProvider = ({ children }) => {
         }
       })
       .catch(() => {});
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onWindowFocus);
+    };
   }, []);
 
   const loginUser = (customUser) => {

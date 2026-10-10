@@ -117,6 +117,7 @@ export const CreatePostScreen = () => {
 
   // Upload states
   const [isUploading, setIsUploading] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [progress, setProgress] = useState(0);
   const [submittedItem, setSubmittedItem] = useState(null);
 
@@ -150,6 +151,8 @@ export const CreatePostScreen = () => {
 
   const handlePublish = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isSubmittingRef.current || isUploading) return;
+
     if (!selectedFile && !mediaUrl) {
       showToast('Please select a photo from your device first!', 'error');
       return;
@@ -162,6 +165,7 @@ export const CreatePostScreen = () => {
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsUploading(true);
     setProgress(5);
 
@@ -234,6 +238,7 @@ export const CreatePostScreen = () => {
       console.error('Post upload error:', err);
       showToast(err.message || 'Upload failed', 'error');
     } finally {
+      isSubmittingRef.current = false;
       setIsUploading(false);
     }
   };

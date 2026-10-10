@@ -17,7 +17,9 @@ export async function listVideos(req, res) {
         u.id AS creator_id, u.name AS creator_name, u.username AS creator_username, u.avatar_url AS creator_avatar
       FROM videos v
       JOIN users u ON v.user_id = u.id
-      WHERE v.status = 'Approved' AND (u.status IS NULL OR u.status != 'Suspended')
+      WHERE v.status = 'Approved' 
+        AND (v.moderation_status IS NULL OR v.moderation_status != 'Rejected')
+        AND (u.status IS NULL OR u.status != 'Suspended')
     `;
     const params = [currentUserId, currentUserId];
 
@@ -149,11 +151,61 @@ export async function createVideo(req, res) {
       safeThumbnail = video_url;
     }
 
+    let userId = req.user?.id;
+    let userExists = false;
+
+    if (userId && userId !== 999999) {
+      const [uCheck] = await pool.query('SELECT id FROM users WHERE id = ?', [userId]);
+      if (uCheck.length > 0) {
+        userExists = true;
+      }
+    }
+
+    if (!userExists) {
+      if (req.user?.email || req.user?.username) {
+        const [uMatch] = await pool.query(
+          'SELECT id FROM users WHERE email = ? OR username = ? LIMIT 1',
+          [req.user.email || '', req.user.username || '']
+        );
+        if (uMatch.length > 0) {
+          userId = uMatch[0].id;
+          userExists = true;
+        }
+      }
+
+      if (!userExists && (req.user?.role === 'admin' || req.user?.isAdminSession)) {
+        const [adminRows] = await pool.query(
+          "SELECT id FROM users WHERE email = 'funflick0308@gmail.com' OR username = 'super_admin' OR role = 'admin' LIMIT 1"
+        );
+        if (adminRows.length > 0) {
+          userId = adminRows[0].id;
+          userExists = true;
+        }
+      }
+    }
+
+    if (!userId || !userExists) {
+      return res.status(401).json({ error: 'Valid user account required to publish post' });
+    }
+
+    // Deduplication check: prevent duplicate inserts if client submitted twice within 15 seconds
+    const [recentDupe] = await pool.query(
+      'SELECT id FROM videos WHERE user_id = ? AND video_url = ? AND created_at >= NOW() - INTERVAL 15 SECOND LIMIT 1',
+      [userId, video_url]
+    );
+    if (recentDupe.length > 0) {
+      return res.status(200).json({
+        success: true,
+        videoId: recentDupe[0].id,
+        message: 'Post published successfully'
+      });
+    }
+
     const [result] = await pool.query(
       `INSERT INTO videos (user_id, title, description, category, video_url, thumbnail_url, duration, media_type, hashtags, location, audio_title, status, moderation_status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        req.user.id,
+        userId,
         videoTitle,
         description || '',
         category || 'Comedy',

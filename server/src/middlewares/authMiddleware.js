@@ -16,10 +16,24 @@ export function authenticateToken(req, res, next) {
     try {
       // Dynamic verification of user suspension & subscription validity in MySQL database
       const pool = (await import('../config/db.js')).default;
-      const [uRows] = await pool.query(
+      let [uRows] = await pool.query(
         'SELECT id, status, suspended_until, suspension_reason, is_influencer, subscription_expires_at FROM users WHERE id = ?',
         [user.id]
       );
+
+      // Stale / synthetic token id (e.g. legacy super admin id 999999 or a re-created account):
+      // resolve the real MySQL user row by email / username so foreign keys never fail.
+      if (uRows.length === 0 && (user.email || user.username)) {
+        const [match] = await pool.query(
+          'SELECT id, status, suspended_until, suspension_reason, is_influencer, subscription_expires_at FROM users WHERE (username = ? OR email = ?) ORDER BY (username = ?) DESC LIMIT 1',
+          [user.username || '', user.email || '', user.username || '']
+        );
+        if (match.length > 0) {
+          user.legacyId = user.id;
+          user.id = match[0].id;
+          uRows = match;
+        }
+      }
 
       if (uRows.length > 0) {
         const u = uRows[0];

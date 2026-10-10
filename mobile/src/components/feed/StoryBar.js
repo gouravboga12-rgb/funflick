@@ -32,27 +32,35 @@ function StoryAvatar({ avatar, name, username }) {
 }
 
 export const StoryBar = ({ onAddStory, onStoryPress }) => {
-  const { currentUser, posts, stories } = useApp();
+  const { currentUser, stories } = useApp();
 
-  // 1. Resolve stories list: start with current user's story
+  // 1. Resolve current user's story
+  const userStoryGroup = (stories || []).find(s => s.isUser);
+  const myStoriesList = userStoryGroup?.stories || [];
+  const hasMyStories = myStoriesList.length > 0;
+
   const myStoryItem = {
-    id: 'my-story',
+    id: userStoryGroup?.id || 'my-story',
     isMe: true,
+    isUser: true,
     name: 'Your Story',
     username: currentUser?.username || 'you',
-    avatar: currentUser?.avatar_url || currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-    hasStories: stories?.find(s => s.isUser)?.stories?.length > 0,
+    avatar: currentUser?.avatar_url || currentUser?.avatar || userStoryGroup?.avatar || '/brand/default-avatar.svg',
+    hasStories: hasMyStories,
+    stories: myStoriesList,
   };
 
-  // 2. Add other stories from API if available (strictly real stories from followed accounts)
+  // 2. Add other stories from API if available (strictly real stories from accounts with active stories)
   const apiStories = (stories || [])
     .filter(s => !s.isUser && s.stories && s.stories.length > 0)
     .map(s => ({
       id: s.id,
+      userId: s.userId,
       isMe: false,
+      isUser: false,
       name: s.name || s.username?.replace('_official', '') || 'Creator',
       username: s.username,
-      avatar: s.avatar || '',
+      avatar: s.avatar || '/brand/default-avatar.svg',
       hasUnseen: s.hasUnseen !== false,
       stories: s.stories || [],
     }));
@@ -62,6 +70,18 @@ export const StoryBar = ({ onAddStory, onStoryPress }) => {
     ...apiStories,
   ];
 
+  const handleItemPress = (item) => {
+    if (item.isMe) {
+      if (item.hasStories && item.stories.length > 0) {
+        onStoryPress?.(item);
+      } else {
+        onAddStory?.();
+      }
+    } else {
+      onStoryPress?.(item);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -70,50 +90,61 @@ export const StoryBar = ({ onAddStory, onStoryPress }) => {
         contentContainerStyle={styles.scroll}
       >
         {allStoryItems.map((item, idx) => (
-          <TouchableOpacity
+          <View
             key={item.id || idx}
             style={styles.storyItem}
-            activeOpacity={0.8}
-            onPress={() => (item.isMe ? onAddStory?.() : onStoryPress?.(item))}
           >
-            {item.isMe ? (
-              <View style={styles.myStoryWrapper}>
-                {item.hasStories ? (
-                  <LinearGradient
-                    colors={['#ff8a00', '#ff007a', '#7928ca']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.gradientRing}
-                  >
-                    <View style={styles.innerRing}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => handleItemPress(item)}
+            >
+              {item.isMe ? (
+                <View style={styles.myStoryWrapper}>
+                  {item.hasStories ? (
+                    <LinearGradient
+                      colors={['#ff8a00', '#ff007a', '#7928ca']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.gradientRing}
+                    >
+                      <View style={styles.innerRing}>
+                        <StoryAvatar avatar={item.avatar} name={item.name} username={item.username} />
+                      </View>
+                    </LinearGradient>
+                  ) : (
+                    <View style={styles.plainRing}>
                       <StoryAvatar avatar={item.avatar} name={item.name} username={item.username} />
                     </View>
-                  </LinearGradient>
-                ) : (
-                  <View style={styles.plainRing}>
+                  )}
+                  <TouchableOpacity
+                    style={styles.plusBadge}
+                    activeOpacity={0.85}
+                    onPress={() => onAddStory?.()}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Plus size={11} color="#fff" strokeWidth={3} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={item.hasUnseen ? ['#ff8a00', '#ff007a', '#7928ca'] : ['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.25)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.gradientRing}
+                >
+                  <View style={styles.innerRing}>
                     <StoryAvatar avatar={item.avatar} name={item.name} username={item.username} />
                   </View>
-                )}
-                <View style={styles.plusBadge}>
-                  <Plus size={11} color="#fff" strokeWidth={3} />
-                </View>
-              </View>
-            ) : (
-              <LinearGradient
-                colors={item.hasUnseen ? ['#ff8a00', '#ff007a', '#7928ca'] : ['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.25)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.gradientRing}
-              >
-                <View style={styles.innerRing}>
-                  <StoryAvatar avatar={item.avatar} name={item.name} username={item.username} />
-                </View>
-              </LinearGradient>
-            )}
-            <Text style={styles.name} numberOfLines={1}>
-              {item.name}
-            </Text>
-          </TouchableOpacity>
+                </LinearGradient>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity activeOpacity={0.8} onPress={() => handleItemPress(item)}>
+              <Text style={styles.name} numberOfLines={1}>
+                {item.name}
+              </Text>
+            </TouchableOpacity>
+          </View>
         ))}
       </ScrollView>
     </View>

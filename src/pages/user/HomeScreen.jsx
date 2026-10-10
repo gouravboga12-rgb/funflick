@@ -83,7 +83,7 @@ export const HomeScreen = () => {
             </div>
           ) : (
             (() => {
-              const activeAds = (adsList || []).filter(a => a.active && a.frequency !== 'Pop-up Ads');
+              const activeAds = (adsList || []).filter(a => a.active && a.frequency === 'After 5 Reels');
               return filteredPosts.map((post, idx) => {
                 const url = post.mediaUrl || '';
                 const isImage = post.mediaType === 'image' ||
