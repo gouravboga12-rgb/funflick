@@ -399,8 +399,8 @@ export const AppProvider = ({ children }) => {
         if (data.pending && Array.isArray(data.pending)) {
           setPendingApprovals(data.pending);
         }
-      } else if (res.status === 401 || res.status === 403) {
-        // Token expired or invalid
+      } else if (res.status === 401) {
+        // Token expired or invalid (401 only, never 403)
         if (localStorage.getItem('funflick_admin_token')) {
           localStorage.removeItem('funflick_admin_token');
           localStorage.removeItem('funflick_admin_user');
@@ -427,7 +427,7 @@ export const AppProvider = ({ children }) => {
         if (data.stats) {
           setAdminStats(data.stats);
         }
-      } else if (res.status === 401 || res.status === 403) {
+      } else if (res.status === 401) {
         if (localStorage.getItem('funflick_admin_token')) {
           localStorage.removeItem('funflick_admin_token');
           localStorage.removeItem('funflick_admin_user');
@@ -435,6 +435,9 @@ export const AppProvider = ({ children }) => {
             window.location.href = '/admin/login?expired=1';
           }
         }
+      } else if (res.status === 403) {
+        // 403 Forbidden is normal for staff moderators without superadmin stats privileges
+        setAdminStats(null);
       }
     } catch (err) {
       console.warn('Could not fetch admin platform stats:', err);

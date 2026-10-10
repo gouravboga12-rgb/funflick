@@ -42,12 +42,23 @@ export const AdminLoginScreen = () => {
         // Dedicated admin-only session bearer token for AWS API communication
         localStorage.setItem('funflick_admin_token', data.token);
         localStorage.setItem('funflick_token', data.token);
+        localStorage.setItem('funflick_admin_user', JSON.stringify(data.adminUser));
         sessionStorage.setItem('funflick_authenticated', 'true');
         if (loginUser && data.adminUser) {
           loginUser(data.adminUser);
         }
-        showToast('🛡️ Administrator identity verified on AWS. Welcome to Admin Center.', 'success');
-        navigate('/admin');
+
+        const isModeratorRole = data.adminUser?.role === 'moderator';
+        showToast(
+          `🛡️ ${isModeratorRole ? 'Staff Moderator' : 'Administrator'} identity verified. Welcome to Admin Center.`,
+          'success'
+        );
+
+        if (isModeratorRole) {
+          navigate('/admin/content');
+        } else {
+          navigate('/admin');
+        }
       } else {
         showToast(data.error || 'Invalid administrator credentials', 'error');
       }

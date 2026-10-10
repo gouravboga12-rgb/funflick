@@ -895,16 +895,18 @@ export async function adminLogin(req, res) {
       return res.status(400).json({ error: 'Admin identifier and password are required' });
     }
 
-    const clean = identifier.trim().toLowerCase();
+    const cleanRaw = identifier.trim().toLowerCase();
+    const cleanHandle = cleanRaw.replace(/^@/, '');
 
     // Check master admin credentials first
-    if ((clean === 'funflick0308@gmail.com' || clean === 'admin') && password === 'FunFlicks@12') {
+    if ((cleanRaw === 'funflick0308@gmail.com' || cleanHandle === 'admin' || cleanHandle === 'super_admin') && password === 'FunFlicks@12') {
       const adminUser = {
         id: 999999,
         name: 'FunFlick Super Administrator',
         username: 'super_admin',
         email: 'funflick0308@gmail.com',
         role: 'admin',
+        status: 'Active',
         avatar_url: '/brand/funflick-logo.png'
       };
 
@@ -924,8 +926,8 @@ export async function adminLogin(req, res) {
 
     // Check database users with role = 'admin' or 'moderator'
     const [rows] = await pool.query(
-      'SELECT id, name, username, email, password_hash, role, avatar_url FROM users WHERE (email = ? OR username = ?) AND role IN (?, ?)',
-      [clean, clean, 'admin', 'moderator']
+      'SELECT id, name, username, email, password_hash, role, status, avatar_url FROM users WHERE (email = ? OR username = ? OR username = ?) AND role IN (?, ?)',
+      [cleanRaw, cleanRaw, cleanHandle, 'admin', 'moderator']
     );
 
     if (rows.length === 0) {
@@ -933,6 +935,12 @@ export async function adminLogin(req, res) {
     }
 
     const admin = rows[0];
+
+    // Check if moderator account is suspended
+    if (admin.status === 'Suspended') {
+      return res.status(403).json({ error: 'Your staff moderator account has been suspended. Please contact Super Administrator.' });
+    }
+
     const match = await bcrypt.compare(password, admin.password_hash);
     if (!match) {
       return res.status(401).json({ error: 'Invalid admin password' });
@@ -954,6 +962,7 @@ export async function adminLogin(req, res) {
         username: admin.username,
         email: admin.email,
         role: admin.role,
+        status: admin.status || 'Active',
         avatar_url: admin.avatar_url || '/brand/funflick-logo.png'
       }
     });

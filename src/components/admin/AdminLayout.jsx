@@ -80,7 +80,13 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   const adminUser = (() => {
     try {
       const u = localStorage.getItem('funflick_admin_user');
-      return u ? JSON.parse(u) : null;
+      if (u) return JSON.parse(u);
+      const token = localStorage.getItem('funflick_admin_token');
+      if (token && token.includes('.')) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload;
+      }
+      return null;
     } catch (e) {
       return null;
     }
@@ -198,10 +204,10 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
               </div>
               <div className="min-w-0 flex-1">
                 <span className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'} truncate block`}>
-                  Super Admin
+                  {adminUser?.name || (isModerator ? 'Staff Moderator' : 'Super Admin')}
                 </span>
                 <span className="text-[10px] text-pink-400 font-medium truncate block">
-                  funflick0308@gmail.com
+                  {adminUser?.email || (adminUser?.username ? `@${adminUser.username}` : 'funflick0308@gmail.com')}
                 </span>
               </div>
             </div>
@@ -271,9 +277,11 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
               {isLight ? <Moon className="w-4 h-4 text-purple-600" /> : <Sun className="w-4 h-4 text-amber-400" />}
             </button>
 
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
+            <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+              isModerator ? 'bg-purple-500/10 border border-purple-500/20 text-purple-400' : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-500'
+            }`}>
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Super Administrator</span>
+              <span>{isModerator ? 'Staff Moderator' : 'Super Administrator'}</span>
             </span>
 
             <button
