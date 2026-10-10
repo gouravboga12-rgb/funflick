@@ -61,9 +61,14 @@ export const CreatePostScreen = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.users && Array.isArray(data.users)) {
-            setTagSearchResults(data.users.filter(u => u.username !== currentUser?.username));
-          }
+            // Filter out myself and staff moderator/admin accounts
+            setTagSearchResults(data.users.filter(u =>
+              u.username !== currentUser?.username &&
+              u.role !== 'moderator' &&
+              u.role !== 'admin' &&
+              u.username !== 'super_admin' &&
+              !u.username?.toLowerCase().startsWith('moderator')
+            ));
         }
       } catch (e) {
         console.warn('Failed to search users for tagging:', e);

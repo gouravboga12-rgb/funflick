@@ -32,6 +32,22 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   const { adminPayouts, pendingApprovals, copyrightReports, adminAdRequests, showToast, theme, setTheme, loginUser, setIsAuthenticated } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const adminUser = (() => {
+    try {
+      const u = localStorage.getItem('funflick_admin_user');
+      if (u) return JSON.parse(u);
+      const token = localStorage.getItem('funflick_admin_token');
+      if (token && token.includes('.')) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  })();
+  const isModerator = adminUser?.role === 'moderator';
+
   const handleOpenUserApp = () => {
     const adminToken = localStorage.getItem('funflick_admin_token');
     if (adminToken) {
@@ -39,16 +55,40 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
       sessionStorage.setItem('funflick_authenticated', 'true');
       if (setIsAuthenticated) setIsAuthenticated(true);
       if (loginUser) {
-        loginUser({
-          id: 999999,
-          name: 'FunFlick Super Administrator',
-          username: 'super_admin',
-          email: 'funflick0308@gmail.com',
-          role: 'admin',
-          avatar_url: '/brand/funflick-logo.png',
-          hasPublishingSubscription: true
-        });
+        if (adminUser) {
+          loginUser({
+            id: adminUser.id,
+            name: adminUser.name || (adminUser.role === 'moderator' ? 'Staff Moderator' : 'FunFlick Administrator'),
+            username: adminUser.username,
+            email: adminUser.email,
+            role: adminUser.role,
+            avatar: adminUser.avatar_url || adminUser.avatar || (adminUser.role === 'admin' ? '/brand/funflick-logo.png' : '/brand/default-avatar.svg'),
+            avatar_url: adminUser.avatar_url || adminUser.avatar || (adminUser.role === 'admin' ? '/brand/funflick-logo.png' : '/brand/default-avatar.svg'),
+            hasPublishingSubscription: true
+          });
+        } else {
+          loginUser({
+            id: 999999,
+            name: 'FunFlick Super Administrator',
+            username: 'super_admin',
+            email: 'funflick0308@gmail.com',
+            role: 'admin',
+            avatar_url: '/brand/funflick-logo.png',
+            hasPublishingSubscription: true
+          });
+        }
       }
+      // Also fetch profile from backend using admin token to sync full user info
+      fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (d?.user && loginUser) {
+            loginUser(d.user);
+          }
+        })
+        .catch(() => {});
     } else {
       sessionStorage.setItem('funflick_authenticated', 'true');
       if (setIsAuthenticated) setIsAuthenticated(true);
@@ -76,22 +116,6 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
       })
       .catch(() => {});
   }, [location.pathname]);
-
-  const adminUser = (() => {
-    try {
-      const u = localStorage.getItem('funflick_admin_user');
-      if (u) return JSON.parse(u);
-      const token = localStorage.getItem('funflick_admin_token');
-      if (token && token.includes('.')) {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        return payload;
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  })();
-  const isModerator = adminUser?.role === 'moderator';
 
   const MODERATOR_ALLOWED_PATHS = [
     '/admin/ad-requests',

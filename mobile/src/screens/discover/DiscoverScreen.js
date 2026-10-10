@@ -83,7 +83,13 @@ export const DiscoverScreen = ({ navigation }) => {
         const q = searchQuery.trim();
         const data = await apiRequest(`/users/search?limit=15${q ? `&q=${encodeURIComponent(q)}` : ''}`);
         if (isMounted && data && Array.isArray(data.users)) {
-          setLiveCreators(data.users);
+          const filtered = data.users.filter(u =>
+            u.role !== 'moderator' &&
+            u.role !== 'admin' &&
+            u.username !== 'super_admin' &&
+            !u.username?.toLowerCase().startsWith('moderator')
+          );
+          setLiveCreators(filtered);
         }
       } catch (e) {
         console.warn('Could not fetch creators:', e);

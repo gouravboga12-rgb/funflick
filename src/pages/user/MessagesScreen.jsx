@@ -123,8 +123,13 @@ export const MessagesScreen = () => {
         if (res.ok) {
           const data = await res.json();
           if (data.users && Array.isArray(data.users)) {
-            // Keep matching users and allow self-chat (notes/saved messages)
-            setDbUsers(data.users);
+            // Keep matching users excluding staff moderators and admin
+            setDbUsers(data.users.filter(u =>
+              u.role !== 'moderator' &&
+              u.role !== 'admin' &&
+              u.username !== 'super_admin' &&
+              !u.username?.toLowerCase().startsWith('moderator')
+            ));
           }
         }
       } catch (err) {

@@ -7,7 +7,7 @@ export async function followUser(req, res) {
 
     // Find target user by username or id
     const [targetRows] = await pool.query(
-      'SELECT id, name, username FROM users WHERE username = ? OR id = ?',
+      'SELECT id, name, username, role FROM users WHERE username = ? OR id = ?',
       [targetUsername, targetUsername]
     );
 
@@ -16,6 +16,11 @@ export async function followUser(req, res) {
     }
 
     const targetUser = targetRows[0];
+
+    // Cannot follow staff moderator or admin accounts
+    if (targetUser.role === 'moderator' || targetUser.role === 'admin' || targetUser.username === 'super_admin' || targetUser.username?.toLowerCase().startsWith('moderator')) {
+      return res.status(400).json({ error: 'Staff moderator accounts cannot be followed' });
+    }
 
     // Cannot follow self!
     if (targetUser.id === currentUserId) {

@@ -1016,13 +1016,20 @@ export const AppProvider = ({ children }) => {
       if (res.ok) {
         const data = await res.json();
         if (data.users && Array.isArray(data.users)) {
-          const mapped = data.users.map(u => ({
+          const filtered = data.users.filter(u =>
+            u.role !== 'moderator' &&
+            u.role !== 'admin' &&
+            u.username !== 'super_admin' &&
+            !u.username?.toLowerCase().startsWith('moderator')
+          );
+          const mapped = filtered.map(u => ({
             id: u.id,
             name: u.name,
             username: u.username,
             avatar: (u.username === 'super_admin')
               ? (u.avatar && !u.avatar.includes('default-avatar') ? u.avatar : '/brand/funflick-logo.png')
               : (u.avatar || '/brand/default-avatar.svg'),
+            role: u.role,
             isFollowing: Boolean(u.isFollowing),
             stats: {
               followers: u.followersCount > 999 ? `${(u.followersCount / 1000).toFixed(1)}K` : String(u.followersCount)

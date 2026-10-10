@@ -91,8 +91,14 @@ export const UploadVideoScreen = () => {
         if (res.ok) {
           const data = await res.json();
           if (data.users && Array.isArray(data.users)) {
-            // Filter out myself
-            setTagSearchResults(data.users.filter(u => u.username !== currentUser?.username));
+            // Filter out myself and staff moderator/admin accounts
+            setTagSearchResults(data.users.filter(u =>
+              u.username !== currentUser?.username &&
+              u.role !== 'moderator' &&
+              u.role !== 'admin' &&
+              u.username !== 'super_admin' &&
+              !u.username?.toLowerCase().startsWith('moderator')
+            ));
           }
         }
       } catch (e) {

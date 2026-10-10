@@ -518,8 +518,8 @@ export async function forgotPasswordReset(req, res) {
  */
 export async function getCurrentUser(req, res) {
   try {
-    // Return Super Administrator profile if authenticated as admin
-    if (req.user && (req.user.role === 'admin' || req.user.id === 999999)) {
+    // Return Super Administrator profile only if authenticated as root master super admin
+    if (req.user && (req.user.id === 999999 || req.user.username === 'super_admin' || req.user.email === 'funflick0308@gmail.com')) {
       return res.json({
         user: {
           id: 999999,

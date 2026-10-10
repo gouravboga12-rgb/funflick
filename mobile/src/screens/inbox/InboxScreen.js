@@ -96,7 +96,12 @@ export const InboxScreen = ({ navigation, route }) => {
       try {
         const data = await apiRequest(`/users/search?q=${encodeURIComponent(trimmed)}&limit=10`);
         if (data && data.users) {
-          setDbUsers(data.users);
+          setDbUsers(data.users.filter(u =>
+            u.role !== 'moderator' &&
+            u.role !== 'admin' &&
+            u.username !== 'super_admin' &&
+            !u.username?.toLowerCase().startsWith('moderator')
+          ));
         }
       } catch (e) {
       } finally {
