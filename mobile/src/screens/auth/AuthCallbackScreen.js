@@ -10,6 +10,15 @@ export default function AuthCallbackScreen() {
     } catch (e) {
       console.warn('Auth callback session complete error:', e);
     }
+
+    // Auto-close browser popup on Web
+    if (typeof window !== 'undefined' && window.opener) {
+      setTimeout(() => {
+        try {
+          window.close();
+        } catch (e) {}
+      }, 500);
+    }
   }, []);
 
   return (

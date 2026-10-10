@@ -195,6 +195,28 @@ export async function subscribeUser(req, res) {
     const newExpiryDate = new Date(baseExpiryDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
     const totalRemainingDays = calculateISTDaysRemaining(newExpiryDate, now);
 
+    // 3.5 Duplicate / rapid-click prevention: check if payment_id exists or identical plan purchased in last 10 seconds
+    const [existingTx] = await pool.query(
+      `SELECT id FROM user_subscriptions 
+       WHERE payment_id = ? 
+          OR (user_id = ? AND plan_id = ? AND created_at >= NOW() - INTERVAL 10 SECOND)
+       LIMIT 1`,
+      [finalPaymentId, userId, planId]
+    );
+
+    if (existingTx.length > 0) {
+      return res.json({
+        success: true,
+        message: 'Subscription already active and recorded',
+        isInfluencer: true,
+        subscriptionPlan: finalPlanName,
+        startDate: baseStartDate,
+        expiresAt: baseExpiryDate,
+        daysRemaining: totalRemainingDays,
+        totalRemainingDays: totalRemainingDays,
+      });
+    }
+
     // 4. Record transaction in user_subscriptions history table
     await pool.query(
       `INSERT INTO user_subscriptions 

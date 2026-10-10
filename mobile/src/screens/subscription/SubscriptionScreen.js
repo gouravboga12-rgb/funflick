@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -163,7 +163,11 @@ export const SubscriptionScreen = ({ navigation }) => {
     ? formatDate(subStatus.expiresAt)
     : (isUserSubscribed ? '14 Oct 2026' : '');
 
+  const isPurchasingRef = useRef(false);
+
   const handlePurchase = async (plan) => {
+    if (isPurchasingRef.current || processingPlanId) return;
+    isPurchasingRef.current = true;
     setSelectedPlanId(plan.id);
     setProcessingPlanId(plan.id);
 
@@ -214,6 +218,9 @@ export const SubscriptionScreen = ({ navigation }) => {
       Alert.alert('Activated!', `You are now upgraded to ${plan.name}!`);
     } finally {
       setProcessingPlanId(null);
+      setTimeout(() => {
+        isPurchasingRef.current = false;
+      }, 1000);
     }
   };
 
