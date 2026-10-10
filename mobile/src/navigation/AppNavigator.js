@@ -15,6 +15,8 @@ import { SubscriptionScreen } from '../screens/subscription/SubscriptionScreen';
 import { WalletScreen } from '../screens/wallet/WalletScreen';
 import { colors } from '../theme/colors';
 
+import * as Linking from 'expo-linking';
+
 const Stack = createNativeStackNavigator();
 
 const CustomDarkTheme = {
@@ -29,9 +31,30 @@ const CustomDarkTheme = {
   },
 };
 
+const prefix = Linking.createURL('/');
+
+const linking = {
+  prefixes: [prefix, 'funflick://', 'https://funflick-theta.vercel.app'],
+  config: {
+    screens: {
+      Splash: 'splash',
+      MainTabs: {
+        screens: {
+          Feed: 'feed',
+          Discover: 'discover',
+          Inbox: 'inbox',
+          Profile: 'profile',
+        },
+      },
+      Login: 'login',
+      SignUp: 'signup',
+    },
+  },
+};
+
 export default function AppNavigator() {
   return (
-    <NavigationContainer theme={CustomDarkTheme}>
+    <NavigationContainer theme={CustomDarkTheme} linking={linking}>
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{

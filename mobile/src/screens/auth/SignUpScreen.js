@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,10 +16,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { UserPlus, User, Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle2, X } from 'lucide-react-native';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { startGoogleOAuth } from '../../services/googleAuth';
 
 export default function SignUpScreen({ route, navigation }) {
   const { register } = useApp();
   const initialEmail = route?.params?.initialEmail || '';
+  const incomingProfile = route?.params?.googleProfile;
 
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -31,27 +33,59 @@ export default function SignUpScreen({ route, navigation }) {
   const [errorMessage, setErrorMessage] = useState('');
 
   // Google Sign-Up state
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [googleInputEmail, setGoogleInputEmail] = useState('');
-  const [isGoogleVerified, setIsGoogleVerified] = useState(Boolean(initialEmail));
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [isGoogleVerified, setIsGoogleVerified] = useState(Boolean(initialEmail || incomingProfile?.email));
 
-  const handleGoogleVerify = () => {
-    if (!googleInputEmail.trim() || !googleInputEmail.includes('@')) {
-      Alert.alert('Email Required', 'Please enter a valid Google email address');
-      return;
+  useEffect(() => {
+    if (incomingProfile?.email) {
+      setEmail(incomingProfile.email.toLowerCase());
+      if (incomingProfile.name && !name) {
+        setName(incomingProfile.name);
+      }
+      if (!username) {
+        setUsername(incomingProfile.email.split('@')[0].replace(/[^a-z0-9_]/g, ''));
+      }
+      setIsGoogleVerified(true);
     }
-    const clean = googleInputEmail.trim().toLowerCase();
-    setEmail(clean);
-    if (!name) {
-      const suggestedName = clean.split('@')[0].replace(/[._]/g, ' ');
-      setName(suggestedName.charAt(0).toUpperCase() + suggestedName.slice(1));
+  }, [incomingProfile]);
+
+  const handleSignUpWithGoogle = async () => {
+    setGoogleLoading(true);
+    setErrorMessage('');
+
+    try {
+      const result = await startGoogleOAuth('signup');
+
+      if (result.type === 'cancelled') {
+        return;
+      }
+
+      if (result.type === 'google_verified') {
+        const cleanEmail = (result.email || '').toLowerCase().trim();
+        setEmail(cleanEmail);
+        if (result.name && !name) {
+          setName(result.name);
+        }
+        if (!username && cleanEmail) {
+          setUsername(cleanEmail.split('@')[0].replace(/[^a-z0-9_]/g, ''));
+        }
+        setIsGoogleVerified(true);
+        Alert.alert(
+          'Google Verified ✓',
+          `Verified: ${cleanEmail}\nPlease set a password to finish creating your FunFlick account.`
+        );
+        return;
+      }
+
+      if (result.type === 'error') {
+        Alert.alert('Google Sign-Up', result.error || 'Failed to authenticate with Google');
+      }
+    } catch (err) {
+      console.error('Google sign-up error:', err);
+      Alert.alert('Google Sign-Up Error', err.message || 'Failed to authenticate with Google');
+    } finally {
+      setGoogleLoading(false);
     }
-    if (!username) {
-      setUsername(clean.split('@')[0].replace(/[^a-z0-9_]/g, ''));
-    }
-    setIsGoogleVerified(true);
-    setShowGoogleModal(false);
-    Alert.alert('Google Verified', `Email verified: ${clean}. Please complete your password.`);
   };
 
   const handleSignUp = async () => {
@@ -133,14 +167,19 @@ export default function SignUpScreen({ route, navigation }) {
           <TouchableOpacity
             style={styles.googleBtn}
             activeOpacity={0.85}
-            onPress={() => setShowGoogleModal(true)}
+            onPress={handleSignUpWithGoogle}
+            disabled={googleLoading}
           >
             <View style={styles.googleIconBadge}>
               <Text style={styles.googleG}>G</Text>
             </View>
-            <Text style={styles.googleBtnText}>
-              {isGoogleVerified ? 'Google Verified ✓' : 'Sign up with Google'}
-            </Text>
+            {googleLoading ? (
+              <ActivityIndicator color="#fff" size="small" style={{ marginLeft: 8 }} />
+            ) : (
+              <Text style={styles.googleBtnText}>
+                {isGoogleVerified ? 'Google Verified ✓' : 'Sign up with Google'}
+              </Text>
+            )}
           </TouchableOpacity>
 
           <View style={styles.dividerRow}>
@@ -252,56 +291,6 @@ export default function SignUpScreen({ route, navigation }) {
         </View>
       </ScrollView>
 
-      {/* Google Verify Modal */}
-      <Modal visible={showGoogleModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={styles.googleIconBadge}>
-                  <Text style={styles.googleG}>G</Text>
-                </View>
-                <Text style={styles.modalTitle}>Sign Up with Google</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowGoogleModal(false)}>
-                <X color="#9ca3af" size={20} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ marginTop: 14 }}>
-              <Text style={styles.modalSubtitle}>
-                Enter your Google email to prefill and verify your account:
-              </Text>
-              <View style={[styles.inputRow, { marginTop: 12 }]}>
-                <Mail color="rgba(255,255,255,0.4)" size={20} style={styles.fieldIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="yourname@gmail.com"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={googleInputEmail}
-                  onChangeText={setGoogleInputEmail}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.submitBtn, { marginTop: 18 }]}
-                onPress={handleGoogleVerify}
-              >
-                <LinearGradient
-                  colors={['#4285F4', '#34A853']}
-                  style={styles.gradientBtn}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <Text style={styles.btnText}>Verify with Google</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }

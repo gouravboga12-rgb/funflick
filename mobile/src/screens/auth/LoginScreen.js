@@ -17,17 +17,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { LogIn, Lock, User, Eye, EyeOff, ArrowLeft, Mail, X } from 'lucide-react-native';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { startGoogleOAuth } from '../../services/googleAuth';
 
 export default function LoginScreen({ navigation }) {
-  const { login, loginWithGoogle, selectGoogleAccount } = useApp();
+  const { login, hydrateOAuthSession, selectGoogleAccount } = useApp();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Google OAuth state
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  // Google OAuth account chooser state
+  const [showAccountChoiceModal, setShowAccountChoiceModal] = useState(false);
   const [googleEmail, setGoogleEmail] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
   const [accountChoices, setAccountChoices] = useState(null);
@@ -55,40 +56,66 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
-  const handleGoogleSubmit = async () => {
-    if (!googleEmail.trim()) {
-      Alert.alert('Email Required', 'Please enter your Google account email');
-      return;
-    }
+  const handleContinueWithGoogle = async () => {
     setGoogleLoading(true);
+    setErrorMessage('');
+
     try {
-      const res = await loginWithGoogle(googleEmail.trim());
-      if (res && res.requiresAccountChoice) {
-        setAccountChoices(res.accounts);
+      const result = await startGoogleOAuth('login');
+
+      if (result.type === 'cancelled') {
+        setGoogleLoading(false);
         return;
       }
-      setShowGoogleModal(false);
-      Alert.alert('Welcome!', 'Signed in successfully via Google.');
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      } else {
-        navigation.replace('MainTabs');
+
+      if (result.type === 'success') {
+        await hydrateOAuthSession(result.token, result.user);
+        Alert.alert('Welcome Back!', `Signed in successfully as @${result.user.username}`);
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          navigation.replace('MainTabs');
+        }
+        return;
+      }
+
+      if (result.type === 'choose_account') {
+        setGoogleEmail(result.email);
+        setAccountChoices(result.accounts);
+        setShowAccountChoiceModal(true);
+        return;
+      }
+
+      if (result.type === 'no_account') {
+        Alert.alert(
+          'No Account Found',
+          `No FunFlick account is registered with ${result.email}. Would you like to Sign Up now?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Sign Up',
+              onPress: () => {
+                navigation.navigate('SignUp', {
+                  googleProfile: {
+                    email: result.email,
+                    name: result.name,
+                    avatar: result.avatar,
+                    googleId: result.googleId,
+                  },
+                });
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      if (result.type === 'error') {
+        Alert.alert('Google Sign-In', result.error || 'Authentication failed. Please try again.');
       }
     } catch (err) {
-      Alert.alert(
-        'Google Login',
-        err.message || 'No FunFlick account found with this Google email. Would you like to Sign Up?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Sign Up',
-            onPress: () => {
-              setShowGoogleModal(false);
-              navigation.navigate('SignUp', { initialEmail: googleEmail.trim() });
-            },
-          },
-        ]
-      );
+      console.error('Google login error:', err);
+      Alert.alert('Google Sign-In Error', err.message || 'Failed to authenticate with Google');
     } finally {
       setGoogleLoading(false);
     }
@@ -98,7 +125,7 @@ export default function LoginScreen({ navigation }) {
     setGoogleLoading(true);
     try {
       await selectGoogleAccount(account.id, googleEmail.trim());
-      setShowGoogleModal(false);
+      setShowAccountChoiceModal(false);
       setAccountChoices(null);
       Alert.alert('Welcome!', `Logged in as @${account.username}`);
       if (navigation.canGoBack()) {
@@ -152,15 +179,17 @@ export default function LoginScreen({ navigation }) {
           <TouchableOpacity
             style={styles.googleBtn}
             activeOpacity={0.85}
-            onPress={() => {
-              setAccountChoices(null);
-              setShowGoogleModal(true);
-            }}
+            onPress={handleContinueWithGoogle}
+            disabled={googleLoading}
           >
             <View style={styles.googleIconBadge}>
               <Text style={styles.googleG}>G</Text>
             </View>
-            <Text style={styles.googleBtnText}>Continue with Google</Text>
+            {googleLoading ? (
+              <ActivityIndicator color="#fff" size="small" style={{ marginLeft: 8 }} />
+            ) : (
+              <Text style={styles.googleBtnText}>Continue with Google</Text>
+            )}
           </TouchableOpacity>
 
           <View style={styles.dividerRow}>
@@ -231,8 +260,8 @@ export default function LoginScreen({ navigation }) {
         </View>
       </ScrollView>
 
-      {/* Google Sign-In Modal */}
-      <Modal visible={showGoogleModal} transparent animationType="fade">
+      {/* Google Account Chooser Modal (Instagram style when multiple accounts exist) */}
+      <Modal visible={showAccountChoiceModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
@@ -240,75 +269,37 @@ export default function LoginScreen({ navigation }) {
                 <View style={styles.googleIconBadge}>
                   <Text style={styles.googleG}>G</Text>
                 </View>
-                <Text style={styles.modalTitle}>Sign in with Google</Text>
+                <Text style={styles.modalTitle}>Choose Account</Text>
               </View>
-              <TouchableOpacity onPress={() => setShowGoogleModal(false)}>
+              <TouchableOpacity onPress={() => setShowAccountChoiceModal(false)}>
                 <X color="#9ca3af" size={20} />
               </TouchableOpacity>
             </View>
 
-            {accountChoices ? (
-              <View style={{ marginTop: 12 }}>
-                <Text style={styles.accountChoiceSubtitle}>
-                  Multiple accounts found. Choose which account to sign into:
-                </Text>
-                {accountChoices.map((acc) => (
-                  <TouchableOpacity
-                    key={acc.id}
-                    style={styles.accountRow}
-                    onPress={() => handleSelectAccount(acc)}
-                  >
-                    <Image
-                      source={{
-                        uri: acc.avatar_url || 'https://funflick-theta.vercel.app/brand/default-avatar.svg',
-                      }}
-                      style={styles.accAvatar}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.accName}>{acc.name || acc.username}</Text>
-                      <Text style={styles.accUsername}>@{acc.username}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
-              <View style={{ marginTop: 14 }}>
-                <Text style={styles.modalSubtitle}>
-                  Enter your Google account email to sign in to FunFlick:
-                </Text>
-                <View style={[styles.inputRow, { marginTop: 12 }]}>
-                  <Mail color="rgba(255,255,255,0.4)" size={20} style={styles.fieldIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="yourname@gmail.com"
-                    placeholderTextColor="rgba(255,255,255,0.3)"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    value={googleEmail}
-                    onChangeText={setGoogleEmail}
-                  />
-                </View>
-
+            <View style={{ marginTop: 12 }}>
+              <Text style={styles.accountChoiceSubtitle}>
+                Multiple accounts are linked to {googleEmail}. Choose which account to sign into:
+              </Text>
+              {accountChoices && accountChoices.map((acc) => (
                 <TouchableOpacity
-                  style={[styles.submitBtn, { marginTop: 18 }]}
-                  onPress={handleGoogleSubmit}
+                  key={acc.id}
+                  style={styles.accountRow}
+                  onPress={() => handleSelectAccount(acc)}
                   disabled={googleLoading}
                 >
-                  <LinearGradient
-                    colors={['#4285F4', '#34A853']}
-                    style={styles.gradientBtn}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  >
-                    {googleLoading ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.btnText}>Continue with Google</Text>
-                    )}
-                  </LinearGradient>
+                  <Image
+                    source={{
+                      uri: acc.avatar_url || 'https://funflick-theta.vercel.app/brand/default-avatar.svg',
+                    }}
+                    style={styles.accAvatar}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.accName}>{acc.name || acc.username}</Text>
+                    <Text style={styles.accUsername}>@{acc.username}</Text>
+                  </View>
                 </TouchableOpacity>
-              </View>
-            )}
+              ))}
+            </View>
           </View>
         </View>
       </Modal>

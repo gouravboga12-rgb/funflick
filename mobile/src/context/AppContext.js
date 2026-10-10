@@ -213,6 +213,19 @@ export const AppProvider = ({ children }) => {
     throw new Error(data.error || 'Failed to select account');
   };
 
+  // Hydrate user session from OAuth token and user object
+  const hydrateOAuthSession = async (token, user) => {
+    if (token && user) {
+      await setToken(token);
+      await setStoredUser(user);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      registerForPushNotificationsAsync();
+      fetchFeed();
+      return user;
+    }
+  };
+
   // Logout handler
   const logout = async () => {
     await setToken(null);
@@ -502,6 +515,7 @@ export const AppProvider = ({ children }) => {
         register,
         loginWithGoogle,
         selectGoogleAccount,
+        hydrateOAuthSession,
         logout,
         posts,
         stories,

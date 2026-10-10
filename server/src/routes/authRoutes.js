@@ -11,6 +11,8 @@ import {
   googleLogin,
   googleSelectAccount,
   googleSignupComplete,
+  googleAuthStart,
+  googleAuthCallback,
   updateContactInfo,
   updateUserProfile,
   deleteAccount,
@@ -38,7 +40,11 @@ router.get('/admin-me', authenticateToken, getAdminMe);
 router.post('/forgot-password/lookup', forgotPasswordLookup);
 router.post('/forgot-password/reset', forgotPasswordReset);
 
-// Google OAuth (Strictly distinct Login vs Sign-Up)
+// Google OAuth (Browser redirect & deep-link flow)
+router.get('/google/start', googleAuthStart);
+router.get('/google/callback', googleAuthCallback);
+
+// Google OAuth (Direct payload & legacy endpoints)
 router.post('/google', googleLogin);
 router.post('/google-login', googleLogin);
 router.post('/google-select-account', googleSelectAccount);

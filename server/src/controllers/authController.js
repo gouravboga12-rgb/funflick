@@ -885,6 +885,250 @@ export async function googleSignupComplete(req, res) {
 }
 
 /**
+ * Browser-based Google OAuth Start:
+ * Initiates the real Google OAuth 2.0 flow.
+ * Redirects user to Google OAuth accounts page.
+ */
+export async function googleAuthStart(req, res) {
+  try {
+    const flow = req.query.flow === 'signup' ? 'signup' : 'login';
+    const returnUrl = req.query.returnUrl || 'funflick://auth/callback';
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const backendCallback = process.env.GOOGLE_CALLBACK_URL || 'https://funflick-theta.vercel.app/api/auth/google/callback';
+
+    if (!clientId) {
+      return res.status(500).json({ error: 'Google Client ID is not configured on server' });
+    }
+
+    const statePayload = Buffer.from(JSON.stringify({ flow, returnUrl, ts: Date.now() })).toString('base64url');
+
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${encodeURIComponent(clientId)}&` +
+      `redirect_uri=${encodeURIComponent(backendCallback)}&` +
+      `response_type=code&` +
+      `scope=${encodeURIComponent('openid email profile')}&` +
+      `prompt=select_account&` +
+      `state=${encodeURIComponent(statePayload)}`;
+
+    if (req.query.format === 'json') {
+      return res.json({ authUrl: googleAuthUrl });
+    }
+
+    return res.redirect(googleAuthUrl);
+  } catch (err) {
+    console.error('Google auth start error:', err);
+    return res.status(500).json({ error: 'Failed to initiate Google OAuth flow' });
+  }
+}
+
+/**
+ * Browser-based Google OAuth Callback:
+ * Google redirects here with authorization code and state.
+ * Backend exchanges code for tokens, fetches user profile, checks database,
+ * and redirects back to the mobile app via custom URL scheme (e.g. funflick://auth/callback).
+ */
+export async function googleAuthCallback(req, res) {
+  let targetReturnUrl = 'funflick://auth/callback';
+  let flow = 'login';
+
+  try {
+    const { code, state, error } = req.query;
+
+    if (state) {
+      try {
+        const decoded = JSON.parse(Buffer.from(state, 'base64url').toString('utf-8'));
+        if (decoded.returnUrl) targetReturnUrl = decoded.returnUrl;
+        if (decoded.flow) flow = decoded.flow;
+      } catch (e) {
+        console.warn('Could not parse OAuth state:', e);
+      }
+    }
+
+    const makeDeepLink = (paramsObj) => {
+      try {
+        const u = new URL(targetReturnUrl);
+        Object.entries(paramsObj).forEach(([k, v]) => {
+          if (v !== undefined && v !== null) {
+            u.searchParams.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+          }
+        });
+        return u.toString();
+      } catch (e) {
+        // Fallback for custom schemes not parsing as standard URLs in some environments
+        const qs = Object.entries(paramsObj)
+          .filter(([_, v]) => v !== undefined && v !== null)
+          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(typeof v === 'object' ? JSON.stringify(v) : String(v))}`)
+          .join('&');
+        return targetReturnUrl.includes('?') ? `${targetReturnUrl}&${qs}` : `${targetReturnUrl}?${qs}`;
+      }
+    };
+
+    const sendRedirectResponse = (deepLinkUrl) => {
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Redirecting to FunFlick...</title>
+          <style>
+            body { background: #07040d; color: #fff; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+            .btn { background: #ff007a; color: #fff; padding: 12px 24px; border-radius: 24px; text-decoration: none; font-weight: bold; margin-top: 16px; display: inline-block; }
+          </style>
+          <script>
+            window.location.href = ${JSON.stringify(deepLinkUrl)};
+            setTimeout(function() {
+              var btn = document.getElementById('openBtn');
+              if (btn) btn.style.display = 'inline-block';
+            }, 1500);
+          </script>
+        </head>
+        <body>
+          <h2 style="margin: 0 0 8px 0;">Returning to FunFlick...</h2>
+          <p style="color: #9ca3af; font-size: 14px; margin: 0;">If you are not redirected automatically, tap below:</p>
+          <a id="openBtn" href="${deepLinkUrl}" class="btn" style="display: none;">Open FunFlick</a>
+        </body>
+        </html>
+      `);
+    };
+
+    if (error) {
+      console.warn('Google OAuth returned error:', error);
+      const failUrl = makeDeepLink({ status: 'error', error: String(error) });
+      return sendRedirectResponse(failUrl);
+    }
+
+    if (!code) {
+      const failUrl = makeDeepLink({ status: 'error', error: 'no_code_provided' });
+      return sendRedirectResponse(failUrl);
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const backendCallback = process.env.GOOGLE_CALLBACK_URL || 'https://funflick-theta.vercel.app/api/auth/google/callback';
+
+    if (!clientId || !clientSecret) {
+      console.error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variable');
+      const failUrl = makeDeepLink({ status: 'error', error: 'server_configuration_error' });
+      return sendRedirectResponse(failUrl);
+    }
+
+    // 1. Exchange authorization code for tokens
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: backendCallback,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    const tokenData = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokenData.access_token) {
+      console.error('Google token exchange error:', tokenData);
+      const failUrl = makeDeepLink({ status: 'error', error: tokenData.error || 'token_exchange_failed' });
+      return sendRedirectResponse(failUrl);
+    }
+
+    // 2. Fetch verified Google user profile
+    const profileResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const googleProfile = await profileResponse.json();
+
+    if (!profileResponse.ok || !googleProfile.email) {
+      console.error('Google user info error:', googleProfile);
+      const failUrl = makeDeepLink({ status: 'error', error: 'failed_to_fetch_profile' });
+      return sendRedirectResponse(failUrl);
+    }
+
+    const email = googleProfile.email.trim().toLowerCase();
+    const name = googleProfile.name || email.split('@')[0];
+    const avatar = googleProfile.picture || null;
+    const googleId = googleProfile.sub || null;
+
+    // 3. Query existing accounts for this email
+    const [accounts] = await pool.query(
+      'SELECT id, name, username, email, phone, avatar_url, bio, role FROM users WHERE email = ?',
+      [email]
+    );
+
+    // FLOW A: SIGN-UP WITH GOOGLE
+    if (flow === 'signup') {
+      const deepLink = makeDeepLink({
+        status: 'google_verified',
+        email,
+        name,
+        avatar: avatar || '',
+        googleId: googleId || '',
+        existingAccountsCount: accounts.length,
+      });
+      return sendRedirectResponse(deepLink);
+    }
+
+    // FLOW B: LOGIN WITH GOOGLE
+    // Case 1: No account registered for this email
+    if (accounts.length === 0) {
+      const deepLink = makeDeepLink({
+        status: 'no_account',
+        email,
+        name,
+        avatar: avatar || '',
+        googleId: googleId || '',
+      });
+      return sendRedirectResponse(deepLink);
+    }
+
+    // Case 2: Multiple accounts found on same Google email (Instagram Account Chooser)
+    if (accounts.length > 1) {
+      const deepLink = makeDeepLink({
+        status: 'choose_account',
+        email,
+        accounts: accounts.map(a => ({
+          id: a.id,
+          name: a.name,
+          username: a.username,
+          avatar_url: a.avatar_url,
+        })),
+      });
+      return sendRedirectResponse(deepLink);
+    }
+
+    // Case 3: Exactly 1 account found -> Direct Login
+    const user = accounts[0];
+    const jwtToken = jwt.sign(
+      { id: user.id, username: user.username, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'funflick_secret',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    const deepLink = makeDeepLink({
+      status: 'success',
+      token: jwtToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        avatar: user.avatar_url,
+        role: user.role,
+      },
+    });
+
+    return sendRedirectResponse(deepLink);
+  } catch (err) {
+    console.error('Google auth callback error:', err);
+    const failUrl = `${targetReturnUrl}?status=error&error=server_error`;
+    return res.redirect(failUrl);
+  }
+}
+
+
+/**
  * Dedicated Admin Authentication
  * Enforces admin-only credentials and separate admin JWT
  */
