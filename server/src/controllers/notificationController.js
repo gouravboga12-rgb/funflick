@@ -34,14 +34,20 @@ export async function listNotifications(req, res) {
         type: r.type,
         user: r.actor_username ? r.actor_username.replace(/^@+/, '') : 'FunFlick',
         actorUsername: r.actor_username ? r.actor_username.replace(/^@+/, '') : '',
+        actor_username: r.actor_username ? r.actor_username.replace(/^@+/, '') : '',
         actorName: r.actor_name || 'FunFlick',
-        avatar: r.actor_avatar || '/brand/funflick-logo.png',
+        actor_name: r.actor_name || 'FunFlick',
+        avatar: r.actor_avatar || '',
+        actor_avatar: r.actor_avatar || '',
         text: cleanText,
-        title: r.title,
+        message: cleanText,
+        title: r.title || (r.type === 'message' ? `${actorName || 'User'} sent you a message` : 'Notification'),
         time: 'Recently',
         created_at: r.created_at,
         unread: !r.is_read,
-        targetId: r.target_id
+        is_read: r.is_read ? 1 : 0,
+        targetId: r.target_id,
+        target_id: r.target_id
       };
     });
 

@@ -346,6 +346,26 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
+  // Follow requests state (matching website)
+  const [followRequests, setFollowRequests] = useState([]);
+
+  const acceptFollowRequest = useCallback((requestId) => {
+    const req = followRequests.find(r => r.id === requestId);
+    if (!req) return;
+    setFollowRequests(prev => prev.filter(r => r.id !== requestId));
+    if (req.username) {
+      setFollowingUsernames(prev => {
+        const next = new Set(prev);
+        next.add(req.username.toLowerCase());
+        return next;
+      });
+    }
+  }, [followRequests]);
+
+  const declineFollowRequest = useCallback((requestId) => {
+    setFollowRequests(prev => prev.filter(r => r.id !== requestId));
+  }, []);
+
   // Conversations State
   const [conversations, setConversations] = useState([]);
   const [userSubmissions, setUserSubmissions] = useState([]);
@@ -861,6 +881,10 @@ export const AppProvider = ({ children }) => {
         fetchNotifications,
         markAllNotificationsRead,
         clearAllNotifications,
+        followRequests,
+        setFollowRequests,
+        acceptFollowRequest,
+        declineFollowRequest,
       }}
     >
       {children}
