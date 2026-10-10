@@ -114,13 +114,11 @@ export const DiscoverScreen = () => {
       .map(([tag]) => tag);
   }, [posts]);
 
-  // Filtered creators when searching (excluding staff moderators and admins)
+  // Filtered creators when searching (excluding staff moderators)
   const filteredCreators = (searchQuery.trim() 
     ? creators.filter(c => c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || c.username?.toLowerCase().includes(searchQuery.toLowerCase()))
     : creators).filter(c =>
       c.role !== 'moderator' &&
-      c.role !== 'admin' &&
-      c.username !== 'super_admin' &&
       !c.username?.toLowerCase().startsWith('moderator')
     );
 

@@ -1018,8 +1018,6 @@ export const AppProvider = ({ children }) => {
         if (data.users && Array.isArray(data.users)) {
           const filtered = data.users.filter(u =>
             u.role !== 'moderator' &&
-            u.role !== 'admin' &&
-            u.username !== 'super_admin' &&
             !u.username?.toLowerCase().startsWith('moderator')
           );
           const mapped = filtered.map(u => ({

@@ -61,12 +61,10 @@ export const CreatePostScreen = () => {
         });
         if (res.ok) {
           const data = await res.json();
-            // Filter out myself and staff moderator/admin accounts
+            // Filter out myself and staff moderator accounts
             setTagSearchResults(data.users.filter(u =>
               u.username !== currentUser?.username &&
               u.role !== 'moderator' &&
-              u.role !== 'admin' &&
-              u.username !== 'super_admin' &&
               !u.username?.toLowerCase().startsWith('moderator')
             ));
         }

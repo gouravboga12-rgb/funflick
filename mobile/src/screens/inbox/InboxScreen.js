@@ -98,8 +98,6 @@ export const InboxScreen = ({ navigation, route }) => {
         if (data && data.users) {
           setDbUsers(data.users.filter(u =>
             u.role !== 'moderator' &&
-            u.role !== 'admin' &&
-            u.username !== 'super_admin' &&
             !u.username?.toLowerCase().startsWith('moderator')
           ));
         }

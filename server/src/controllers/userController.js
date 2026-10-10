@@ -19,8 +19,7 @@ export async function searchUsers(req, res) {
         (SELECT COUNT(*) FROM follows WHERE follower_id = ? AND following_id = u.id) AS is_following
       FROM users u
       WHERE u.status = 'Active'
-        AND u.role NOT IN ('moderator', 'admin')
-        AND u.username != 'super_admin'
+        AND u.role != 'moderator'
         AND u.username NOT LIKE 'moderator%'
     `;
     const params = [currentUserId];
@@ -87,8 +86,8 @@ export async function getUserProfile(req, res) {
 
     const r = rows[0];
 
-    // Staff moderator or admin accounts should not be publicly accessible in the user side
-    if (r.role === 'moderator' || r.role === 'admin' || r.username === 'super_admin' || r.username?.toLowerCase().startsWith('moderator')) {
+    // Staff moderator accounts should not be publicly accessible in the user side
+    if (r.role === 'moderator' || r.username?.toLowerCase().startsWith('moderator')) {
       const isViewerAuthorized = Boolean(
         currentUserId && (
           r.id === currentUserId ||
