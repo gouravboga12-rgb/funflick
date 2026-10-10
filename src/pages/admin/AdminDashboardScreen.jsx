@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
+import { AdminVideoPlayer } from '../../components/admin/AdminVideoPlayer';
 import { 
   Users, 
   Video, 
@@ -19,6 +20,49 @@ import {
   RefreshCw,
   AlertCircle
 } from 'lucide-react';
+
+function DashboardMediaThumbnail({ item, onPreview }) {
+  const [imgError, setImgError] = React.useState(false);
+  const mediaUrl = item?.mediaUrl || item?.videoUrl || item?.thumbnail || '';
+  const thumbnailUrl = item?.thumbnail || item?.thumbnailUrl || '';
+  const isVideoUrl = (url) => url && (/\.(mp4|mov|webm|m4v|ogg)($|\?)/i.test(url) || url.includes('/video/') || url.includes('video'));
+  const isImageUrl = (url) => url && (/\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(url) || url.startsWith('data:image/'));
+
+  const hasImage = thumbnailUrl && isImageUrl(thumbnailUrl) && !imgError;
+  const videoSrc = isVideoUrl(thumbnailUrl) ? thumbnailUrl : (isVideoUrl(mediaUrl) ? mediaUrl : null);
+
+  return (
+    <div
+      onClick={onPreview}
+      className="relative w-16 h-16 rounded-2xl overflow-hidden bg-gray-950 shrink-0 border border-white/10 cursor-pointer group shadow-sm hover:border-pink-500/50 transition"
+      title="Click to preview & inspect video"
+    >
+      {hasImage ? (
+        <img
+          src={thumbnailUrl}
+          alt={item?.title || 'Video'}
+          onError={() => setImgError(true)}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+        />
+      ) : videoSrc ? (
+        <video
+          src={`${videoSrc}#t=0.5`}
+          preload="metadata"
+          muted
+          playsInline
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform pointer-events-none"
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-tr from-purple-900 to-pink-900 flex items-center justify-center">
+          <Video className="w-6 h-6 text-pink-300" />
+        </div>
+      )}
+      <div className="absolute inset-0 bg-black/35 group-hover:bg-black/15 flex items-center justify-center transition">
+        <Play className="w-5 h-5 fill-current text-white/90 group-hover:scale-110 transition-transform" />
+      </div>
+    </div>
+  );
+}
 
 export const AdminDashboardScreen = () => {
   const navigate = useNavigate();
@@ -40,6 +84,7 @@ export const AdminDashboardScreen = () => {
   const isLight = theme === 'light';
 
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [previewItem, setPreviewItem] = React.useState(null);
 
   const loadData = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
@@ -172,19 +217,13 @@ export const AdminDashboardScreen = () => {
                 className="p-4 rounded-3xl bg-[#140e2b] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-pink-500/20 transition"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-gray-900 shrink-0">
-                    <img
-                      src={item.thumbnail}
-                      alt={item.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                      <Play className="w-5 h-5 fill-current text-white/80" />
-                    </div>
-                  </div>
+                  <DashboardMediaThumbnail 
+                    item={item} 
+                    onPreview={() => setPreviewItem(item)} 
+                  />
 
-                  <div>
-                    <h4 className="text-sm font-bold text-white font-heading">
+                  <div className="cursor-pointer" onClick={() => setPreviewItem(item)}>
+                    <h4 className="text-sm font-bold text-white font-heading hover:text-pink-300 transition">
                       {item.title}
                     </h4>
                     <p className="text-xs text-pink-300 font-medium mt-0.5">
@@ -201,7 +240,7 @@ export const AdminDashboardScreen = () => {
                 <div className="flex items-center gap-2 sm:self-center self-end">
                   <button
                     onClick={() => handlePendingApproval(item.id, 'approve')}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <Check className="w-3.5 h-3.5 stroke-[3]" />
                     <span>Approve</span>
@@ -209,7 +248,7 @@ export const AdminDashboardScreen = () => {
 
                   <button
                     onClick={() => handlePendingApproval(item.id, 'reject')}
-                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5 stroke-[3]" />
                     <span>Reject</span>
@@ -220,6 +259,85 @@ export const AdminDashboardScreen = () => {
           </div>
         )}
       </div>
+
+      {/* Media Inspection Modal */}
+      {previewItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-[#130d29] border border-pink-500/30 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto no-scrollbar">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div>
+                <h4 className="font-extrabold text-white text-base font-heading">
+                  Video Review & Inspection
+                </h4>
+                <span className="text-[11px] text-pink-300">
+                  Inspect high-fidelity source before approving or rejecting
+                </span>
+              </div>
+              <button 
+                onClick={() => setPreviewItem(null)} 
+                className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-white/10 shadow-2xl">
+              <AdminVideoPlayer
+                src={previewItem.mediaUrl || previewItem.video_url || previewItem.thumbnail}
+                poster={previewItem.thumbnail}
+                autoPlay={true}
+                className="w-full h-full"
+              />
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Content Title:</span>
+                <span className="font-bold text-white text-right">{previewItem.title}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Creator Details:</span>
+                <span className="text-pink-300 font-semibold">{previewItem.creatorName} (@{previewItem.creator})</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Category:</span>
+                <span className="text-gray-200">{previewItem.category}</span>
+              </div>
+              {previewItem.caption && (
+                <div className="pt-2 border-t border-white/5">
+                  <span className="text-gray-400 block mb-1">Caption / Description:</span>
+                  <p className="text-gray-200 bg-black/30 p-2.5 rounded-xl">{previewItem.caption}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => {
+                  handlePendingApproval(previewItem.id, 'reject');
+                  setPreviewItem(null);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <X className="w-4 h-4 stroke-[3]" />
+                <span>Reject & Delete</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  handlePendingApproval(previewItem.id, 'approve');
+                  setPreviewItem(null);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>Confirm & Approve</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Access to Important Features: Payouts & Subscriptions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

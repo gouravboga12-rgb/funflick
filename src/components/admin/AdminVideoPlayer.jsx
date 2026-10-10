@@ -182,7 +182,7 @@ export const AdminVideoPlayer = ({
       <video
         ref={videoRef}
         src={src}
-        poster={poster}
+        poster={poster && !/\.(mp4|mov|webm|m4v|ogg)($|\?)/i.test(poster) && !poster.includes('/videos/') ? poster : undefined}
         playsInline
         preload="metadata"
         onClick={togglePlay}

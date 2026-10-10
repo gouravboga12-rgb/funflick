@@ -435,15 +435,24 @@ export async function getAdminContent(req, res) {
     let query = `
       SELECT 
         v.id, v.title, v.description AS caption, v.category, v.video_url, v.thumbnail_url,
-        v.media_type, v.hashtags, v.location, v.audio_title, v.duration, v.created_at, v.status,
+        v.media_type, v.hashtags, v.location, v.audio_title, v.duration, v.created_at, v.status, v.moderation_status,
         u.id AS user_id, u.name AS creator_name, u.username AS creator, u.avatar_url AS avatar, u.status AS user_status
       FROM videos v
       JOIN users u ON v.user_id = u.id
     `;
     const params = [];
     if (status && status !== 'all') {
-      query += ` WHERE v.status = ?`;
-      params.push(status);
+      const s = String(status).toLowerCase();
+      if (s === 'pending') {
+        query += ` WHERE (v.moderation_status = 'Pending' OR (v.moderation_status IS NULL AND v.status = 'Pending'))`;
+      } else if (s === 'approved') {
+        query += ` WHERE (v.moderation_status = 'Approved' OR (v.moderation_status IS NULL AND v.status = 'Approved'))`;
+      } else if (s === 'rejected') {
+        query += ` WHERE (v.moderation_status = 'Rejected' OR v.status = 'Rejected')`;
+      } else {
+        query += ` WHERE (v.status = ? OR v.moderation_status = ?)`;
+        params.push(status, status);
+      }
     }
     query += ` ORDER BY v.created_at DESC`;
     const [rows] = await pool.query(query, params);
@@ -458,6 +467,8 @@ export async function getAdminContent(req, res) {
       } else {
         displayType = (r.category === 'Reel' || r.duration <= 90) ? 'Reel' : 'Video';
       }
+
+      const effectiveStatus = r.moderation_status || r.status || 'Pending';
 
       return {
         id: r.id,
@@ -480,7 +491,8 @@ export async function getAdminContent(req, res) {
         userStatus: r.user_status || 'Active',
         date: new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
         createdAt: r.created_at,
-        status: r.status || 'Pending'
+        status: effectiveStatus,
+        moderationStatus: effectiveStatus
       };
     });
 
@@ -776,7 +788,7 @@ export async function getAdminStats(req, res) {
     const [[{ totalUsers }]] = await pool.query("SELECT COUNT(*) AS totalUsers FROM users WHERE role != 'admin'");
     const [[{ totalCreators }]] = await pool.query("SELECT COUNT(*) AS totalCreators FROM users WHERE role = 'creator' OR is_influencer = 1");
     const [[{ totalVideos }]] = await pool.query("SELECT COUNT(*) AS totalVideos FROM videos WHERE status = 'Approved'");
-    const [[{ pendingVideos }]] = await pool.query("SELECT COUNT(*) AS pendingVideos FROM videos WHERE status = 'Pending'");
+    const [[{ pendingVideos }]] = await pool.query("SELECT COUNT(*) AS pendingVideos FROM videos WHERE (moderation_status = 'Pending' OR (moderation_status IS NULL AND status = 'Pending'))");
     const [[{ activeStories }]] = await pool.query("SELECT COUNT(*) AS activeStories FROM stories WHERE expires_at IS NULL OR expires_at > NOW()");
     const [[{ activeSubscriptions }]] = await pool.query("SELECT COUNT(*) AS activeSubscriptions FROM users WHERE is_influencer = 1 AND subscription_expires_at > NOW()");
     const [[{ totalRevenue }]] = await pool.query("SELECT COALESCE(SUM(price), 0) AS totalRevenue FROM user_subscriptions WHERE payment_status = 'success'");

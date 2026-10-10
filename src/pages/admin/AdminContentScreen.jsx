@@ -28,7 +28,7 @@ import {
 import { SuspendAccountModal } from '../../components/admin/SuspendAccountModal';
 
 export const AdminContentScreen = () => {
-  const { showToast, fetchAdminStats } = useApp();
+  const { showToast, fetchAdminStats, pendingApprovals } = useApp();
   const [tab, setTab] = useState('Pending'); // 'Pending' | 'Approved' | 'Rejected' | 'All'
   const [contentList, setContentList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -174,7 +174,9 @@ export const AdminContentScreen = () => {
     return item.displayType?.toLowerCase() === typeFilter.toLowerCase();
   });
 
-  const pendingCount = contentList.filter(c => c.status === 'Pending').length;
+  const pendingCount = (pendingApprovals && pendingApprovals.length > 0)
+    ? pendingApprovals.length
+    : contentList.filter(c => c.status === 'Pending').length;
 
   return (
     <AdminLayout title="Content Moderation Desk">
