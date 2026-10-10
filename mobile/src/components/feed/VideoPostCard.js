@@ -27,6 +27,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const isFocused = useIsFocused();
   const { toggleLikePost, recordPostView, toggleFollowCreator, isReelsMuted, toggleMute, currentUser } = useApp();
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isUserPaused, setIsUserPaused] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [commentsCount, setCommentsCount] = useState(Number(post.commentsCount) || 0);
   const [lastTap, setLastTap] = useState(0);
@@ -42,17 +43,24 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
-    if (isActive && isFocused) {
+    if (isActive && isFocused && !isUserPaused) {
       p.play();
       setIsPlaying(true);
     }
   });
 
-  // Play/pause based on active viewport state and screen focus
+  // Reset user manual pause state when scrolling away to another reel
+  useEffect(() => {
+    if (!isActive) {
+      setIsUserPaused(false);
+    }
+  }, [isActive]);
+
+  // Play/pause based on active viewport state, screen focus, and user pause toggle
   useEffect(() => {
     if (!player) return;
     try {
-      if (isActive && isFocused) {
+      if (isActive && isFocused && !isUserPaused) {
         player.play();
         setIsPlaying(true);
         recordPostView(post.id);
@@ -61,7 +69,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         setIsPlaying(false);
       }
     } catch {}
-  }, [isActive, isFocused, player, post.id]);
+  }, [isActive, isFocused, isUserPaused, player, post.id]);
 
   // Sync mute state
   useEffect(() => {
@@ -90,17 +98,21 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
       }
       triggerHeartBurst();
     } else {
-      // Single tap -> Toggle Play/Pause
+      // Single tap -> Toggle Play/Pause reliably
       if (player) {
         try {
-          if (player.playing) {
+          if (!isUserPaused && isPlaying) {
             player.pause();
+            setIsUserPaused(true);
             setIsPlaying(false);
           } else {
             player.play();
+            setIsUserPaused(false);
             setIsPlaying(true);
           }
-        } catch {}
+        } catch (e) {
+          console.warn('Video toggle play error:', e?.message);
+        }
       }
     }
     setLastTap(now);
@@ -149,7 +161,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         />
 
         {/* Center Pause Indicator */}
-        {!isPlaying && isVideo && (
+        {(!isPlaying || isUserPaused) && isVideo && (
           <View style={styles.playOverlay} pointerEvents="none">
             <View style={styles.playIconCircle}>
               <Play size={32} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />

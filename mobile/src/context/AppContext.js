@@ -712,21 +712,35 @@ export const AppProvider = ({ children }) => {
       type === 'chat' ||
       type === 'direct_message' ||
       notifData.sender_username ||
+      notifData.senderUsername ||
       notifData.sender ||
+      notifData.targetUser ||
       title.includes('message') ||
-      title.includes('chat')
+      title.includes('chat') ||
+      title.startsWith('💬')
     ) {
-      const partner = notifData.sender_username || notifData.sender || notifData.username;
+      const usernameMatch = (notifData.title || '').match(/@([a-zA-Z0-9_.]+)/);
+      const partner = notifData.targetUser?.username || notifData.senderUsername || notifData.sender_username || notifData.sender || notifData.username || (usernameMatch ? usernameMatch[1] : null);
+      const partnerName = notifData.targetUser?.name || notifData.senderName || notifData.sender_name || notifData.name || partner;
+      const partnerAvatar = notifData.targetUser?.avatar || notifData.senderAvatar || notifData.sender_avatar || notifData.avatar;
+
       navigate('MainTabs', {
         screen: 'Inbox',
         params: partner ? {
           targetUser: {
             username: partner,
-            name: notifData.sender_name || notifData.name || partner,
-            avatar: notifData.sender_avatar || notifData.avatar,
+            name: partnerName,
+            avatar: partnerAvatar,
           },
         } : undefined,
       });
+      return;
+    }
+
+    // 2. Likes & Comments -> Video Details
+    const videoId = notifData.videoId || notifData.target_id || notifData.targetId;
+    if ((type === 'like' || type === 'comment') && videoId) {
+      navigate('VideoDetail', { videoId });
       return;
     }
 

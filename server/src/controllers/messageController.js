@@ -191,28 +191,45 @@ export async function sendMessage(req, res) {
     );
 
     // Fetch sender info for recipient notification
-    const [senderRows] = await pool.query('SELECT name, username FROM users WHERE id = ?', [senderId]);
-    const senderName = senderRows[0]?.name || senderRows[0]?.username || 'Someone';
+    const [senderRows] = await pool.query('SELECT name, username, avatar_url FROM users WHERE id = ?', [senderId]);
+    const sender = senderRows[0] || {};
+    const senderName = sender.name || sender.username || 'Someone';
+    const senderUsername = sender.username || '';
+    const senderAvatar = sender.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
 
     // Insert notification for recipient (if not self-chat)
     if (!isSelfChat) {
       try {
-        const notifSnippet = text?.trim() ? text.trim().slice(0, 50) : (finalMediaType === 'video' ? 'Sent a video' : 'Sent a photo');
+        const notifSnippet = text?.trim() ? text.trim().slice(0, 80) : (finalMediaType === 'video' ? '🎥 Sent a video' : '📷 Sent a photo');
         await pool.query(
           `
           INSERT INTO notifications (user_id, actor_id, type, title, message)
-          VALUES (?, ?, 'system', 'New Message', ?)
+          VALUES (?, ?, 'message', ?, ?)
           `,
-          [recipientId, senderId, `${senderName}: ${notifSnippet}`]
+          [recipientId, senderId, `${senderName} (@${senderUsername})`, notifSnippet]
         );
 
-        // Send instant device push notification
+        // Send instant device push notification (wakes up phone when app is closed)
         sendPushNotification(recipientId, {
-          title: `💬 ${senderName}`,
+          title: `💬 ${senderName} (@${senderUsername})`,
           body: notifSnippet,
-          data: { type: 'chat', partnerId: senderId, senderUsername: senderRows[0]?.username }
+          data: {
+            type: 'chat',
+            partnerId: senderId,
+            senderUsername: senderUsername,
+            senderName: senderName,
+            senderAvatar: senderAvatar,
+            targetUser: {
+              id: senderId,
+              username: senderUsername,
+              name: senderName,
+              avatar: senderAvatar
+            }
+          }
         });
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Message notification error:', e?.message);
+      }
     }
 
     const newMsg = {

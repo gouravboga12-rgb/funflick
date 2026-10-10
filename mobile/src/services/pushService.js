@@ -44,6 +44,8 @@ export async function registerForPushNotificationsAsync() {
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#ff007a',
           sound: 'default',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          showBadge: true,
         });
       } catch (channelErr) {
         console.warn('Notification channel setup error:', channelErr?.message);

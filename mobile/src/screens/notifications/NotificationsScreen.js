@@ -19,6 +19,8 @@ import {
   Heart,
   UserPlus,
   MessageSquare,
+  MessageCircle,
+  ChevronRight,
   Sparkles,
   CreditCard,
   ShieldAlert,
@@ -26,7 +28,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
-const CATEGORIES = ['All', 'Requests', 'Likes', 'Comments', 'Follows', 'System'];
+const CATEGORIES = ['All', 'Messages', 'Likes', 'Comments', 'Follows', 'System'];
 
 export const NotificationsScreen = ({ navigation }) => {
   const {
@@ -74,12 +76,85 @@ export const NotificationsScreen = ({ navigation }) => {
     );
   };
 
+  const handleNotificationItemPress = (item) => {
+    if (!item) return;
+    const type = String(item.type || '').toLowerCase();
+    const title = String(item.title || '').toLowerCase();
+    const msg = String(item.message || '').toLowerCase();
+
+    // 1. Direct Messages / Chat
+    if (
+      type === 'message' ||
+      type === 'chat' ||
+      title.includes('message') ||
+      title.includes('chat') ||
+      title.startsWith('💬')
+    ) {
+      const usernameMatch = (item.title || '').match(/@([a-zA-Z0-9_.]+)/);
+      const targetUsername = usernameMatch ? usernameMatch[1] : (item.actor_username || item.username || item.actor_id);
+      const cleanName = (item.title || '')
+        .replace(/^💬\s*/, '')
+        .replace(/\s*\(@.*\)/, '')
+        .trim() || targetUsername;
+
+      navigation.navigate('MainTabs', {
+        screen: 'Inbox',
+        params: {
+          targetUser: {
+            username: targetUsername,
+            name: cleanName,
+            avatar: item.actor_avatar || item.avatar_url,
+          },
+        },
+      });
+      return;
+    }
+
+    // 2. Payout / Wallet / Payment
+    if (
+      type === 'payout' ||
+      type === 'wallet' ||
+      type === 'payment' ||
+      title.includes('payout') ||
+      title.includes('wallet') ||
+      msg.includes('wallet')
+    ) {
+      navigation.navigate('Wallet');
+      return;
+    }
+
+    // 3. Like or Comment on a video
+    if ((type === 'like' || type === 'comment') && item.target_id) {
+      navigation.navigate('VideoDetail', { videoId: item.target_id });
+      return;
+    }
+
+    // 4. Follow -> Creator Profile
+    if (type === 'follow' && (item.actor_username || item.username)) {
+      navigation.navigate('CreatorProfile', { username: item.actor_username || item.username });
+      return;
+    }
+
+    // 5. Moderation or System Alerts
+    if (type?.startsWith('moderation') || type === 'system') {
+      Alert.alert(item.title || 'Notification Update', item.message || '');
+      return;
+    }
+  };
+
   const filteredNotifs = useMemo(() => {
     const list = notifications || [];
+    if (activeTab === 'Messages') {
+      return list.filter(n =>
+        n.type === 'message' ||
+        n.type === 'chat' ||
+        n.title?.startsWith('💬') ||
+        n.title?.toLowerCase().includes('message')
+      );
+    }
     if (activeTab === 'Likes') return list.filter(n => n.type === 'like');
     if (activeTab === 'Comments') return list.filter(n => n.type === 'comment');
     if (activeTab === 'Follows') return list.filter(n => n.type === 'follow');
-    if (activeTab === 'Requests') return list.filter(n => n.type === 'request');
     if (activeTab === 'System') {
       return list.filter(n =>
         n.type === 'system' ||
@@ -102,6 +177,9 @@ export const NotificationsScreen = ({ navigation }) => {
         return <UserPlus size={16} color="#38bdf8" />;
       case 'comment':
         return <MessageSquare size={16} color="#4ade80" />;
+      case 'message':
+      case 'chat':
+        return <MessageCircle size={16} color="#ff007a" />;
       case 'subscription':
         return <Sparkles size={16} color="#c084fc" />;
       case 'payout':
@@ -235,7 +313,11 @@ export const NotificationsScreen = ({ navigation }) => {
             : 'Today';
 
           return (
-            <View style={[styles.notifCard, isUnread && styles.notifCardUnread]}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => handleNotificationItemPress(item)}
+              style={[styles.notifCard, isUnread && styles.notifCardUnread]}
+            >
               <View style={styles.notifIconWrap}>{renderIcon(item.type)}</View>
 
               <View style={styles.notifBody}>
@@ -253,8 +335,10 @@ export const NotificationsScreen = ({ navigation }) => {
                 )}
               </View>
 
+              <ChevronRight size={16} color="rgba(255,255,255,0.25)" style={{ marginLeft: 6 }} />
+
               {isUnread && <View style={styles.unreadDot} />}
-            </View>
+            </TouchableOpacity>
           );
         }}
       />

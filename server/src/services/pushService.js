@@ -23,7 +23,9 @@ export async function sendPushNotification(targetUserId, { title, body, data = {
       body: body || '',
       data: data,
       priority: 'high',
-      channelId: 'default'
+      channelId: 'default',
+      badge: 1,
+      _displayInForeground: true,
     };
 
     const response = await fetch('https://exp.host/--/api/v2/push/send', {

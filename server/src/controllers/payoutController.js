@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { sendPushNotification } from '../services/pushService.js';
 
 export async function savePayoutDetails(req, res) {
   try {
@@ -379,6 +380,15 @@ export async function markAsPaidAdmin(req, res) {
       [creatorId, notificationMessage, result.insertId]
     );
 
+    // Send instant external push notification (wakes up device when app is closed)
+    try {
+      sendPushNotification(creatorId, {
+        title: '💰 Payout Disbursed!',
+        body: notificationMessage,
+        data: { type: 'wallet', screen: 'Wallet' }
+      });
+    } catch (pushErr) {}
+
     await conn.commit();
 
     const [wRows] = await pool.query('SELECT wallet_balance FROM users WHERE id = ?', [creatorId]);
@@ -451,6 +461,15 @@ export async function remindCreatorPayoutDetails(req, res) {
         videoId
       ]
     );
+
+    // Send instant external push notification
+    try {
+      sendPushNotification(creatorId, {
+        title: '💳 Add Payout Details',
+        body: 'FunFlick wants to send you a creator reward! Please add your Bank / UPI ID in Wallet to receive it.',
+        data: { type: 'wallet', screen: 'Wallet' }
+      });
+    } catch (pushErr) {}
 
     return res.json({ success: true, message: `Reminder sent to ${cRows[0].username}` });
   } catch (err) {
