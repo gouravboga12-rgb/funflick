@@ -482,22 +482,20 @@ export const UserProfileScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsSettingsModalOpen(false);
-    showAppConfirm('Log Out', 'Are you sure you want to log out of FunFlick?', async () => {
-      try {
-        await logout?.();
-        const parent = navigation.getParent();
-        if (parent) {
-          parent.reset({ index: 0, routes: [{ name: 'Splash' }] });
-        } else {
-          navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
-        }
-      } catch (e) {
-        console.warn('Logout error:', e);
-        navigation.navigate('Splash');
+    try {
+      await logout?.();
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.reset({ index: 0, routes: [{ name: 'Splash' }] });
+      } else {
+        navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
       }
-    });
+    } catch (e) {
+      console.warn('Logout error:', e);
+      navigation.navigate('Splash');
+    }
   };
 
   // User posts / submissions

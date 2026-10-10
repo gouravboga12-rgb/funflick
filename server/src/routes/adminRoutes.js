@@ -26,6 +26,7 @@ import {
   deleteAdminAdRequest,
   getAdminStaff,
   createAdminStaff,
+  updateAdminStaff,
   deleteAdminStaff,
   toggleAdminStaff
 } from '../controllers/adminController.js';
@@ -64,6 +65,7 @@ router.get('/influencer-media', authenticateToken, requireSuperAdmin, getAdminIn
 // Moderator Staff Accounts Management (Super Admin only)
 router.get('/staff', authenticateToken, requireSuperAdmin, getAdminStaff);
 router.post('/staff', authenticateToken, requireSuperAdmin, createAdminStaff);
+router.put('/staff/:id', authenticateToken, requireSuperAdmin, updateAdminStaff);
 router.delete('/staff/:id', authenticateToken, requireSuperAdmin, deleteAdminStaff);
 router.put('/staff/:id/toggle', authenticateToken, requireSuperAdmin, toggleAdminStaff);
 

@@ -6,6 +6,7 @@ import {
   ShieldCheck, 
   UserPlus, 
   Trash2, 
+  Edit3,
   CheckCircle2, 
   XCircle, 
   X, 
@@ -36,6 +37,17 @@ export const AdminStaffScreen = () => {
     password: '',
     role: 'moderator'
   });
+
+  // Edit Modal State
+  const [editingStaff, setEditingStaff] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    username: '',
+    email: '',
+    password: '',
+    status: 'Active'
+  });
+  const [isEditingSubmitting, setIsEditingSubmitting] = useState(false);
 
   const fetchStaff = async () => {
     setLoading(true);
@@ -97,6 +109,55 @@ export const AdminStaffScreen = () => {
       showToast('Network error creating staff member', 'error');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const openEditModal = (staff) => {
+    setEditingStaff(staff);
+    setEditFormData({
+      name: staff.name || '',
+      username: staff.username || '',
+      email: staff.email || '',
+      password: '',
+      status: staff.status || (staff.active !== false ? 'Active' : 'Suspended')
+    });
+  };
+
+  const handleUpdateStaff = async (e) => {
+    e.preventDefault();
+    if (!editingStaff) return;
+    if (!editFormData.name.trim() || !editFormData.username.trim() || !editFormData.email.trim()) {
+      showToast('Please fill all required fields', 'error');
+      return;
+    }
+    if (editFormData.password.trim() && editFormData.password.trim().length < 6) {
+      showToast('New password must be at least 6 characters', 'error');
+      return;
+    }
+
+    setIsEditingSubmitting(true);
+    const token = localStorage.getItem('funflick_admin_token');
+    try {
+      const res = await fetch(`/api/admin/staff/${editingStaff.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(editFormData)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Moderator @${editFormData.username} updated successfully!`, 'success');
+        setEditingStaff(null);
+        fetchStaff();
+      } else {
+        showToast(data.error || 'Failed to update moderator', 'error');
+      }
+    } catch (err) {
+      showToast('Network error updating moderator', 'error');
+    } finally {
+      setIsEditingSubmitting(false);
     }
   };
 
@@ -274,13 +335,22 @@ export const AdminStaffScreen = () => {
                         </button>
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          onClick={() => handleDeleteStaff(staff.id, staff.username)}
-                          className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
-                          title="Delete staff account"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => openEditModal(staff)}
+                            className="p-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 transition cursor-pointer"
+                            title="Edit staff account"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStaff(staff.id, staff.username)}
+                            className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition cursor-pointer"
+                            title="Delete staff account"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -381,6 +451,124 @@ export const AdminStaffScreen = () => {
               >
                 {isSubmitting ? 'Creating Staff Member...' : 'Create Moderator Account'}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Moderator Modal */}
+      {editingStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[#120a24] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base font-heading">Edit Moderator Account</h3>
+                  <p className="text-[10px] text-gray-400">Update credentials for @{editingStaff.username}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setEditingStaff(null)} 
+                className="p-1.5 rounded-full bg-white/10 text-gray-300 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStaff} className="space-y-3 pt-1">
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. John Doe"
+                  value={editFormData.name}
+                  onChange={e => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full text-xs px-3 py-2.5 rounded-xl bg-[#181033] border border-white/10 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-1">Username (Login Handle)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 font-bold text-xs">@</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="moderator1"
+                    value={editFormData.username}
+                    onChange={e => setEditFormData({ ...editFormData, username: e.target.value.toLowerCase().replace(/\s+/g, '') })}
+                    className="w-full text-xs pl-8 pr-3 py-2.5 rounded-xl bg-[#181033] border border-white/10 text-white focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-1">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="staff@funflick.com"
+                  value={editFormData.email}
+                  onChange={e => setEditFormData({ ...editFormData, email: e.target.value })}
+                  className="w-full text-xs px-3 py-2.5 rounded-xl bg-[#181033] border border-white/10 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block">New Password</label>
+                  <span className="text-[10px] text-gray-500 font-medium">(Optional)</span>
+                </div>
+                <input
+                  type="password"
+                  placeholder="Leave blank to keep existing password"
+                  value={editFormData.password}
+                  onChange={e => setEditFormData({ ...editFormData, password: e.target.value })}
+                  className="w-full text-xs px-3 py-2.5 rounded-xl bg-[#181033] border border-white/10 text-white focus:outline-none focus:border-purple-500 placeholder:text-gray-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-1">Account Status</label>
+                <select
+                  value={editFormData.status}
+                  onChange={e => setEditFormData({ ...editFormData, status: e.target.value })}
+                  className="w-full text-xs px-3 py-2.5 rounded-xl bg-[#181033] border border-white/10 text-white focus:outline-none focus:border-purple-500"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-white/5 border border-white/5 text-[11px] text-gray-300 space-y-1">
+                <span className="font-bold text-purple-400 block">Assigned Permissions:</span>
+                <p>• Ads Requests Review</p>
+                <p>• Active Ads List</p>
+                <p>• Video / Reel Content Moderation</p>
+                <p>• Story Moderation</p>
+                <p>• User Reports Desk</p>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditingStaff(null)}
+                  className="w-1/3 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-gray-300 font-bold text-xs hover:bg-white/10 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isEditingSubmitting}
+                  className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-600 text-white font-bold text-xs shadow-lg shadow-purple-500/25 hover:opacity-95 active:scale-95 transition disabled:opacity-50 cursor-pointer"
+                >
+                  {isEditingSubmitting ? 'Saving Changes...' : 'Save Changes'}
+                </button>
+              </div>
             </form>
           </div>
         </div>

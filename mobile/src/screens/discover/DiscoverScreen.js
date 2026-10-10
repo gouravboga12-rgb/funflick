@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  useWindowDimensions,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +23,7 @@ import {
   Film,
   Eye,
   Heart,
+  Play,
 } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { apiRequest } from '../../services/api';
@@ -67,6 +69,7 @@ function CreatorAvatarCircle({ avatar, name, username, size = 64 }) {
 
 export const DiscoverScreen = ({ navigation }) => {
   const { currentUser, posts, toggleFollowCreator } = useApp();
+  const { width: windowWidth } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState('');
   const [liveCreators, setLiveCreators] = useState([]);
   const [isLoadingCreators, setIsLoadingCreators] = useState(false);
@@ -284,39 +287,54 @@ export const DiscoverScreen = ({ navigation }) => {
               <Text style={styles.emptyVideosSub}>Try another keyword or hashtag.</Text>
             </View>
           ) : (
-            <View style={styles.trendingGrid}>
-              {displayedTrendingVideos.map((video, idx) => (
-                <TouchableOpacity
-                  key={video.id}
-                  style={styles.gridVideoCard}
-                  activeOpacity={0.85}
-                  onPress={() => navigation.navigate('VideoDetail', { videoId: video.id })}
-                >
-                  <Image
-                    source={{ uri: video.thumbnailUrl || video.posterUrl || video.mediaUrl }}
-                    style={styles.gridVideoThumb}
-                  />
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.85)']}
-                    style={styles.gridVideoGradient}
-                  />
-                  <View style={styles.rankBadge}>
-                    <Text style={styles.rankBadgeText}>#{idx + 1}</Text>
-                  </View>
-                  <View style={styles.viewsBadge}>
-                    <Eye size={10} color="#f472b6" />
-                    <Text style={styles.viewsBadgeText}>{video.viewsCount || '0'}</Text>
-                  </View>
-                  <View style={styles.gridVideoMeta}>
-                    <Text style={styles.gridVideoTitle} numberOfLines={1}>
-                      {video.title}
-                    </Text>
-                    <Text style={styles.gridVideoAuthor} numberOfLines={1}>
-                      @{video.creator?.username || 'user'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+            <View style={[styles.trendingGrid, displayedTrendingVideos.length === 1 && { flexDirection: 'column' }]}>
+              {displayedTrendingVideos.map((video, idx) => {
+                const isSingle = displayedTrendingVideos.length === 1;
+                const dynamicCardWidth = isSingle ? '100%' : Math.max(140, Math.floor((windowWidth - 42) / 2));
+                return (
+                  <TouchableOpacity
+                    key={video.id}
+                    style={[
+                      styles.gridVideoCard,
+                      { width: dynamicCardWidth, height: isSingle ? 210 : 200 }
+                    ]}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate('VideoDetail', { videoId: video.id })}
+                  >
+                    <Image
+                      source={{ uri: video.thumbnailUrl || video.posterUrl || video.mediaUrl }}
+                      style={styles.gridVideoThumb}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.92)']}
+                      style={[styles.gridVideoGradient, isSingle && { height: 90 }]}
+                    />
+                    <View style={styles.rankBadge}>
+                      <Text style={styles.rankBadgeText}>#{idx + 1}</Text>
+                    </View>
+                    <View style={styles.viewsBadge}>
+                      <Eye size={10} color="#f472b6" />
+                      <Text style={styles.viewsBadgeText}>{video.viewsCount || '0'}</Text>
+                    </View>
+                    {isSingle && (
+                      <View style={styles.singlePlayOverlay} pointerEvents="none">
+                        <View style={styles.singlePlayCircle}>
+                          <Play size={18} color="#ffffff" fill="#ffffff" />
+                        </View>
+                      </View>
+                    )}
+                    <View style={styles.gridVideoMeta}>
+                      <Text style={[styles.gridVideoTitle, isSingle && { fontSize: 13, fontWeight: '800' }]} numberOfLines={1}>
+                        {video.title}
+                      </Text>
+                      <Text style={[styles.gridVideoAuthor, isSingle && { fontSize: 11, fontWeight: '700' }]} numberOfLines={1}>
+                        @{video.creator?.username || 'user'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
 
@@ -724,16 +742,38 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   gridVideoCard: {
-    width: (SCREEN_WIDTH - 44) / 2,
-    height: 180,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: 'hidden',
     position: 'relative',
     backgroundColor: '#18122c',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   gridVideoThumb: {
     width: '100%',
     height: '100%',
+  },
+  singlePlayOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  singlePlayCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 0, 122, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 8,
   },
   gridVideoGradient: {
     position: 'absolute',

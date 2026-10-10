@@ -1452,3 +1452,69 @@ export async function toggleAdminStaff(req, res) {
   }
 }
 
+// 5. Update moderator staff account details
+export async function updateAdminStaff(req, res) {
+  try {
+    const { id } = req.params;
+    const { name, username, email, password, status } = req.body;
+
+    const [rows] = await pool.query('SELECT id, name, username, email, status, role FROM users WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Staff account not found' });
+    if (rows[0].role !== 'moderator') {
+      return res.status(403).json({ error: 'Can only modify accounts with role moderator' });
+    }
+
+    const cleanUser = username ? username.trim().toLowerCase().replace(/^@/, '') : rows[0].username;
+    const cleanEmail = email ? email.trim().toLowerCase() : rows[0].email;
+    const fullName = name ? name.trim() : rows[0].name;
+
+    // Check uniqueness if username or email changed
+    if (cleanUser !== rows[0].username || cleanEmail !== rows[0].email) {
+      const [existing] = await pool.query(
+        'SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ? LIMIT 1',
+        [cleanUser, cleanEmail, id]
+      );
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'Username or email already in use by another user' });
+      }
+    }
+
+    if (password && password.trim().length > 0) {
+      if (password.trim().length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      }
+      const hash = await bcrypt.hash(password.trim(), 10);
+      await pool.query(
+        'UPDATE users SET name = ?, username = ?, email = ?, password_hash = ? WHERE id = ?',
+        [fullName, cleanUser, cleanEmail, hash, id]
+      );
+    } else {
+      await pool.query(
+        'UPDATE users SET name = ?, username = ?, email = ? WHERE id = ?',
+        [fullName, cleanUser, cleanEmail, id]
+      );
+    }
+
+    if (status) {
+      await pool.query('UPDATE users SET status = ? WHERE id = ?', [status, id]);
+    }
+
+    return res.json({
+      success: true,
+      message: `Moderator @${cleanUser} updated successfully!`,
+      staff: {
+        id: Number(id),
+        name: fullName,
+        username: cleanUser,
+        email: cleanEmail,
+        role: 'moderator',
+        status: status || rows[0].status || 'Active'
+      }
+    });
+  } catch (err) {
+    console.error('Update admin staff error:', err);
+    return res.status(500).json({ error: 'Failed to update moderator account' });
+  }
+}
+
+
