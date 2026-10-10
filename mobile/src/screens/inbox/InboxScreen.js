@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,6 +28,7 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   Trash2,
+  Download,
 } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { apiRequest } from '../../services/api';
@@ -51,6 +53,8 @@ export const InboxScreen = ({ navigation, route }) => {
   const [isSearchingDb, setIsSearchingDb] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [attachedMedia, setAttachedMedia] = useState(null);
+  const [viewingMedia, setViewingMedia] = useState(null);
+  const [downloading, setDownloading] = useState(false);
 
   const flatListRef = useRef(null);
 
@@ -195,15 +199,80 @@ export const InboxScreen = ({ navigation, route }) => {
     }
   };
 
+  const handleDownloadMedia = async (targetMedia) => {
+    if (!targetMedia?.url && !targetMedia?.uri) return;
+    const url = targetMedia.url || targetMedia.uri;
+    const cleanName = targetMedia.name || (targetMedia.type === 'video' ? 'chat-video.mp4' : 'chat-image.jpg');
+    setDownloading(true);
+
+    try {
+      if (Platform.OS === 'web') {
+        try {
+          const res = await fetch(url, { mode: 'cors' });
+          if (res.ok) {
+            const blob = await res.blob();
+            const objectUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = objectUrl;
+            a.download = cleanName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => window.URL.revokeObjectURL(objectUrl), 2000);
+            setDownloading(false);
+            return;
+          }
+        } catch (e) {}
+
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = cleanName;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setDownloading(false);
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch (e) {
+      console.warn('Download error:', e);
+      try {
+        await Linking.openURL(url);
+      } catch (err) {}
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const handleUnsendMessage = (item) => {
-    if (item.sender !== 'me') return;
+    const isMe = item.sender === 'me';
+    const title = isMe ? 'Unsend Message?' : 'Delete Message?';
+    const message = isMe
+      ? 'Unsending will remove the message for everyone in this chat. People may have already seen it.'
+      : 'Deleting will remove this message from your chat history.';
+    const actionText = isMe ? 'Unsend' : 'Delete';
+
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' && window.confirm
+        ? window.confirm(`${title}\n\n${message}`)
+        : true;
+      if (confirmed) {
+        unsendMessage(activeConvId, item.id);
+      }
+      return;
+    }
+
     Alert.alert(
-      'Unsend Message?',
-      'Unsending will remove the message for everyone in this chat. People may have already seen it.',
+      title,
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Unsend',
+          text: actionText,
           style: 'destructive',
           onPress: () => {
             unsendMessage(activeConvId, item.id);
@@ -265,24 +334,22 @@ export const InboxScreen = ({ navigation, route }) => {
               return (
                 <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
                   <TouchableOpacity
-                    activeOpacity={isMe ? 0.8 : 1}
-                    onLongPress={isMe ? () => handleUnsendMessage(item) : undefined}
+                    activeOpacity={0.8}
+                    onLongPress={() => handleUnsendMessage(item)}
                     delayLongPress={220}
                     style={[styles.msgBubble, isMe ? styles.msgBubbleMe : styles.msgBubbleOther]}
                   >
                     {Boolean(item.media || item.mediaUrl || item.media_url) && (() => {
                       const m = item.media || {
                         url: item.mediaUrl || item.media_url,
+                        uri: item.mediaUrl || item.media_url,
                         type: item.mediaType || item.media_type || 'image',
                         name: item.mediaName || item.media_name,
                       };
                       return (
                         <TouchableOpacity
                           activeOpacity={0.85}
-                          onPress={() => {
-                            const target = m.url || m.uri;
-                            if (target) Linking.openURL(target);
-                          }}
+                          onPress={() => setViewingMedia(m)}
                           style={styles.msgMediaWrap}
                         >
                           <Image
@@ -308,15 +375,13 @@ export const InboxScreen = ({ navigation, route }) => {
                   <View style={styles.msgMetaRow}>
                     <Text style={styles.msgTime}>{item.time || 'Just now'}</Text>
                     {isMe && <CheckCheck size={12} color="#ff007a" style={{ marginLeft: 3 }} />}
-                    {isMe && (
-                      <TouchableOpacity
-                        onPress={() => handleUnsendMessage(item)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        style={{ marginLeft: 6, opacity: 0.7 }}
-                      >
-                        <Trash2 size={11} color="#f43f5e" />
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                      onPress={() => handleUnsendMessage(item)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={{ marginLeft: 6, opacity: 0.7 }}
+                    >
+                      <Trash2 size={11} color="#f43f5e" />
+                    </TouchableOpacity>
                   </View>
                 </View>
               );
@@ -378,6 +443,106 @@ export const InboxScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+
+        {/* Full-Screen Media Viewer Modal (Images & Videos with 1-click Download) */}
+        <Modal
+          visible={Boolean(viewingMedia)}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setViewingMedia(null)}
+        >
+          <View style={styles.mediaModalOverlay}>
+            {/* Header Bar */}
+            <View style={styles.mediaModalHeader}>
+              <View style={styles.mediaModalTitleWrap}>
+                <Text style={styles.mediaModalTitle} numberOfLines={1}>
+                  {viewingMedia?.name || (viewingMedia?.type === 'video' ? 'Video Attachment' : 'Photo Attachment')}
+                </Text>
+                <Text style={styles.mediaModalSub}>
+                  {viewingMedia?.type === 'video' ? 'Video File' : 'Photo File'} · Tap Save to download
+                </Text>
+              </View>
+
+              <View style={styles.mediaModalHeaderBtns}>
+                <TouchableOpacity
+                  style={styles.mediaModalDownloadBtn}
+                  onPress={() => handleDownloadMedia(viewingMedia)}
+                  disabled={downloading}
+                >
+                  {downloading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Download size={15} color="#fff" />
+                      <Text style={styles.mediaModalDownloadText}>Save</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.mediaModalCloseBtn}
+                  onPress={() => setViewingMedia(null)}
+                >
+                  <X size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Media Body */}
+            <View style={styles.mediaModalBody}>
+              {viewingMedia?.type === 'video' ? (
+                Platform.OS === 'web' ? (
+                  <video
+                    src={viewingMedia.url || viewingMedia.uri}
+                    controls
+                    autoPlay
+                    playsInline
+                    style={{
+                      maxWidth: '94%',
+                      maxHeight: '70vh',
+                      borderRadius: 16,
+                      backgroundColor: '#000',
+                    }}
+                  />
+                ) : (
+                  <View style={styles.nativeVideoWrap}>
+                    <Image
+                      source={{ uri: viewingMedia.url || viewingMedia.uri }}
+                      style={styles.mediaModalImage}
+                      resizeMode="contain"
+                    />
+                    <TouchableOpacity
+                      style={styles.playCenterBtn}
+                      onPress={() => Linking.openURL(viewingMedia.url || viewingMedia.uri)}
+                    >
+                      <Play size={32} color="#fff" fill="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                )
+              ) : (
+                <Image
+                  source={{ uri: viewingMedia?.url || viewingMedia?.uri }}
+                  style={styles.mediaModalImage}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+
+            {/* Bottom Footer Action */}
+            <View style={styles.mediaModalFooter}>
+              <TouchableOpacity
+                style={styles.mediaModalActionBtn}
+                onPress={() => handleDownloadMedia(viewingMedia)}
+                disabled={downloading}
+              >
+                <Download size={18} color="#fff" />
+                <Text style={styles.mediaModalActionText}>
+                  {downloading ? 'Downloading...' : 'Download / Save to Device'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -878,5 +1043,109 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     opacity: 0.4,
+  },
+  mediaModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'space-between',
+  },
+  mediaModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 48 : 16,
+    paddingBottom: 14,
+    backgroundColor: 'rgba(15, 10, 28, 0.95)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  mediaModalTitleWrap: {
+    flex: 1,
+    marginRight: 12,
+  },
+  mediaModalTitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  mediaModalSub: {
+    color: '#9ca3af',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  mediaModalHeaderBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  mediaModalDownloadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff007a',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  mediaModalDownloadText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  mediaModalCloseBtn: {
+    padding: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 18,
+  },
+  mediaModalBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 12,
+  },
+  mediaModalImage: {
+    width: '100%',
+    height: '80%',
+    borderRadius: 12,
+  },
+  nativeVideoWrap: {
+    width: '100%',
+    height: '80%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playCenterBtn: {
+    position: 'absolute',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaModalFooter: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(15, 10, 28, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+  },
+  mediaModalActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff007a',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  mediaModalActionText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

@@ -397,18 +397,16 @@ export const MessagesScreen = () => {
                       {isMe && <CheckCheck className="w-3 h-3 text-pink-400" />}
                     </span>
 
-                    {/* Instagram-style Unsend Option for Sent Messages */}
-                    {isMe && (
-                      <button
-                        type="button"
-                        onClick={() => setUnsendTargetMsg(msg)}
-                        title="Unsend message"
-                        className="opacity-70 hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-rose-400 transition ml-1 cursor-pointer flex items-center gap-0.5 text-[9px]"
-                      >
-                        <Trash2 className="w-2.5 h-2.5" />
-                        <span className="hover:underline">Unsend</span>
-                      </button>
-                    )}
+                    {/* Instagram-style Unsend Option for Sent Messages / Delete Option for Received Messages */}
+                    <button
+                      type="button"
+                      onClick={() => setUnsendTargetMsg({ ...msg, isSender: isMe })}
+                      title={isMe ? "Unsend message" : "Delete message"}
+                      className="opacity-70 hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-rose-400 transition ml-1 cursor-pointer flex items-center gap-0.5 text-[9px]"
+                    >
+                      <Trash2 className="w-2.5 h-2.5" />
+                      <span className="hover:underline">{isMe ? 'Unsend' : 'Delete'}</span>
+                    </button>
                   </div>
                 </div>
               );
@@ -615,7 +613,7 @@ export const MessagesScreen = () => {
         onClose={() => setViewingMedia(null)} 
       />
 
-      {/* Instagram-style Unsend Message Confirmation Dialog */}
+      {/* Instagram-style Unsend / Delete Message Confirmation Dialog */}
       {unsendTargetMsg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in select-none">
           <div className="w-full max-w-xs bg-[#18122c] border border-white/10 rounded-3xl p-5 shadow-2xl text-center space-y-4">
@@ -625,25 +623,28 @@ export const MessagesScreen = () => {
             
             <div className="space-y-1">
               <h3 className="font-extrabold text-sm text-white font-heading">
-                Unsend Message?
+                {unsendTargetMsg.isSender !== false ? 'Unsend Message?' : 'Delete Message?'}
               </h3>
               <p className="text-[11px] text-gray-400 leading-relaxed px-2">
-                Unsending will remove the message for everyone in this chat. People may have already seen or played it.
+                {unsendTargetMsg.isSender !== false
+                  ? 'Unsending will remove the message for everyone in this chat. People may have already seen or played it.'
+                  : 'Deleting will remove this message from your chat history.'}
               </p>
             </div>
 
             <div className="pt-2 flex flex-col gap-2">
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   const targetId = unsendTargetMsg.id;
+                  const isSender = unsendTargetMsg.isSender !== false;
                   setUnsendTargetMsg(null);
-                  unsendMessage(activeConvId, targetId);
-                  showToast('Message unsent', 'info');
+                  await unsendMessage(activeConvId, targetId);
+                  showToast(isSender ? 'Message unsent' : 'Message deleted', 'info');
                 }}
                 className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition active:scale-95 cursor-pointer"
               >
-                Unsend
+                {unsendTargetMsg.isSender !== false ? 'Unsend' : 'Delete'}
               </button>
               <button
                 type="button"

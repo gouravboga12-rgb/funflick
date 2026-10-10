@@ -450,15 +450,20 @@ export const AppProvider = ({ children }) => {
     }
   }, [conversations]);
 
-  // Unsend message (Instagram style: removes message for everyone)
+  // Unsend / Delete message (Instagram style: removes message for everyone / conversation)
   const unsendMessage = useCallback(async (convId, messageId) => {
     if (!messageId) return;
 
     // Optimistically remove from local state
     setConversations(prev =>
       prev.map(c => {
-        if (c.id === convId) {
-          const remaining = (c.messages || []).filter(m => m.id !== messageId);
+        const isMatch = !convId || 
+                        c.id === convId || 
+                        String(c.userId) === String(convId) || 
+                        c.user?.username === convId || 
+                        c.id === `conv_${convId}`;
+        if (isMatch) {
+          const remaining = (c.messages || []).filter(m => String(m.id) !== String(messageId));
           const lastMsg = remaining.length > 0 ? remaining[remaining.length - 1] : null;
           return {
             ...c,
@@ -471,7 +476,7 @@ export const AppProvider = ({ children }) => {
     );
 
     try {
-      if (typeof messageId === 'number' || !String(messageId).startsWith('msg_')) {
+      if (typeof messageId === 'number' || (!isNaN(Number(messageId)) && !String(messageId).startsWith('msg_'))) {
         await apiRequest(`/messages/${messageId}`, { method: 'DELETE' });
       }
     } catch (e) {

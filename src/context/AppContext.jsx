@@ -2269,11 +2269,13 @@ export const AppProvider = ({ children }) => {
 
     // Optimistically remove from state immediately
     setConversations(prev => prev.map(c => {
-      const match = c.id === conversationId || 
+      const match = !conversationId ||
+                    c.id === conversationId || 
                     String(c.userId) === String(conversationId) || 
-                    c.user?.username === conversationId;
+                    c.user?.username === conversationId ||
+                    c.id === `conv_${conversationId}`;
       if (match) {
-        const remaining = (c.messages || []).filter(m => m.id !== messageId);
+        const remaining = (c.messages || []).filter(m => String(m.id) !== String(messageId));
         const lastMsg = remaining.length > 0 ? remaining[remaining.length - 1] : null;
         let lastPreview = 'Chat started';
         if (lastMsg) {
@@ -2291,7 +2293,8 @@ export const AppProvider = ({ children }) => {
 
     // Call DELETE on server if numeric/real message ID
     const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
-    if (token && typeof messageId === 'number') {
+    const isValidServerId = typeof messageId === 'number' || (!isNaN(Number(messageId)) && !String(messageId).startsWith('msg_'));
+    if (token && isValidServerId) {
       try {
         await fetch(`/api/messages/${messageId}`, {
           method: 'DELETE',
@@ -2300,7 +2303,7 @@ export const AppProvider = ({ children }) => {
           }
         });
       } catch (err) {
-        console.error('Failed to unsend message on server:', err);
+        console.error('Failed to unsend/delete message on server:', err);
       }
     }
   };

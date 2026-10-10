@@ -237,15 +237,15 @@ export async function deleteMessage(req, res) {
     const currentUserId = req.user.id;
     const { id } = req.params;
 
-    // Check message existence and that current user is sender (or admin)
+    // Check message existence and that current user is sender or recipient (or admin)
     const [rows] = await pool.query('SELECT * FROM messages WHERE id = ?', [id]);
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Message not found' });
     }
 
     const message = rows[0];
-    if (message.sender_id !== currentUserId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'You can only unsend messages you sent' });
+    if (message.sender_id !== currentUserId && message.recipient_id !== currentUserId && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'You can only delete messages from your conversations' });
     }
 
     await pool.query('DELETE FROM messages WHERE id = ?', [id]);
