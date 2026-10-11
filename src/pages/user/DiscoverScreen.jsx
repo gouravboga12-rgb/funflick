@@ -26,8 +26,8 @@ import {
   Heart,
   MessageCircle,
   UserPlus,
-  Hash
 } from 'lucide-react';
+import { VideoThumbnail } from '../../components/common/VideoThumbnail';
 
 export const DiscoverScreen = () => {
   const navigate = useNavigate();
@@ -289,10 +289,13 @@ export const DiscoverScreen = () => {
 
             {/* Right Character / Comedian Visual */}
             <div className="absolute -right-2 -bottom-2 w-32 h-32 pointer-events-none group-hover:scale-105 transition-transform duration-300">
-              <img
-                src={filteredVideos[0]?.posterUrl || filteredVideos[0]?.mediaUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"}
+              <VideoThumbnail
+                posterUrl={filteredVideos[0]?.posterUrl}
+                thumbnailUrl={filteredVideos[0]?.thumbnailUrl}
+                videoUrl={filteredVideos[0]?.mediaUrl}
                 alt="Trending Content"
                 className="w-full h-full object-cover rounded-2xl rotate-6 shadow-2xl border-2 border-white/20"
+                fallbackTitle={filteredVideos[0]?.title}
               />
             </div>
           </div>
@@ -400,12 +403,15 @@ export const DiscoverScreen = () => {
                     onClick={() => navigate(`/reels?id=${video.id}`)}
                     className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-gray-900 cursor-pointer group shadow-lg hover:ring-2 hover:ring-pink-500/50 transition-all"
                   >
-                    <img
-                      src={video.posterUrl || video.mediaUrl || video.image}
+                    <VideoThumbnail
+                      posterUrl={video.posterUrl}
+                      thumbnailUrl={video.thumbnailUrl}
+                      videoUrl={video.mediaUrl}
                       alt={video.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      fallbackTitle={video.title}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
                     
                     {/* Rank Badge & Views Badge */}
                     <div className="absolute top-2 left-2 flex items-center gap-1.5">

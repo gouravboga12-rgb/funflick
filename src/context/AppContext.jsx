@@ -372,6 +372,8 @@ export const AppProvider = ({ children }) => {
               mediaType: determinedType,
               mediaUrl: v.video_url,
               posterUrl: safePoster,
+              thumbnailUrl: safePoster,
+              thumbnail: safePoster,
               hashtags: v.hashtags || '',
               tags: formattedTags,
               likesCount: Number(v.likes_count) || 0,
