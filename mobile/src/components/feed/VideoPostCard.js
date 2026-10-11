@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Share, Dimensions, Animated } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView } from 'expo-video';
@@ -12,8 +12,6 @@ import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-
-
 function formatCount(num) {
   if (!num) return '0';
   if (typeof num === 'string' && (num.includes('K') || num.includes('M'))) return num;
@@ -24,14 +22,12 @@ function formatCount(num) {
   return String(n);
 }
 
-export const VideoPostCard = ({ post, isActive = false, navigation }) => {
+export const VideoPostCard = ({ post, isActive = false, shouldCreatePlayer = true, navigation }) => {
   const isFocused = useIsFocused();
   const { toggleLikePost, recordPostView, toggleFollowCreator, isReelsMuted, toggleMute, currentUser, isAdPopupOpen } = useApp();
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isUserPaused, setIsUserPaused] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [commentsCount, setCommentsCount] = useState(Number(post.commentsCount) || 0);
-  const [lastTap, setLastTap] = useState(0);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [avatarErr, setAvatarErr] = useState(false);
@@ -43,25 +39,19 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
 
   // Treat feed video as unfocused when an interstitial ad popup is open
   const effectiveIsFocused = isFocused && !isAdPopupOpen;
-  const shouldPlay = isActive && effectiveIsFocused && !isUserPaused;
+  const shouldPlay = isActive && effectiveIsFocused && !userPaused;
 
-  const player = useManagedPlayer({
-    source: isVideo ? post.mediaUrl : null,
+  const { player, isBuffering } = useManagedPlayer({
+    source: shouldCreatePlayer && isVideo ? post.mediaUrl : null,
     shouldPlay,
     isMuted: isReelsMuted,
     loop: true,
-    onPlayingChange: (isPlayingNow) => {
-      setIsPlaying(isPlayingNow);
-      if (!isPlayingNow) {
-        setIsUserPaused(true);
-      }
-    },
   });
 
   // Reset user manual pause state when scrolling away to another reel
   useEffect(() => {
     if (!isActive) {
-      setIsUserPaused(false);
+      setUserPaused(false);
     }
   }, [isActive]);
 
@@ -78,10 +68,11 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
       isFocused,
       isAdPopupOpen,
       effectiveIsFocused,
-      isUserPaused,
+      userPaused,
+      isBuffering,
       decision: shouldPlay ? 'PLAY' : 'PAUSE',
     });
-  }, [post.id, player, isActive, isFocused, isAdPopupOpen, effectiveIsFocused, isUserPaused, shouldPlay]);
+  }, [post.id, player, isActive, isFocused, isAdPopupOpen, effectiveIsFocused, userPaused, isBuffering, shouldPlay]);
 
   // Record view after 5 seconds of continuous active playback
   useEffect(() => {
@@ -95,43 +86,39 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     return () => clearTimeout(viewTimer);
   }, [shouldPlay, post.id, recordPostView]);
 
-  const togglePlayPause = () => {
-    if (!player) return;
-    try {
-      const isCurrentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (isPlaying && !isUserPaused);
-      if (isCurrentlyPlaying) {
-        player.pause();
-        setIsUserPaused(true);
-        setIsPlaying(false);
-      } else {
-        player.play();
-        setIsUserPaused(false);
-        setIsPlaying(true);
-      }
-    } catch (e) {
-      console.warn('Video toggle play error:', e?.message);
-    }
-  };
+  const togglePlayPause = useCallback(() => {
+    setUserPaused(prev => !prev);
+  }, []);
 
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDelay(250)
-    .runOnJS(true)
-    .onEnd(() => {
-      if (!post.isLiked) {
-        toggleLikePost(post.id);
-      }
-      triggerHeartBurst();
-    });
+  const triggerHeartBurst = useCallback(() => {
+    heartScale.setValue(0);
+    Animated.sequence([
+      Animated.spring(heartScale, { toValue: 1.25, friction: 3, useNativeDriver: true }),
+      Animated.timing(heartScale, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start();
+  }, [heartScale]);
 
-  const singleTapGesture = Gesture.Tap()
-    .numberOfTaps(1)
-    .runOnJS(true)
-    .onEnd(() => {
-      togglePlayPause();
-    });
+  const tapGesture = useMemo(() => {
+    const doubleTap = Gesture.Tap()
+      .numberOfTaps(2)
+      .maxDelay(250)
+      .runOnJS(true)
+      .onEnd(() => {
+        if (!post.isLiked && toggleLikePost) {
+          toggleLikePost(post.id);
+        }
+        triggerHeartBurst();
+      });
 
-  const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
+    const singleTap = Gesture.Tap()
+      .numberOfTaps(1)
+      .runOnJS(true)
+      .onEnd(() => {
+        togglePlayPause();
+      });
+
+    return Gesture.Exclusive(doubleTap, singleTap);
+  }, [post.id, post.isLiked, toggleLikePost, triggerHeartBurst, togglePlayPause]);
 
   const handleShare = async () => {
     try {
@@ -146,7 +133,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     <View style={styles.card}>
       {/* Media Player Container */}
       <View style={styles.playerContainer}>
-        {isVideo && player ? (
+        {isVideo && player && shouldCreatePlayer ? (
           <VideoView
             player={player}
             style={styles.videoPlayer}
@@ -183,16 +170,12 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
           pointerEvents="none"
         />
 
-        {/* Center Pause Indicator & Tap-to-play button */}
-        {(!isPlaying || isUserPaused) && isVideo && (
-          <View style={styles.playOverlay} pointerEvents="box-none">
-            <TouchableOpacity
-              style={styles.playIconCircle}
-              onPress={togglePlayPause}
-              activeOpacity={0.8}
-            >
+        {/* Center Pause Indicator (display-only, pointerEvents none) */}
+        {userPaused && isVideo && (
+          <View style={styles.playOverlay} pointerEvents="none">
+            <View style={styles.playIconCircle}>
               <Play size={34} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
-            </TouchableOpacity>
+            </View>
           </View>
         )}
 

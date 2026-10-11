@@ -26,7 +26,7 @@ const { width, height } = Dimensions.get('window');
 const STORY_DURATION = 5000;
 
 function StoryVideo({ mediaUrl, isPaused }) {
-  const player = useManagedPlayer({
+  const { player } = useManagedPlayer({
     source: mediaUrl,
     shouldPlay: !isPaused,
     isMuted: false,

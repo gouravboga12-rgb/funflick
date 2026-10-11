@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView } from 'expo-video';
@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Music, Bookmark, Plus, Eye, Check } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
@@ -22,11 +23,12 @@ function formatCount(num) {
   return String(n);
 }
 
-function ReelItem({
+const ReelItem = React.memo(function ReelItem({
   item,
   isActive,
   isScreenFocused,
   isAdPopupOpen,
+  shouldCreatePlayer,
   reelHeight,
   isReelsMuted,
   toggleMute,
@@ -36,30 +38,26 @@ function ReelItem({
   handleShare,
   navigation,
 }) {
-  const [isPaused, setIsPaused] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const [lastTap, setLastTap] = useState(0);
   const heartScale = useRef(new Animated.Value(0)).current;
   const hasRecordedViewRef = useRef(false);
 
   const effectiveIsScreenFocused = isScreenFocused && !isAdPopupOpen;
-  const shouldPlay = isActive && effectiveIsScreenFocused && !isPaused;
+  const shouldPlay = isActive && effectiveIsScreenFocused && !userPaused;
 
-  const player = useManagedPlayer({
-    source: item.mediaUrl,
+  const { player, isBuffering } = useManagedPlayer({
+    source: shouldCreatePlayer ? item.mediaUrl : null,
     shouldPlay,
     isMuted: isReelsMuted,
     loop: true,
-    onPlayingChange: (isPlayingNow) => {
-      setIsPaused(!isPlayingNow);
-    },
   });
 
-  // Reset paused state when scrolling away to another reel
+  // Reset userPaused when scrolling away
   useEffect(() => {
     if (!isActive) {
-      setIsPaused(false);
+      setUserPaused(false);
     }
   }, [isActive]);
 
@@ -75,10 +73,11 @@ function ReelItem({
       isScreenFocused,
       isAdPopupOpen,
       effectiveIsScreenFocused,
-      isPaused,
+      userPaused,
+      isBuffering,
       decision: shouldPlay ? 'PLAY' : 'PAUSE',
     });
-  }, [item.id, player, isActive, isScreenFocused, isAdPopupOpen, effectiveIsScreenFocused, isPaused, shouldPlay]);
+  }, [item.id, player, isActive, isScreenFocused, isAdPopupOpen, effectiveIsScreenFocused, userPaused, isBuffering, shouldPlay]);
 
   // Record view after 5 seconds of continuous active playback
   useEffect(() => {
@@ -92,74 +91,45 @@ function ReelItem({
     return () => clearTimeout(viewTimer);
   }, [shouldPlay, item.id, recordPostView]);
 
-  const tapTimeoutRef = useRef(null);
-
-  useEffect(() => {
-    return () => {
-      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-    };
-  }, []);
-
-  // Sync state with native player events
-  useEffect(() => {
-    if (!player) return;
-    const sub = player.addListener?.('playingChange', (event) => {
-      setIsPaused(!event.isPlaying);
-    });
-    return () => {
-      sub?.remove?.();
-    };
-  }, [player]);
-
-  const triggerHeartBurst = () => {
+  const triggerHeartBurst = useCallback(() => {
     heartScale.setValue(0);
     Animated.sequence([
       Animated.spring(heartScale, { toValue: 1.25, friction: 3, useNativeDriver: true }),
       Animated.timing(heartScale, { toValue: 0, duration: 250, useNativeDriver: true }),
     ]).start();
-  };
+  }, [heartScale]);
 
-  const togglePlayPause = () => {
-    if (!player) return;
-    try {
-      const isCurrentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (!isPaused);
-      if (isCurrentlyPlaying) {
-        player.pause();
-        setIsPaused(true);
-      } else {
-        player.play();
-        setIsPaused(false);
-      }
-    } catch (e) {
-      console.warn('Reel toggle play error:', e?.message);
-    }
-  };
+  const togglePlayPause = useCallback(() => {
+    setUserPaused(prev => !prev);
+  }, []);
 
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDelay(250)
-    .runOnJS(true)
-    .onEnd(() => {
-      if (!item.isLiked) {
-        toggleLikePost(item.id);
-      }
-      triggerHeartBurst();
-    });
+  const tapGesture = useMemo(() => {
+    const doubleTap = Gesture.Tap()
+      .numberOfTaps(2)
+      .maxDelay(250)
+      .runOnJS(true)
+      .onEnd(() => {
+        if (!item.isLiked && toggleLikePost) {
+          toggleLikePost(item.id);
+        }
+        triggerHeartBurst();
+      });
 
-  const singleTapGesture = Gesture.Tap()
-    .numberOfTaps(1)
-    .runOnJS(true)
-    .onEnd(() => {
-      togglePlayPause();
-    });
+    const singleTap = Gesture.Tap()
+      .numberOfTaps(1)
+      .runOnJS(true)
+      .onEnd(() => {
+        togglePlayPause();
+      });
 
-  const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
+    return Gesture.Exclusive(doubleTap, singleTap);
+  }, [item.id, item.isLiked, toggleLikePost, triggerHeartBurst, togglePlayPause]);
 
   return (
     <View style={[styles.reelContainer, { height: reelHeight }]}>
       <GestureDetector gesture={tapGesture}>
         <View style={styles.mediaTouch}>
-          {player ? (
+          {player && shouldCreatePlayer ? (
             <VideoView
               player={player}
               style={styles.fullscreenVideo}
@@ -191,12 +161,12 @@ function ReelItem({
             pointerEvents="none"
           />
 
-          {/* Center Pause/Play Indicator */}
-          {isPaused && (
-            <View style={styles.pausedOverlay} pointerEvents="box-none">
-              <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.8}>
+          {/* Center Pause/Play Indicator (display-only, pointerEvents none) */}
+          {userPaused && (
+            <View style={styles.pausedOverlay} pointerEvents="none">
+              <View style={styles.pausedCircle}>
                 <Play size={36} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
-              </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -336,18 +306,27 @@ function ReelItem({
       </View>
     </View>
   );
-}
+});
 
 export const ReelsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const { posts, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator, recordPostView, isAdPopupOpen } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
 
-  const videoPosts = posts.filter(
-    p => p.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(p.mediaUrl || '')
-  );
+  let tabBarHeight = 65;
+  try {
+    tabBarHeight = useBottomTabBarHeight();
+  } catch (e) {
+    tabBarHeight = 65;
+  }
+  const reelHeight = WINDOW_HEIGHT - tabBarHeight;
+
+  const videoPosts = useMemo(() => {
+    return (posts || []).filter(
+      p => p.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(p.mediaUrl || '')
+    );
+  }, [posts]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0) {
@@ -359,25 +338,35 @@ export const ReelsScreen = ({ navigation }) => {
     itemVisiblePercentThreshold: 65,
   }).current;
 
-  const handleShare = async post => {
+  const handleShare = useCallback(async post => {
     try {
       await Share.share({
         message: `Watch this reel on FunFlick! https://funflick-theta.vercel.app/video/${post.id}`,
         url: `https://funflick-theta.vercel.app/video/${post.id}`,
       });
     } catch (e) {}
-  };
+  }, []);
+
+  const renderItem = useCallback(({ item, index }) => (
+    <ReelItem
+      item={item}
+      isActive={index === currentIndex}
+      isScreenFocused={isFocused}
+      isAdPopupOpen={isAdPopupOpen}
+      shouldCreatePlayer={Math.abs(index - currentIndex) <= 1}
+      reelHeight={reelHeight}
+      isReelsMuted={isReelsMuted}
+      toggleMute={toggleMute}
+      toggleLikePost={toggleLikePost}
+      toggleFollowCreator={toggleFollowCreator}
+      recordPostView={recordPostView}
+      handleShare={handleShare}
+      navigation={navigation}
+    />
+  ), [currentIndex, isFocused, isAdPopupOpen, reelHeight, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator, recordPostView, handleShare, navigation]);
 
   return (
-    <View
-      style={styles.container}
-      onLayout={e => {
-        const h = e.nativeEvent.layout.height;
-        if (h > 200 && h !== containerHeight) {
-          setContainerHeight(h);
-        }
-      }}
-    >
+    <View style={styles.container}>
       {/* Top Floating Header (Matching Web Reels) */}
       <View style={[styles.topHeader, { top: Math.max(insets.top, 14) }]}>
         <Text style={styles.headerTitle}>Reels</Text>
@@ -389,30 +378,15 @@ export const ReelsScreen = ({ navigation }) => {
       <FlatList
         data={videoPosts}
         keyExtractor={item => String(item.id)}
-        renderItem={({ item, index }) => (
-          <ReelItem
-            item={item}
-            isActive={index === currentIndex}
-            isScreenFocused={isFocused}
-            isAdPopupOpen={isAdPopupOpen}
-            reelHeight={containerHeight}
-            isReelsMuted={isReelsMuted}
-            toggleMute={toggleMute}
-            toggleLikePost={toggleLikePost}
-            toggleFollowCreator={toggleFollowCreator}
-            recordPostView={recordPostView}
-            handleShare={handleShare}
-            navigation={navigation}
-          />
-        )}
+        renderItem={renderItem}
         pagingEnabled
         showsVerticalScrollIndicator={false}
-        snapToInterval={containerHeight}
+        snapToInterval={reelHeight}
         snapToAlignment="start"
         decelerationRate="fast"
         getItemLayout={(data, index) => ({
-          length: containerHeight,
-          offset: containerHeight * index,
+          length: reelHeight,
+          offset: reelHeight * index,
           index,
         })}
         onViewableItemsChanged={onViewableItemsChanged}
