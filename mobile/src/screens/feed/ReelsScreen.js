@@ -137,80 +137,85 @@ function ReelItem({
     }
   };
 
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDelay(250)
-    .runOnJS(true)
-    .onEnd(() => {
-      if (!item.isLiked) {
+  const lastTapRef = useRef(0);
+  const tapTimeoutRef = useRef(null);
+
+  const handleMediaPress = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 280;
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+        tapTimeoutRef.current = null;
+      }
+      if (!item.isLiked && toggleLikePost) {
         toggleLikePost(item.id);
       }
       triggerHeartBurst();
-    });
-
-  const singleTapGesture = Gesture.Tap()
-    .numberOfTaps(1)
-    .runOnJS(true)
-    .onEnd(() => {
-      togglePlayPause();
-    });
-
-  const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
+    } else {
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+      }
+      tapTimeoutRef.current = setTimeout(() => {
+        togglePlayPause();
+        tapTimeoutRef.current = null;
+      }, 180);
+    }
+    lastTapRef.current = now;
+  };
 
   return (
     <View style={[styles.reelContainer, { height: reelHeight }]}>
-      <GestureDetector gesture={tapGesture}>
-        <View style={styles.mediaTouch}>
-          {player ? (
-            <VideoView
-              player={player}
-              style={styles.fullscreenVideo}
-              contentFit="cover"
-              surfaceType="textureView"
-              useExoShutter={false}
-              nativeControls={false}
-              pointerEvents="none"
-            />
-          ) : (
-            <Image
-              source={{ uri: item.posterUrl || item.thumbnailUrl || item.mediaUrl }}
-              style={styles.fullscreenVideo}
-              resizeMode="cover"
-            />
-          )}
-
-          {/* Top Gradient */}
-          <LinearGradient
-            colors={['rgba(0,0,0,0.6)', 'transparent']}
-            style={styles.topVignette}
+      <TouchableOpacity activeOpacity={1} onPress={handleMediaPress} style={styles.mediaTouch}>
+        {player ? (
+          <VideoView
+            player={player}
+            style={styles.fullscreenVideo}
+            contentFit="cover"
+            surfaceType="textureView"
+            useExoShutter={false}
+            nativeControls={false}
             pointerEvents="none"
           />
-
-          {/* Bottom Gradient Overlay */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.85)']}
-            style={styles.bottomVignette}
-            pointerEvents="none"
+        ) : (
+          <Image
+            source={{ uri: item.posterUrl || item.thumbnailUrl || item.mediaUrl }}
+            style={styles.fullscreenVideo}
+            resizeMode="cover"
           />
+        )}
 
-          {/* Center Pause/Play Indicator */}
-          {isPaused && (
-            <View style={styles.pausedOverlay} pointerEvents="box-none">
-              <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.8}>
-                <Play size={36} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
-              </TouchableOpacity>
-            </View>
-          )}
+        {/* Top Gradient */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.6)', 'transparent']}
+          style={styles.topVignette}
+          pointerEvents="none"
+        />
 
-          {/* Animated Heart Burst */}
-          <Animated.View
-            style={[styles.burstHeartWrap, { transform: [{ scale: heartScale }] }]}
-            pointerEvents="none"
-          >
-            <Heart size={84} color="#ff007a" fill="#ff007a" />
-          </Animated.View>
-        </View>
-      </GestureDetector>
+        {/* Bottom Gradient Overlay */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.85)']}
+          style={styles.bottomVignette}
+          pointerEvents="none"
+        />
+
+        {/* Center Pause/Play Indicator */}
+        {isPaused && (
+          <View style={styles.pausedOverlay} pointerEvents="box-none">
+            <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.8}>
+              <Play size={36} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Animated Heart Burst */}
+        <Animated.View
+          style={[styles.burstHeartWrap, { transform: [{ scale: heartScale }] }]}
+          pointerEvents="none"
+        >
+          <Heart size={84} color="#ff007a" fill="#ff007a" />
+        </Animated.View>
+      </TouchableOpacity>
 
       {/* Right Floating Actions Bar (Matching Web Reels) */}
       <View style={styles.rightActions} pointerEvents="box-none">

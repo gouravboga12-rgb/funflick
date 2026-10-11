@@ -146,25 +146,32 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     }
   };
 
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDelay(250)
-    .runOnJS(true)
-    .onEnd(() => {
-      if (!post.isLiked) {
+  const lastTapRef = useRef(0);
+  const tapTimeoutRef = useRef(null);
+
+  const handleMediaPress = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 280;
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+        tapTimeoutRef.current = null;
+      }
+      if (!post.isLiked && toggleLikePost) {
         toggleLikePost(post.id);
       }
       triggerHeartBurst();
-    });
-
-  const singleTapGesture = Gesture.Tap()
-    .numberOfTaps(1)
-    .runOnJS(true)
-    .onEnd(() => {
-      togglePlayPause();
-    });
-
-  const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
+    } else {
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+      }
+      tapTimeoutRef.current = setTimeout(() => {
+        togglePlayPause();
+        tapTimeoutRef.current = null;
+      }, 180);
+    }
+    lastTapRef.current = now;
+  };
 
   const handleShare = async () => {
     try {
@@ -198,9 +205,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         )}
 
         {/* Full-surface tap overlay covering center & entire video */}
-        <GestureDetector gesture={tapGesture}>
-          <View style={styles.fullTapLayer} />
-        </GestureDetector>
+        <TouchableOpacity activeOpacity={1} onPress={handleMediaPress} style={styles.fullTapLayer} />
 
         {/* Top Vignette Overlay */}
         <LinearGradient
