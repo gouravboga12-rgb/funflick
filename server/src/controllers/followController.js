@@ -77,7 +77,6 @@ export async function toggleFollowUser(req, res) {
     }
 
     const targetUser = targetRows[0];
-    const currentUserId = req.user.id;
 
     if (targetUser.id === currentUserId) {
       return res.status(400).json({ error: 'You cannot follow yourself' });
