@@ -21,6 +21,8 @@ export const HomeScreen = ({ navigation }) => {
     unreadNotificationCount,
     markAllNotificationsRead,
     showMobileAd,
+    isAuthenticated,
+    currentUser,
   } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
   const [activeVideoId, setActiveVideoId] = useState(null);
@@ -87,7 +89,8 @@ export const HomeScreen = ({ navigation }) => {
             a.active &&
             a.frequency === 'After 5 Reels'
           );
-          const showFeedAd = !isPaidInfluencer && inFeedAds.length > 0 && ((index + 1) % 5 === 0);
+          const isUserLoggedIn = isAuthenticated && Boolean(currentUser);
+          const showFeedAd = isUserLoggedIn && !isPaidInfluencer && inFeedAds.length > 0 && ((index + 1) % 5 === 0);
           const adIndex = Math.floor(index / 5) % Math.max(1, inFeedAds.length);
           const feedAd = showFeedAd ? inFeedAds[adIndex] : null;
 

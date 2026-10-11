@@ -736,7 +736,8 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const showMobileAd = useCallback((adId) => {
-    if (isPaidInfluencer) return; // Paid / Influencer members NEVER see any ads!
+    // Ads strictly only display if the user is LOGGED IN and NOT a paid influencer!
+    if (!isAuthenticated || !currentUser || isPaidInfluencer) return;
     const list = adsListRef.current?.length > 0 ? adsListRef.current : adsList;
     const activeAds = (list || []).filter(a => a.active);
     if (!activeAds.length) return;
@@ -750,14 +751,15 @@ export const AppProvider = ({ children }) => {
         (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
         !sessionSeenAdIdsRef.current.has(a.id)
       );
-      // 2. Fallback to any unshown active ad
+      // 2. If all popup ads have been seen, reset seen tracking and loop back through active popup ads
       if (!target) {
-        target = activeAds.find(a => !sessionSeenAdIdsRef.current.has(a.id));
-      }
-      // 3. If all seen, reset session cache and show first active popup ad
-      if (!target) {
-        sessionSeenAdIdsRef.current.clear();
-        target = activeAds.find(a => a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open') || activeAds[0];
+        const popupAds = activeAds.filter(a =>
+          a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session'
+        );
+        if (popupAds.length > 0) {
+          sessionSeenAdIdsRef.current.clear();
+          target = popupAds[0];
+        }
       }
     }
 
@@ -766,14 +768,15 @@ export const AppProvider = ({ children }) => {
       setActivePopupAd(target);
       recordAdMetric(target.id, 'impression');
     }
-  }, [isPaidInfluencer, adsList, recordAdMetric]);
+  }, [isAuthenticated, currentUser, isPaidInfluencer, adsList, recordAdMetric]);
 
   const dismissMobileAd = useCallback(() => {
     const currentAdId = activePopupAd?.id;
 
-    // Sequential Pop-up Ads Queue: Check if another active Pop-up Ad is in queue for this session
-    if (!isPaidInfluencer && adsList && adsList.length > 0) {
-      const nextPopupAd = adsList.find(a =>
+    // Sequential Pop-up Ads Queue: Check if another active Pop-up Ad is in queue for this session (1, 2, 3 ads in sequence)
+    if (isAuthenticated && currentUser && !isPaidInfluencer) {
+      const list = adsListRef.current?.length > 0 ? adsListRef.current : adsList;
+      const nextPopupAd = (list || []).find(a =>
         a.active &&
         (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
         a.id !== currentAdId &&
@@ -789,7 +792,7 @@ export const AppProvider = ({ children }) => {
     }
 
     setActivePopupAd(null);
-  }, [activePopupAd, isPaidInfluencer, adsList, recordAdMetric]);
+  }, [activePopupAd, isAuthenticated, currentUser, isPaidInfluencer, adsList, recordAdMetric]);
 
   // Story Viewed State Tracker
   const recordStoryView = useCallback(async (storyId, userGroupId) => {
@@ -887,9 +890,9 @@ export const AppProvider = ({ children }) => {
     }
   }, [isAuthenticated, fetchAds, fetchNotifications, fetchLiveConversations]);
 
-  // Automatic In-App Pop-up Ad trigger for unpaid / normal users
+  // Automatic In-App Pop-up Ad trigger for unpaid users (logged in only)
   useEffect(() => {
-    if (isPaidInfluencer || hasTriggeredAdOnLaunchRef.current) return;
+    if (!isAuthenticated || !currentUser || isPaidInfluencer || hasTriggeredAdOnLaunchRef.current) return;
     const list = adsListRef.current?.length > 0 ? adsListRef.current : adsList;
     if (!list || list.length === 0) return;
 
@@ -904,7 +907,7 @@ export const AppProvider = ({ children }) => {
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isPaidInfluencer, adsList, showMobileAd]);
+  }, [isAuthenticated, currentUser, isPaidInfluencer, adsList, showMobileAd]);
 
   // Direct Redirection for External Notifications (Chats, Payments, Violations, Activities)
   const handleNotificationClick = useCallback((notifData) => {

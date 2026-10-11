@@ -112,7 +112,7 @@ export const MobileAdPopup = () => {
     return () => clearInterval(timer);
   }, [ad?.id]);
 
-  if (!ad || isPaidInfluencer) {
+  if (!ad || !currentUser || isPaidInfluencer) {
     return null;
   }
 
@@ -132,7 +132,7 @@ export const MobileAdPopup = () => {
 
   return (
     <Modal
-      visible={Boolean(activePopupAd && !isPaidInfluencer)}
+      visible={Boolean(activePopupAd && currentUser && !isPaidInfluencer)}
       transparent
       animationType="fade"
       onRequestClose={handleClose}

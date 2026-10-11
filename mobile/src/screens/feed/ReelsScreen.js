@@ -358,6 +358,9 @@ export const ReelsScreen = ({ navigation }) => {
     recordPostView,
     showMobileAd,
     isPaidInfluencer,
+    isAuthenticated,
+    currentUser,
+    adsList,
   } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
@@ -372,9 +375,18 @@ export const ReelsScreen = ({ navigation }) => {
       const newIdx = viewableItems[0].index || 0;
       setCurrentIndex(newIdx);
       reelsScrolledCountRef.current += 1;
-      // Trigger ad every 5 reels scrolled for unpaid / normal users
-      if (!isPaidInfluencer && reelsScrolledCountRef.current > 0 && reelsScrolledCountRef.current % 5 === 0) {
-        showMobileAd?.();
+      // Trigger ad strictly every 5 reels scrolled, strictly for LOGGED-IN unpaid normal users,
+      // and strictly if admin has posted an 'After 5 Reels' ad!
+      const isUserLoggedIn = isAuthenticated && Boolean(currentUser);
+      if (isUserLoggedIn && !isPaidInfluencer && reelsScrolledCountRef.current > 0 && reelsScrolledCountRef.current % 5 === 0) {
+        const reelAds = (adsList || []).filter(a => a.active && a.frequency === 'After 5 Reels');
+        if (reelAds.length > 0) {
+          const adIdx = Math.floor((reelsScrolledCountRef.current / 5) - 1) % reelAds.length;
+          const targetAd = reelAds[adIdx];
+          if (targetAd) {
+            showMobileAd?.(targetAd.id);
+          }
+        }
       }
     }
   }).current;
