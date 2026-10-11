@@ -16,8 +16,7 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Heart, Share2, Music, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { VideoView } from 'expo-video';
-import { useManagedPlayer } from '../../hooks/useManagedPlayer';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { colors } from '../../theme/colors';
 import { apiRequest } from '../../services/api';
 import { useApp } from '../../context/AppContext';
@@ -26,12 +25,18 @@ const { width, height } = Dimensions.get('window');
 const STORY_DURATION = 5000;
 
 function StoryVideo({ mediaUrl, isPaused }) {
-  const { player } = useManagedPlayer({
-    source: mediaUrl,
-    shouldPlay: !isPaused,
-    isMuted: false,
-    loop: false,
+  const player = useVideoPlayer(mediaUrl, p => {
+    if (!p) return;
+    p.loop = false;
+    p.play();
   });
+
+  useEffect(() => {
+    if (player) {
+      if (isPaused) player.pause();
+      else player.play();
+    }
+  }, [isPaused, player]);
 
   if (!player) return null;
 
@@ -182,21 +187,6 @@ export default function StoryViewerScreen({ route, navigation }) {
     )
   );
 
-  useEffect(() => {
-    console.log('[DBG][StoryViewerScreen] isOwner inputs:', {
-      currentUserId: currentUser?.id,
-      currentUsername: currentUser?.username,
-      currentUserRole: currentUser?.role,
-      targetStoryUserId: targetStory?.userId,
-      targetStoryUsername: targetStory?.username,
-      targetStoryIsUser: targetStory?.isUser,
-      targetStoryIsMe: targetStory?.isMe,
-      activeStoryId: activeStory?.id,
-      activeStoryUserId: activeStory?.user_id || activeStory?.userId,
-      isOwner,
-    });
-  }, [currentUser, targetStory, activeStory, isOwner]);
-
   const handleDeleteStory = () => {
     if (!activeStory?.id) return;
     setIsPaused(true);
@@ -214,11 +204,7 @@ export default function StoryViewerScreen({ route, navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              const deleteResult = await apiRequest(`/stories/${activeStory.id}`, { method: 'DELETE' });
-              console.log('[DBG][StoryViewerScreen] delete API result:', {
-                storyId: activeStory.id,
-                deleteResult,
-              });
+              await apiRequest(`/stories/${activeStory.id}`, { method: 'DELETE' });
               fetchLiveStories?.();
               if (rawStories.length > 1) {
                 if (currentIndex < rawStories.length - 1) {
@@ -230,7 +216,6 @@ export default function StoryViewerScreen({ route, navigation }) {
                 navigation.goBack();
               }
             } catch (e) {
-              console.log('[DBG][StoryViewerScreen] delete API error:', { storyId: activeStory.id, error: e?.message });
               Alert.alert('Error', e?.message || 'Failed to delete story');
               setIsPaused(false);
             }

@@ -193,7 +193,7 @@ export const AppProvider = ({ children }) => {
       // Trigger login pop-up ad for normal users
       hasTriggeredAdOnLaunchRef.current = false;
       setTimeout(() => {
-        showMobileAd(undefined, 'login');
+        showMobileAd();
       }, 1200);
       return data.user;
     }
@@ -216,7 +216,7 @@ export const AppProvider = ({ children }) => {
       fetchFeed();
       hasTriggeredAdOnLaunchRef.current = false;
       setTimeout(() => {
-        showMobileAd(undefined, 'register');
+        showMobileAd();
       }, 1200);
       return data.user;
     }
@@ -243,7 +243,7 @@ export const AppProvider = ({ children }) => {
       fetchFeed();
       hasTriggeredAdOnLaunchRef.current = false;
       setTimeout(() => {
-        showMobileAd(undefined, 'loginWithGoogle');
+        showMobileAd();
       }, 1200);
       return data;
     }
@@ -267,7 +267,7 @@ export const AppProvider = ({ children }) => {
       fetchFeed();
       hasTriggeredAdOnLaunchRef.current = false;
       setTimeout(() => {
-        showMobileAd(undefined, 'selectGoogleAccount');
+        showMobileAd();
       }, 1200);
       return data;
     }
@@ -691,7 +691,6 @@ export const AppProvider = ({ children }) => {
   // Ads State
   const [adsList, setAdsList] = useState([]);
   const [activePopupAd, setActivePopupAd] = useState(null);
-  const isAdPopupOpen = Boolean(activePopupAd);
   const hasTriggeredAdOnLaunchRef = useRef(false);
   const sessionSeenAdIdsRef = useRef(new Set());
 
@@ -710,16 +709,6 @@ export const AppProvider = ({ children }) => {
       new Date(currentUser.subscriptionExpiresAt) > new Date()
     )
   );
-
-  useEffect(() => {
-    console.log('[DBG][AdEligibility]', {
-      isPaidInfluencer,
-      userId: currentUser?.id,
-      isAdFreeSubscriber: currentUser?.isAdFreeSubscriber,
-      subscription_plan: currentUser?.subscription_plan || currentUser?.subscriptionPlan,
-      subscription_expires_at: currentUser?.subscription_expires_at || currentUser?.subscriptionExpiresAt,
-    });
-  }, [currentUser, isPaidInfluencer]);
 
   const fetchAds = useCallback(async () => {
     try {
@@ -744,17 +733,8 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
   }, []);
 
-  const showMobileAd = useCallback((adId, caller = 'unspecified') => {
-    console.log('[DBG][showMobileAd] called by:', caller, {
-      adId,
-      isPaidInfluencer,
-      adsCount: adsList?.length,
-      sessionSeenCount: sessionSeenAdIdsRef.current.size,
-    });
-    if (isPaidInfluencer) {
-      console.log('[DBG][showMobileAd] blocked because user is paid/ad-free');
-      return;
-    }
+  const showMobileAd = useCallback((adId) => {
+    if (isPaidInfluencer) return; // Paid / Influencer members NEVER see any ads!
     const target = adId
       ? adsList.find(a => a.id === adId)
       : adsList.find(a =>
@@ -762,7 +742,6 @@ export const AppProvider = ({ children }) => {
           (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
           !sessionSeenAdIdsRef.current.has(a.id)
         );
-    console.log('[DBG][showMobileAd] selected target ad:', target ? { id: target.id, title: target.title, frequency: target.frequency } : null);
     if (target) {
       sessionSeenAdIdsRef.current.add(target.id);
       setActivePopupAd(target);
@@ -901,7 +880,7 @@ export const AppProvider = ({ children }) => {
     if (popupAd) {
       hasTriggeredAdOnLaunchRef.current = true;
       const timer = setTimeout(() => {
-        showMobileAd(popupAd.id, 'session_restore_effect');
+        showMobileAd(popupAd.id);
       }, 2500);
       return () => clearTimeout(timer);
     }
@@ -1063,7 +1042,6 @@ export const AppProvider = ({ children }) => {
         deleteUserPost,
         adsList,
         activePopupAd,
-        isAdPopupOpen,
         fetchAds,
         showMobileAd,
         dismissMobileAd,

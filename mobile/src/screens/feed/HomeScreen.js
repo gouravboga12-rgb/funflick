@@ -91,18 +91,11 @@ export const HomeScreen = ({ navigation }) => {
           const adIndex = Math.floor(index / 5) % Math.max(1, inFeedAds.length);
           const feedAd = showFeedAd ? inFeedAds[adIndex] : null;
 
-          const activeIndex = activeVideoId
-            ? filteredPosts.findIndex(p => p.id === activeVideoId)
-            : 0;
-          const currentActiveIdx = activeIndex >= 0 ? activeIndex : 0;
-          const shouldCreatePlayer = Math.abs(index - currentActiveIdx) <= 1;
-
           return (
             <View style={styles.cardWrapper}>
               <VideoPostCard
                 post={item}
                 isActive={activeVideoId ? item.id === activeVideoId : index === 0}
-                shouldCreatePlayer={shouldCreatePlayer}
                 navigation={navigation}
               />
               {feedAd && (

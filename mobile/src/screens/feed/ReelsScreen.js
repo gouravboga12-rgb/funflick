@@ -1,13 +1,11 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { VideoView } from 'expo-video';
-import { useManagedPlayer } from '../../hooks/useManagedPlayer';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Music, Bookmark, Plus, Eye, Check } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
@@ -23,12 +21,10 @@ function formatCount(num) {
   return String(n);
 }
 
-const ReelItem = React.memo(function ReelItem({
+function ReelItem({
   item,
   isActive,
   isScreenFocused,
-  isAdPopupOpen,
-  shouldCreatePlayer,
   reelHeight,
   isReelsMuted,
   toggleMute,
@@ -38,26 +34,26 @@ const ReelItem = React.memo(function ReelItem({
   handleShare,
   navigation,
 }) {
-  const [userPaused, setUserPaused] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [lastTap, setLastTap] = useState(0);
   const heartScale = useRef(new Animated.Value(0)).current;
   const hasRecordedViewRef = useRef(false);
 
-  const effectiveIsScreenFocused = isScreenFocused && !isAdPopupOpen;
-  const shouldPlay = isActive && effectiveIsScreenFocused && !userPaused;
-
-  const { player, isBuffering } = useManagedPlayer({
-    source: shouldCreatePlayer ? item.mediaUrl : null,
-    shouldPlay,
-    isMuted: isReelsMuted,
-    loop: true,
+  const player = useVideoPlayer(item.mediaUrl, p => {
+    if (!p) return;
+    p.loop = true;
+    p.muted = isReelsMuted;
+    if (isActive && isScreenFocused && !isPaused) {
+      p.play();
+    }
   });
 
-  // Reset userPaused when scrolling away
+  // Reset paused state when scrolling away to another reel
   useEffect(() => {
     if (!isActive) {
-      setUserPaused(false);
+      setIsPaused(false);
     }
   }, [isActive]);
 
@@ -66,70 +62,106 @@ const ReelItem = React.memo(function ReelItem({
   }, [item.id]);
 
   useEffect(() => {
-    console.log('[DBG][ReelsScreen] play-pause decision:', {
-      reelId: item.id,
-      hasPlayer: Boolean(player),
-      isActive,
-      isScreenFocused,
-      isAdPopupOpen,
-      effectiveIsScreenFocused,
-      userPaused,
-      isBuffering,
-      decision: shouldPlay ? 'PLAY' : 'PAUSE',
-    });
-  }, [item.id, player, isActive, isScreenFocused, isAdPopupOpen, effectiveIsScreenFocused, userPaused, isBuffering, shouldPlay]);
-
-  // Record view after 5 seconds of continuous active playback
-  useEffect(() => {
-    if (!shouldPlay || hasRecordedViewRef.current || !recordPostView) return;
-    const viewTimer = setTimeout(() => {
-      if (!hasRecordedViewRef.current) {
-        hasRecordedViewRef.current = true;
-        recordPostView(item.id);
+    if (!player) return;
+    let viewTimer = null;
+    try {
+      if (isActive && isScreenFocused && !isPaused) {
+        player.play();
+        // Record view only after 5 seconds of continuous playback
+        if (!hasRecordedViewRef.current && recordPostView) {
+          viewTimer = setTimeout(() => {
+            if (!hasRecordedViewRef.current) {
+              hasRecordedViewRef.current = true;
+              recordPostView(item.id);
+            }
+          }, 5000);
+        }
+      } else {
+        player.pause();
       }
-    }, 5000);
-    return () => clearTimeout(viewTimer);
-  }, [shouldPlay, item.id, recordPostView]);
+    } catch {}
 
-  const triggerHeartBurst = useCallback(() => {
+    return () => {
+      if (viewTimer) clearTimeout(viewTimer);
+    };
+  }, [isActive, isScreenFocused, isPaused, player, item.id, recordPostView]);
+
+  useEffect(() => {
+    if (player) {
+      try {
+        player.muted = isReelsMuted;
+      } catch {}
+    }
+  }, [isReelsMuted, player]);
+
+  const tapTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    };
+  }, []);
+
+  // Sync state with native player events
+  useEffect(() => {
+    if (!player) return;
+    const sub = player.addListener?.('playingChange', (event) => {
+      setIsPaused(!event.isPlaying);
+    });
+    return () => {
+      sub?.remove?.();
+    };
+  }, [player]);
+
+  const triggerHeartBurst = () => {
     heartScale.setValue(0);
     Animated.sequence([
       Animated.spring(heartScale, { toValue: 1.25, friction: 3, useNativeDriver: true }),
       Animated.timing(heartScale, { toValue: 0, duration: 250, useNativeDriver: true }),
     ]).start();
-  }, [heartScale]);
+  };
 
-  const togglePlayPause = useCallback(() => {
-    setUserPaused(prev => !prev);
-  }, []);
+  const togglePlayPause = () => {
+    if (!player) return;
+    try {
+      const isCurrentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (!isPaused);
+      if (isCurrentlyPlaying) {
+        player.pause();
+        setIsPaused(true);
+      } else {
+        player.play();
+        setIsPaused(false);
+      }
+    } catch (e) {
+      console.warn('Reel toggle play error:', e?.message);
+    }
+  };
 
-  const tapGesture = useMemo(() => {
-    const doubleTap = Gesture.Tap()
-      .numberOfTaps(2)
-      .maxDelay(250)
-      .runOnJS(true)
-      .onEnd(() => {
-        if (!item.isLiked && toggleLikePost) {
-          toggleLikePost(item.id);
-        }
-        triggerHeartBurst();
-      });
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDelay(250)
+    .runOnJS(true)
+    .onEnd(() => {
+      if (!item.isLiked) {
+        toggleLikePost(item.id);
+      }
+      triggerHeartBurst();
+    });
 
-    const singleTap = Gesture.Tap()
-      .numberOfTaps(1)
-      .runOnJS(true)
-      .onEnd(() => {
-        togglePlayPause();
-      });
+  const singleTapGesture = Gesture.Tap()
+    .numberOfTaps(1)
+    .runOnJS(true)
+    .onEnd(() => {
+      togglePlayPause();
+    });
 
-    return Gesture.Exclusive(doubleTap, singleTap);
-  }, [item.id, item.isLiked, toggleLikePost, triggerHeartBurst, togglePlayPause]);
+  const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
 
   return (
     <View style={[styles.reelContainer, { height: reelHeight }]}>
       <GestureDetector gesture={tapGesture}>
         <View style={styles.mediaTouch}>
-          {player && shouldCreatePlayer ? (
+          {player ? (
             <VideoView
               player={player}
               style={styles.fullscreenVideo}
@@ -161,12 +193,12 @@ const ReelItem = React.memo(function ReelItem({
             pointerEvents="none"
           />
 
-          {/* Center Pause/Play Indicator (display-only, pointerEvents none) */}
-          {userPaused && (
-            <View style={styles.pausedOverlay} pointerEvents="none">
-              <View style={styles.pausedCircle}>
+          {/* Center Pause/Play Indicator */}
+          {isPaused && (
+            <View style={styles.pausedOverlay} pointerEvents="box-none">
+              <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.8}>
                 <Play size={36} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
-              </View>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -306,27 +338,18 @@ const ReelItem = React.memo(function ReelItem({
       </View>
     </View>
   );
-});
+}
 
 export const ReelsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const { posts, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator, recordPostView, isAdPopupOpen } = useApp();
+  const { posts, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator, recordPostView } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
 
-  let tabBarHeight = 65;
-  try {
-    tabBarHeight = useBottomTabBarHeight();
-  } catch (e) {
-    tabBarHeight = 65;
-  }
-  const reelHeight = WINDOW_HEIGHT - tabBarHeight;
-
-  const videoPosts = useMemo(() => {
-    return (posts || []).filter(
-      p => p.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(p.mediaUrl || '')
-    );
-  }, [posts]);
+  const videoPosts = posts.filter(
+    p => p.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(p.mediaUrl || '')
+  );
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0) {
@@ -338,35 +361,25 @@ export const ReelsScreen = ({ navigation }) => {
     itemVisiblePercentThreshold: 65,
   }).current;
 
-  const handleShare = useCallback(async post => {
+  const handleShare = async post => {
     try {
       await Share.share({
         message: `Watch this reel on FunFlick! https://funflick-theta.vercel.app/video/${post.id}`,
         url: `https://funflick-theta.vercel.app/video/${post.id}`,
       });
     } catch (e) {}
-  }, []);
-
-  const renderItem = useCallback(({ item, index }) => (
-    <ReelItem
-      item={item}
-      isActive={index === currentIndex}
-      isScreenFocused={isFocused}
-      isAdPopupOpen={isAdPopupOpen}
-      shouldCreatePlayer={Math.abs(index - currentIndex) <= 1}
-      reelHeight={reelHeight}
-      isReelsMuted={isReelsMuted}
-      toggleMute={toggleMute}
-      toggleLikePost={toggleLikePost}
-      toggleFollowCreator={toggleFollowCreator}
-      recordPostView={recordPostView}
-      handleShare={handleShare}
-      navigation={navigation}
-    />
-  ), [currentIndex, isFocused, isAdPopupOpen, reelHeight, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator, recordPostView, handleShare, navigation]);
+  };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onLayout={e => {
+        const h = e.nativeEvent.layout.height;
+        if (h > 200 && h !== containerHeight) {
+          setContainerHeight(h);
+        }
+      }}
+    >
       {/* Top Floating Header (Matching Web Reels) */}
       <View style={[styles.topHeader, { top: Math.max(insets.top, 14) }]}>
         <Text style={styles.headerTitle}>Reels</Text>
@@ -378,15 +391,29 @@ export const ReelsScreen = ({ navigation }) => {
       <FlatList
         data={videoPosts}
         keyExtractor={item => String(item.id)}
-        renderItem={renderItem}
+        renderItem={({ item, index }) => (
+          <ReelItem
+            item={item}
+            isActive={index === currentIndex}
+            isScreenFocused={isFocused}
+            reelHeight={containerHeight}
+            isReelsMuted={isReelsMuted}
+            toggleMute={toggleMute}
+            toggleLikePost={toggleLikePost}
+            toggleFollowCreator={toggleFollowCreator}
+            recordPostView={recordPostView}
+            handleShare={handleShare}
+            navigation={navigation}
+          />
+        )}
         pagingEnabled
         showsVerticalScrollIndicator={false}
-        snapToInterval={reelHeight}
+        snapToInterval={containerHeight}
         snapToAlignment="start"
         decelerationRate="fast"
         getItemLayout={(data, index) => ({
-          length: reelHeight,
-          offset: reelHeight * index,
+          length: containerHeight,
+          offset: containerHeight * index,
           index,
         })}
         onViewableItemsChanged={onViewableItemsChanged}
