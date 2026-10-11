@@ -90,16 +90,6 @@ export const InboxScreen = ({ navigation, route }) => {
     return () => clearInterval(interval);
   }, [fetchLiveConversations]);
 
-  // Reset active conversation when user switches to Inbox tab from another tab
-  useEffect(() => {
-    const unsubscribe = navigation?.addListener?.('focus', () => {
-      if (!route?.params?.user && !route?.params?.targetUser) {
-        setActiveConvId(null);
-      }
-    });
-    return unsubscribe;
-  }, [navigation, route?.params]);
-
   // Handle hardware back press on Android when inside active chat view
   useEffect(() => {
     if (!activeConvId) return;
@@ -120,12 +110,12 @@ export const InboxScreen = ({ navigation, route }) => {
       const convId = openOrCreateConversation(target);
       if (convId) {
         setActiveConvId(convId);
+        setIsChatOpen?.(true);
         const partner = target.username || target;
         fetchConversationMessages(partner);
       }
-      navigation?.setParams?.({ user: null, targetUser: null });
     }
-  }, [route?.params, openOrCreateConversation, fetchConversationMessages, navigation]);
+  }, [route?.params?.targetUser, route?.params?.user, openOrCreateConversation, fetchConversationMessages, setIsChatOpen]);
 
   // Load message history when entering active conversation
   useEffect(() => {

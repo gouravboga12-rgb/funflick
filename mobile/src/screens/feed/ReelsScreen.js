@@ -101,6 +101,17 @@ function ReelItem({
     };
   }, []);
 
+  // Sync state with native player events
+  useEffect(() => {
+    if (!player) return;
+    const sub = player.addListener?.('playingChange', (event) => {
+      setIsPaused(!event.isPlaying);
+    });
+    return () => {
+      sub?.remove?.();
+    };
+  }, [player]);
+
   const triggerHeartBurst = () => {
     heartScale.setValue(0);
     Animated.sequence([
@@ -112,8 +123,8 @@ function ReelItem({
   const togglePlayPause = () => {
     if (!player) return;
     try {
-      const currentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (!isPaused);
-      if (currentlyPlaying) {
+      const isCurrentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (!isPaused);
+      if (isCurrentlyPlaying) {
         player.pause();
         setIsPaused(true);
       } else {
@@ -144,7 +155,7 @@ function ReelItem({
       tapTimeoutRef.current = setTimeout(() => {
         togglePlayPause();
         tapTimeoutRef.current = null;
-      }, 180);
+      }, 150);
     }
     setLastTap(now);
   };

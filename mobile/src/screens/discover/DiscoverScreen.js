@@ -103,6 +103,13 @@ export const DiscoverScreen = ({ navigation }) => {
 
   // Optimistic follow toggle with live counter update
   const handleFollowPress = (creator) => {
+    if (!currentUser) {
+      Alert.alert('Sign In Required', 'Please sign in to follow creators.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+      ]);
+      return;
+    }
     if (!creator?.username) return;
     const cleanUser = creator.username.toLowerCase();
     const currentlyFollowing = Boolean(
@@ -219,7 +226,13 @@ export const DiscoverScreen = ({ navigation }) => {
   };
 
   const handleMessageCreator = (creator) => {
-    // Navigate to Inbox tab with selected conversation
+    if (!currentUser) {
+      Alert.alert('Sign In Required', 'Please sign in to message creators.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+      ]);
+      return;
+    }
     navigation.navigate('Inbox', { targetUser: creator });
   };
 
@@ -337,7 +350,166 @@ export const DiscoverScreen = ({ navigation }) => {
           </View>
         )}
 
-        {/* 5. Trending / Search Results Videos Section (Always visible) */}
+        {/* 5. People & Creators to Follow Section (Carousel matching image copy 30.png) */}
+        {!searchQuery.trim() && (
+          <View style={styles.sectionWrap}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>People & Creators to Follow</Text>
+              <Text style={styles.sectionSubtitle}>
+                Discover real users, follow them and connect directly
+              </Text>
+            </View>
+
+            {isLoadingCreators && liveCreators.length === 0 ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.creatorsScroll}
+              >
+                {liveCreators.map(creator => {
+                  const isSelf = creator.username === currentUser?.username;
+                  const cleanCreatorUser = (creator.username || '').toLowerCase();
+                  const isFollowing = Boolean(
+                    (followingUsernames && followingUsernames.has(cleanCreatorUser)) ||
+                    creator.isFollowing
+                  );
+
+                  const creatorStory = (stories || []).find(s =>
+                    String(s.id) === String(creator.id) ||
+                    String(s.userId) === String(creator.id) ||
+                    (s.username && s.username.toLowerCase() === cleanCreatorUser)
+                  );
+                  const hasUnseenStory = Boolean(creatorStory && creatorStory.hasUnseen);
+
+                  return (
+                    <View key={creator.id || creator.username} style={styles.creatorCard}>
+                      {/* Avatar with Gradient Border only if unseen stories exist */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (hasUnseenStory && creatorStory) {
+                            navigation.navigate('StoryViewer', { story: creatorStory });
+                          } else {
+                            handleOpenCreator(creator);
+                          }
+                        }}
+                        activeOpacity={0.8}
+                        style={styles.creatorAvatarWrap}
+                      >
+                        <LinearGradient
+                          colors={
+                            hasUnseenStory
+                              ? ['#ff8a00', '#ff007a', '#7928ca']
+                              : ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)']
+                          }
+                          style={styles.avatarGradientRing}
+                        >
+                          <View style={styles.avatarInner}>
+                            <CreatorAvatarCircle
+                              avatar={creator.avatar || creator.avatar_url}
+                              name={creator.name}
+                              username={creator.username}
+                              size={56}
+                            />
+                          </View>
+                        </LinearGradient>
+                      </TouchableOpacity>
+
+                      {/* Name & Username */}
+                      <TouchableOpacity
+                        onPress={() => handleOpenCreator(creator)}
+                        activeOpacity={0.8}
+                        style={styles.creatorInfoTouch}
+                      >
+                        <Text style={styles.creatorName} numberOfLines={1}>
+                          {creator.name || creator.username}
+                        </Text>
+                        <Text style={styles.creatorHandle} numberOfLines={1}>
+                          @{creator.username}
+                        </Text>
+                        <Text style={styles.creatorFollowers}>
+                          {creator.followersCount || creator.stats?.followers || 0} followers
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Action Buttons */}
+                      <View style={styles.creatorActions}>
+                        {isSelf ? (
+                          <TouchableOpacity
+                            style={styles.myAccountBtn}
+                            onPress={() => navigation.navigate('Profile')}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.myAccountBtnText}>My Account</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <>
+                            <TouchableOpacity
+                              style={styles.followBtnWrap}
+                              onPress={() => handleFollowPress(creator)}
+                              activeOpacity={0.8}
+                            >
+                              <LinearGradient
+                                colors={
+                                  isFollowing
+                                    ? ['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.15)']
+                                    : ['#ff007a', '#ff4b2b']
+                                }
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.followGradientBtn}
+                              >
+                                <Text style={styles.followBtnText}>
+                                  {isFollowing ? 'Following' : 'Follow'}
+                                </Text>
+                              </LinearGradient>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={styles.messageBtn}
+                              onPress={() => handleMessageCreator(creator)}
+                              activeOpacity={0.7}
+                            >
+                              <MessageSquare size={13} color="#f472b6" style={{ marginRight: 4 }} />
+                              <Text style={styles.messageBtnText}>Message</Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        )}
+
+        {/* 6. Trending Hashtags Section (2-Column Cards matching image copy 30.png) */}
+        {!searchQuery.trim() && (
+          <View style={styles.sectionWrap}>
+            <Text style={styles.sectionTitle}>Trending Hashtags</Text>
+
+            <View style={styles.hashtagsGrid}>
+              {dynamicHashtagCards.map(item => (
+                <TouchableOpacity
+                  key={item.tag}
+                  style={styles.hashtagCard}
+                  activeOpacity={0.75}
+                  onPress={() => setSearchQuery(item.tag)}
+                >
+                  <View style={styles.hashtagCardLeft}>
+                    <Text style={styles.hashtagTagText}>{item.tag}</Text>
+                    <Text style={styles.hashtagCountText}>{item.posts}</Text>
+                  </View>
+                  <TrendingUp size={16} color="#64748b" />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* 7. Trending / Search Results Videos Section */}
         <View style={styles.sectionWrap}>
           <View style={styles.sectionHeaderBetween}>
             <View>
@@ -429,161 +601,6 @@ export const DiscoverScreen = ({ navigation }) => {
               </Text>
             </TouchableOpacity>
           )}
-        </View>
-
-        {/* 6. People & Creators to Follow Section (Carousel matching image copy 30.png) */}
-        <View style={styles.sectionWrap}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>People & Creators to Follow</Text>
-            <Text style={styles.sectionSubtitle}>
-              Discover real users, follow them and connect directly
-            </Text>
-          </View>
-
-          {isLoadingCreators && liveCreators.length === 0 ? (
-            <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.creatorsScroll}
-            >
-              {liveCreators.map(creator => {
-                const isSelf = creator.username === currentUser?.username;
-                const cleanCreatorUser = (creator.username || '').toLowerCase();
-                const isFollowing = Boolean(
-                  (followingUsernames && followingUsernames.has(cleanCreatorUser)) ||
-                  creator.isFollowing
-                );
-
-                const creatorStory = (stories || []).find(s =>
-                  String(s.id) === String(creator.id) ||
-                  String(s.userId) === String(creator.id) ||
-                  (s.username && s.username.toLowerCase() === cleanCreatorUser)
-                );
-                const hasUnseenStory = Boolean(creatorStory && creatorStory.hasUnseen);
-
-                return (
-                  <View key={creator.id || creator.username} style={styles.creatorCard}>
-                    {/* Avatar with Gradient Border only if unseen stories exist */}
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (hasUnseenStory && creatorStory) {
-                          navigation.navigate('StoryViewer', { story: creatorStory });
-                        } else {
-                          handleOpenCreator(creator);
-                        }
-                      }}
-                      activeOpacity={0.8}
-                      style={styles.creatorAvatarWrap}
-                    >
-                      <LinearGradient
-                        colors={
-                          hasUnseenStory
-                            ? ['#ff8a00', '#ff007a', '#7928ca']
-                            : ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)']
-                        }
-                        style={styles.avatarGradientRing}
-                      >
-                        <View style={styles.avatarInner}>
-                          <CreatorAvatarCircle
-                            avatar={creator.avatar || creator.avatar_url}
-                            name={creator.name}
-                            username={creator.username}
-                            size={56}
-                          />
-                        </View>
-                      </LinearGradient>
-                    </TouchableOpacity>
-
-                    {/* Name & Username */}
-                    <TouchableOpacity
-                      onPress={() => handleOpenCreator(creator)}
-                      activeOpacity={0.8}
-                      style={styles.creatorInfoTouch}
-                    >
-                      <Text style={styles.creatorName} numberOfLines={1}>
-                        {creator.name || creator.username}
-                      </Text>
-                      <Text style={styles.creatorHandle} numberOfLines={1}>
-                        @{creator.username}
-                      </Text>
-                      <Text style={styles.creatorFollowers}>
-                        {creator.followersCount || creator.stats?.followers || 0} followers
-                      </Text>
-                    </TouchableOpacity>
-
-                    {/* Action Buttons */}
-                    <View style={styles.creatorActions}>
-                      {isSelf ? (
-                        <TouchableOpacity
-                          style={styles.myAccountBtn}
-                          onPress={() => navigation.navigate('Profile')}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={styles.myAccountBtnText}>My Account</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <>
-                          <TouchableOpacity
-                            style={styles.followBtnWrap}
-                            onPress={() => handleFollowPress(creator)}
-                            activeOpacity={0.8}
-                          >
-                            <LinearGradient
-                              colors={
-                                isFollowing
-                                  ? ['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.15)']
-                                  : ['#ff007a', '#ff4b2b']
-                              }
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 0 }}
-                              style={styles.followGradientBtn}
-                            >
-                              <Text style={styles.followBtnText}>
-                                {isFollowing ? 'Following' : 'Follow'}
-                              </Text>
-                            </LinearGradient>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.messageBtn}
-                            onPress={() => handleMessageCreator(creator)}
-                            activeOpacity={0.7}
-                          >
-                            <MessageSquare size={13} color="#f472b6" style={{ marginRight: 4 }} />
-                            <Text style={styles.messageBtnText}>Message</Text>
-                          </TouchableOpacity>
-                        </>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          )}
-        </View>
-
-        {/* 7. Trending Hashtags Section (2-Column Cards matching image copy 30.png) */}
-        <View style={styles.sectionWrap}>
-          <Text style={styles.sectionTitle}>Trending Hashtags</Text>
-
-          <View style={styles.hashtagsGrid}>
-            {dynamicHashtagCards.map(item => (
-              <TouchableOpacity
-                key={item.tag}
-                style={styles.hashtagCard}
-                activeOpacity={0.75}
-                onPress={() => setSearchQuery(item.tag)}
-              >
-                <View style={styles.hashtagCardLeft}>
-                  <Text style={styles.hashtagTagText}>{item.tag}</Text>
-                  <Text style={styles.hashtagCountText}>{item.posts}</Text>
-                </View>
-                <TrendingUp size={16} color="#64748b" />
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
 
         {/* Bottom spacing for bottom navigation */}

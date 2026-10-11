@@ -174,11 +174,15 @@ export default function StoryViewerScreen({ route, navigation }) {
 
   const isOwner = Boolean(
     currentUser && (
+      currentUser?.role === 'admin' ||
+      currentUser?.role === 'super_admin' ||
       targetStory?.isUser ||
       targetStory?.isMe ||
       String(targetStory?.userId) === String(currentUser?.id) ||
       (targetStory?.username && targetStory?.username.toLowerCase() === currentUser?.username?.toLowerCase()) ||
-      String(activeStory?.user_id) === String(currentUser?.id)
+      String(activeStory?.user_id) === String(currentUser?.id) ||
+      String(activeStory?.userId) === String(currentUser?.id) ||
+      (activeStory?.username && activeStory?.username.toLowerCase() === currentUser?.username?.toLowerCase())
     )
   );
 
@@ -496,17 +500,23 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   contentOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 30,
-    elevation: 30,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 100,
+    elevation: 100,
     justifyContent: 'space-between',
-    pointerEvents: 'box-none',
   },
   topSection: {
+    width: '100%',
     paddingTop: 8,
     gap: 8,
-    zIndex: 35,
-    elevation: 35,
+    zIndex: 110,
+    elevation: 110,
   },
   progressBarContainer: {
     flexDirection: 'row',
@@ -617,9 +627,10 @@ const styles = StyleSheet.create({
     fontSize: 52,
   },
   bottomSection: {
+    width: '100%',
     gap: 10,
-    zIndex: 35,
-    elevation: 35,
+    zIndex: 110,
+    elevation: 110,
   },
   captionContainer: {
     backgroundColor: 'rgba(0, 0, 0, 0.45)',

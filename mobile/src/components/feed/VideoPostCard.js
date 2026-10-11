@@ -113,11 +113,25 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     };
   }, []);
 
+  // Sync state with native player events
+  useEffect(() => {
+    if (!player) return;
+    const sub = player.addListener?.('playingChange', (event) => {
+      setIsPlaying(event.isPlaying);
+      if (!event.isPlaying) {
+        setIsUserPaused(true);
+      }
+    });
+    return () => {
+      sub?.remove?.();
+    };
+  }, [player]);
+
   const togglePlayPause = () => {
     if (!player) return;
     try {
-      const currentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (isPlaying && !isUserPaused);
-      if (currentlyPlaying) {
+      const isCurrentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (isPlaying && !isUserPaused);
+      if (isCurrentlyPlaying) {
         player.pause();
         setIsUserPaused(true);
         setIsPlaying(false);
@@ -150,7 +164,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
       tapTimeoutRef.current = setTimeout(() => {
         togglePlayPause();
         tapTimeoutRef.current = null;
-      }, 180);
+      }, 150);
     }
     setLastTap(now);
   };
@@ -416,6 +430,7 @@ const styles = StyleSheet.create({
   },
   fullTapLayer: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
     zIndex: 10,
     elevation: 10,
   },
@@ -439,20 +454,20 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 20,
-    elevation: 20,
+    zIndex: 25,
+    elevation: 25,
   },
   playIconCircle: {
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.4)',
-    zIndex: 25,
-    elevation: 25,
+    zIndex: 30,
+    elevation: 30,
   },
   burstHeartWrap: {
     position: 'absolute',
