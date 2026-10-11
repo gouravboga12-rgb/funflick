@@ -138,7 +138,6 @@ function ReelItem({
   };
 
   const lastTapRef = useRef(0);
-  const tapTimeoutRef = useRef(null);
 
   const handleMediaPress = () => {
     const now = Date.now();
