@@ -130,8 +130,8 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   cardWrapper: {
-    paddingHorizontal: 10,
-    paddingTop: 8,
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
   modalOverlay: {
     flex: 1,

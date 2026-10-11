@@ -12,6 +12,7 @@ import {
   Share,
   Alert,
 } from 'react-native';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Heart, Share2, Music, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -232,18 +233,81 @@ export default function StoryViewerScreen({ route, navigation }) {
     } catch (e) {}
   };
 
+  const translateY = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const panGesture = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetY([15, 1000])
+    .activeOffsetX([-25, 25])
+    .onUpdate((e) => {
+      if (e.translationY > 0 && Math.abs(e.translationY) > Math.abs(e.translationX) * 0.7) {
+        translateY.setValue(e.translationY);
+        const s = Math.max(0.75, 1 - (e.translationY / height) * 0.35);
+        scale.setValue(s);
+      } else if (Math.abs(e.translationX) > Math.abs(e.translationY)) {
+        translateX.setValue(e.translationX * 0.5);
+      }
+    })
+    .onEnd((e) => {
+      if (e.translationY > 120 || (e.translationY > 40 && e.velocityY > 600)) {
+        Animated.timing(translateY, {
+          toValue: height,
+          duration: 180,
+          useNativeDriver: true,
+        }).start(() => {
+          navigation.goBack();
+        });
+        return;
+      }
+
+      if (e.translationX < -70 || (e.translationX < -30 && e.velocityX < -450)) {
+        if (currentGroupIndex >= 0 && currentGroupIndex < availableStoryGroups.length - 1) {
+          const nextGroup = availableStoryGroups[currentGroupIndex + 1];
+          navigation.replace('StoryViewer', { story: nextGroup });
+          return;
+        } else {
+          navigation.goBack();
+          return;
+        }
+      }
+
+      if (e.translationX > 70 || (e.translationX > 30 && e.velocityX > 450)) {
+        if (currentGroupIndex > 0) {
+          const prevGroup = availableStoryGroups[currentGroupIndex - 1];
+          navigation.replace('StoryViewer', { story: prevGroup });
+          return;
+        }
+      }
+
+      Animated.parallel([
+        Animated.spring(translateY, { toValue: 0, friction: 8, tension: 80, useNativeDriver: true }),
+        Animated.spring(translateX, { toValue: 0, friction: 8, tension: 80, useNativeDriver: true }),
+        Animated.spring(scale, { toValue: 1, friction: 8, tension: 80, useNativeDriver: true }),
+      ]).start();
+    });
+
   const displayMedia = activeStory?.mediaUrl || activeStory?.media_url;
   const isVideo = activeStory?.mediaType === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(displayMedia || '');
 
   return (
     <View style={styles.container}>
-      <View style={styles.storyFrame}>
-        {/* Background Media with 9:16 fitting and zero-crop blur backdrop */}
-        {isVideo && displayMedia ? (
-          <View style={StyleSheet.absoluteFillObject}>
-            <StoryVideo key={displayMedia} mediaUrl={displayMedia} isPaused={isPaused} />
-          </View>
-        ) : displayMedia ? (
+      <GestureDetector gesture={panGesture}>
+        <Animated.View
+          style={[
+            styles.storyFrame,
+            {
+              transform: [{ translateY }, { translateX }, { scale }],
+            },
+          ]}
+        >
+          {/* Background Media with 9:16 fitting and zero-crop blur backdrop */}
+          {isVideo && displayMedia ? (
+            <View style={StyleSheet.absoluteFillObject}>
+              <StoryVideo key={displayMedia} mediaUrl={displayMedia} isPaused={isPaused} />
+            </View>
+          ) : displayMedia ? (
           <View style={StyleSheet.absoluteFillObject}>
             <Image
               source={{ uri: displayMedia }}
@@ -434,9 +498,10 @@ export default function StoryViewerScreen({ route, navigation }) {
             </View>
           </View>
         </View>
-      </View>
-    </View>
-  );
+      </Animated.View>
+    </GestureDetector>
+  </View>
+);
 }
 
 const styles = StyleSheet.create({

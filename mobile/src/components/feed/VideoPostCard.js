@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Share, Dimensions, Animated } from 'react-native';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, Play, Music, Plus, Eye, Check } from 'lucide-react-native';
@@ -145,29 +146,25 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     }
   };
 
-  const handleTap = () => {
-    const now = Date.now();
-    const DOUBLE_TAP_DELAY = 280;
-    if (now - lastTap < DOUBLE_TAP_DELAY) {
-      if (tapTimeoutRef.current) {
-        clearTimeout(tapTimeoutRef.current);
-        tapTimeoutRef.current = null;
-      }
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDelay(250)
+    .runOnJS(true)
+    .onEnd(() => {
       if (!post.isLiked) {
         toggleLikePost(post.id);
       }
       triggerHeartBurst();
-    } else {
-      if (tapTimeoutRef.current) {
-        clearTimeout(tapTimeoutRef.current);
-      }
-      tapTimeoutRef.current = setTimeout(() => {
-        togglePlayPause();
-        tapTimeoutRef.current = null;
-      }, 150);
-    }
-    setLastTap(now);
-  };
+    });
+
+  const singleTapGesture = Gesture.Tap()
+    .numberOfTaps(1)
+    .runOnJS(true)
+    .onEnd(() => {
+      togglePlayPause();
+    });
+
+  const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
 
   const handleShare = async () => {
     try {
@@ -201,11 +198,9 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         )}
 
         {/* Full-surface tap overlay covering center & entire video */}
-        <TouchableOpacity
-          style={styles.fullTapLayer}
-          activeOpacity={1}
-          onPress={handleTap}
-        />
+        <GestureDetector gesture={tapGesture}>
+          <View style={styles.fullTapLayer} />
+        </GestureDetector>
 
         {/* Top Vignette Overlay */}
         <LinearGradient
@@ -407,12 +402,13 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#0a0515',
-    borderRadius: 22,
-    marginBottom: 16,
+    backgroundColor: '#000000',
+    borderRadius: 0,
+    marginBottom: 0,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
     width: '100%',
     aspectRatio: 9 / 16,
   },

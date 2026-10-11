@@ -1,5 +1,6 @@
 import 'react-native-gesture-handler';
 import React from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as WebBrowser from 'expo-web-browser';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,13 +13,16 @@ WebBrowser.maybeCompleteAuthSession({ skipRedirectCheck: true });
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AppProvider>
-        <StatusBar style="light" backgroundColor="#07040d" />
-        <AppNavigator />
-        <MobileAdPopup />
-        <InAppNotificationBanner />
-      </AppProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AppProvider>
+          <StatusBar style="light" backgroundColor="#07040d" />
+          <AppNavigator />
+          <MobileAdPopup />
+          <InAppNotificationBanner />
+        </AppProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
+
