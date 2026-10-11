@@ -18,6 +18,30 @@ export const AppProvider = ({ children }) => {
   const [activePlayingVideoId, setActivePlayingVideoId] = useState(null);
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const locallySeenStoryIdsRef = useRef(new Set());
+
+  // In-app floating toast banner state
+  const [inAppBanner, setInAppBanner] = useState({
+    visible: false,
+    title: '',
+    body: '',
+    avatar: null,
+    data: null,
+  });
+
+  const showInAppBanner = useCallback(({ title, body, avatar, data }) => {
+    setInAppBanner({
+      visible: true,
+      title: title || 'FunFlick',
+      body: body || '',
+      avatar: avatar || null,
+      data: data || null,
+    });
+  }, []);
+
+  const dismissInAppBanner = useCallback(() => {
+    setInAppBanner(prev => ({ ...prev, visible: false }));
+  }, []);
 
   // Fetch live stories from EC2 MySQL backend
   const fetchLiveStories = useCallback(async () => {
@@ -46,16 +70,24 @@ export const AppProvider = ({ children }) => {
                          (currentUser?.username && s.username?.toLowerCase() === currentUser.username?.toLowerCase());
             return !isMe && s.stories && s.stories.length > 0;
           })
-          .map(s => ({
-            id: s.id || `st_${s.userId || s.username}`,
-            userId: s.userId,
-            isUser: false,
-            username: s.username,
-            name: s.name || s.username,
-            avatar: s.avatar || '/brand/default-avatar.svg',
-            hasUnseen: true,
-            stories: s.stories || [],
-          }));
+          .map(s => {
+            const updatedStories = (s.stories || []).map(item => ({
+              ...item,
+              isViewed: Boolean(item.isViewed || locallySeenStoryIdsRef.current.has(item.id)),
+            }));
+            const hasUnseen = (s.hasUnseen === true || s.hasUnseen === 1) && updatedStories.some(item => !item.isViewed);
+
+            return {
+              id: s.id || `st_${s.userId || s.username}`,
+              userId: s.userId,
+              isUser: false,
+              username: s.username,
+              name: s.name || s.username,
+              avatar: s.avatar || '/brand/default-avatar.svg',
+              hasUnseen,
+              stories: updatedStories,
+            };
+          });
 
         setStories([myStory, ...others]);
       }
@@ -402,12 +434,54 @@ export const AppProvider = ({ children }) => {
   // Conversations State
   const [conversations, setConversations] = useState([]);
   const [userSubmissions, setUserSubmissions] = useState([]);
+  const seenLastMsgIdsRef = useRef(new Map());
+  const isInitialConversationsFetchRef = useRef(true);
 
   // Fetch live conversations from EC2 backend (merges cleanly without erasing loaded messages)
   const fetchLiveConversations = useCallback(async () => {
     try {
       const data = await apiRequest('/messages/conversations');
       if (data && data.conversations && Array.isArray(data.conversations)) {
+        // Trigger in-app toast & push notification for incoming direct messages
+        for (const dbConv of data.conversations) {
+          const uId = String(dbConv.userId || dbConv.user?.id || '');
+          const lastMsg = String(dbConv.lastMessage || '');
+          const unread = Number(dbConv.unreadCount) || 0;
+
+          if (!isInitialConversationsFetchRef.current && unread > 0) {
+            const prevRecorded = seenLastMsgIdsRef.current.get(uId);
+            if (prevRecorded !== lastMsg) {
+              seenLastMsgIdsRef.current.set(uId, lastMsg);
+              scheduleLocalNotification({
+                title: `💬 ${dbConv.user?.name || dbConv.user?.username || 'New Message'}`,
+                body: lastMsg || 'Sent you a message',
+                data: {
+                  type: 'chat',
+                  partnerId: dbConv.userId,
+                  senderUsername: dbConv.user?.username,
+                  senderName: dbConv.user?.name,
+                  senderAvatar: dbConv.user?.avatar,
+                },
+              });
+              showInAppBanner({
+                title: `💬 ${dbConv.user?.name || dbConv.user?.username || 'New Message'}`,
+                body: lastMsg || 'Sent you a message',
+                avatar: dbConv.user?.avatar,
+                data: {
+                  type: 'chat',
+                  partnerId: dbConv.userId,
+                  senderUsername: dbConv.user?.username,
+                  senderName: dbConv.user?.name,
+                  senderAvatar: dbConv.user?.avatar,
+                },
+              });
+            }
+          } else {
+            seenLastMsgIdsRef.current.set(uId, lastMsg);
+          }
+        }
+        isInitialConversationsFetchRef.current = false;
+
         setConversations(prev => {
           const seenIds = new Set();
           const merged = [];
@@ -447,7 +521,7 @@ export const AppProvider = ({ children }) => {
     } catch (e) {
       console.warn('Could not fetch conversations in mobile:', e.message);
     }
-  }, []);
+  }, [showInAppBanner]);
 
   // Fetch messages with specific partner
   const fetchConversationMessages = useCallback(async (targetPartner) => {
@@ -621,14 +695,7 @@ export const AppProvider = ({ children }) => {
   const sessionSeenAdIdsRef = useRef(new Set());
 
   const isPaidInfluencer = Boolean(
-    currentUser?.isInfluencer === true ||
-    currentUser?.isInfluencer === 1 ||
-    currentUser?.is_influencer === true ||
-    currentUser?.is_influencer === 1 ||
-    currentUser?.role === 'influencer' ||
-    currentUser?.role === 'admin' ||
-    currentUser?.role === 'super_admin' ||
-    currentUser?.username === 'super_admin' ||
+    currentUser?.isAdFreeSubscriber === true ||
     (
       currentUser?.subscription_plan &&
       !['Free Member', 'Free User', 'free', 'Free Creator'].includes(currentUser.subscription_plan) &&
@@ -708,6 +775,7 @@ export const AppProvider = ({ children }) => {
   // Story Viewed State Tracker
   const recordStoryView = useCallback(async (storyId, userGroupId) => {
     if (!storyId) return;
+    locallySeenStoryIdsRef.current.add(storyId);
     apiRequest(`/stories/${storyId}/view`, { method: 'POST' }).catch(() => {});
 
     setStories(prev =>
@@ -748,6 +816,12 @@ export const AppProvider = ({ children }) => {
                 body: n.message || 'You have a new notification',
                 data: n,
               });
+              showInAppBanner({
+                title: n.title || 'FunFlick Activity',
+                body: n.message || 'You have a new notification',
+                avatar: n.avatar || n.actor_avatar,
+                data: n,
+              });
               break;
             }
           }
@@ -761,7 +835,7 @@ export const AppProvider = ({ children }) => {
         setUnreadNotificationCount(data.notifications.filter(n => !n.is_read).length);
       }
     } catch (e) {}
-  }, []);
+  }, [showInAppBanner]);
 
   const markAllNotificationsRead = useCallback(async () => {
     setNotifications(prev => prev.map(n => ({ ...n, is_read: 1 })));
@@ -784,11 +858,15 @@ export const AppProvider = ({ children }) => {
     fetchAds();
     if (isAuthenticated) {
       fetchNotifications();
+      fetchLiveConversations();
       registerForPushNotificationsAsync();
-      const interval = setInterval(fetchNotifications, 8000);
+      const interval = setInterval(() => {
+        fetchNotifications();
+        fetchLiveConversations();
+      }, 6000);
       return () => clearInterval(interval);
     }
-  }, [isAuthenticated, fetchAds, fetchNotifications]);
+  }, [isAuthenticated, fetchAds, fetchNotifications, fetchLiveConversations]);
 
   // Automatic In-App Pop-up Ad trigger for unpaid users (logged in only)
   useEffect(() => {
@@ -977,6 +1055,9 @@ export const AppProvider = ({ children }) => {
         setFollowRequests,
         acceptFollowRequest,
         declineFollowRequest,
+        inAppBanner,
+        showInAppBanner,
+        dismissInAppBanner,
       }}
     >
       {children}

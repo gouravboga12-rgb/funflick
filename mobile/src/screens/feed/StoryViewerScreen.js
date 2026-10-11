@@ -12,7 +12,7 @@ import {
   Share,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Heart, Share2, Music, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -45,11 +45,13 @@ function StoryVideo({ mediaUrl, isPaused }) {
       style={StyleSheet.absoluteFillObject}
       contentFit="contain"
       nativeControls={false}
+      pointerEvents="none"
     />
   );
 }
 
 export default function StoryViewerScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const { story } = route.params || {};
   const { currentUser, stories: allStories, recordStoryView } = useApp();
 
@@ -249,7 +251,16 @@ export default function StoryViewerScreen({ route, navigation }) {
           <ChevronRight size={24} color="#ffffff" />
         </TouchableOpacity>
 
-        <SafeAreaView style={styles.contentOverlay} edges={['top', 'bottom']}>
+        <View
+          style={[
+            styles.contentOverlay,
+            {
+              paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 24 : 12),
+              paddingBottom: Math.max(insets.bottom, 20),
+            },
+          ]}
+          pointerEvents="box-none"
+        >
           {/* Top Controls Section */}
           <View style={styles.topSection}>
             {/* Instagram-style Segmented Progress Bar */}
@@ -356,7 +367,7 @@ export default function StoryViewerScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
           </View>
-        </SafeAreaView>
+        </View>
       </View>
     </View>
   );
@@ -393,12 +404,13 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 15,
+    zIndex: 40,
+    elevation: 40,
   },
   rightNavArrow: {
     position: 'absolute',
@@ -408,12 +420,13 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 15,
+    zIndex: 40,
+    elevation: 40,
   },
   touchArea: {
     ...StyleSheet.absoluteFillObject,
@@ -422,14 +435,16 @@ const styles = StyleSheet.create({
   },
   contentOverlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 20,
+    zIndex: 30,
+    elevation: 30,
     justifyContent: 'space-between',
     pointerEvents: 'box-none',
   },
   topSection: {
     paddingTop: 8,
     gap: 8,
-    zIndex: 20,
+    zIndex: 35,
+    elevation: 35,
   },
   progressBarContainer: {
     flexDirection: 'row',
@@ -453,6 +468,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 4,
+    zIndex: 40,
+    elevation: 40,
   },
   creatorRow: {
     flexDirection: 'row',
@@ -486,14 +503,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+    zIndex: 50,
+    elevation: 50,
   },
   viewerMusicBadge: {
     alignSelf: 'flex-start',
@@ -525,7 +544,8 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     gap: 10,
-    zIndex: 20,
+    zIndex: 35,
+    elevation: 35,
   },
   captionContainer: {
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
@@ -548,6 +568,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 20,
     gap: 12,
+    zIndex: 40,
+    elevation: 40,
   },
   actionBtn: {
     flexDirection: 'row',
@@ -557,12 +579,14 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: 14,
     borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.3)',
+    zIndex: 50,
+    elevation: 50,
   },
   actionBtnLiked: {
-    backgroundColor: 'rgba(255,0,122,0.25)',
+    backgroundColor: 'rgba(255,0,122,0.35)',
     borderColor: '#ff007a',
   },
   likeCountText: {

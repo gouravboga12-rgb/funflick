@@ -54,14 +54,7 @@ export const MobileAdPopup = () => {
 
   const isPaidInfluencer = Boolean(
     ctxIsPaidInfluencer ||
-    currentUser?.isInfluencer === true ||
-    currentUser?.isInfluencer === 1 ||
-    currentUser?.is_influencer === true ||
-    currentUser?.is_influencer === 1 ||
-    currentUser?.role === 'influencer' ||
-    currentUser?.role === 'admin' ||
-    currentUser?.role === 'super_admin' ||
-    currentUser?.username === 'super_admin' ||
+    currentUser?.isAdFreeSubscriber === true ||
     (
       currentUser?.subscription_plan &&
       !['Free Member', 'Free User', 'free', 'Free Creator'].includes(currentUser.subscription_plan) &&

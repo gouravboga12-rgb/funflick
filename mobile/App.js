@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider } from './src/context/AppContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { MobileAdPopup } from './src/components/common/MobileAdPopup';
+import { InAppNotificationBanner } from './src/components/common/InAppNotificationBanner';
 
 WebBrowser.maybeCompleteAuthSession({ skipRedirectCheck: true });
 
@@ -16,6 +17,7 @@ export default function App() {
         <StatusBar style="light" backgroundColor="#07040d" />
         <AppNavigator />
         <MobileAdPopup />
+        <InAppNotificationBanner />
       </AppProvider>
     </SafeAreaProvider>
   );

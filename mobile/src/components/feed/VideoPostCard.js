@@ -105,9 +105,26 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     ]).start();
   };
 
+  const togglePlayPause = () => {
+    if (!player) return;
+    try {
+      if (isPlaying && !isUserPaused) {
+        player.pause();
+        setIsUserPaused(true);
+        setIsPlaying(false);
+      } else {
+        player.play();
+        setIsUserPaused(false);
+        setIsPlaying(true);
+      }
+    } catch (e) {
+      console.warn('Video toggle play error:', e?.message);
+    }
+  };
+
   const handleTap = () => {
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300;
+    const DOUBLE_TAP_DELAY = 280;
     if (now - lastTap < DOUBLE_TAP_DELAY) {
       // Double tap -> Like with burst animation
       if (!post.isLiked) {
@@ -115,22 +132,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
       }
       triggerHeartBurst();
     } else {
-      // Single tap -> Toggle Play/Pause reliably
-      if (player) {
-        try {
-          if (!isUserPaused) {
-            player.pause();
-            setIsUserPaused(true);
-            setIsPlaying(false);
-          } else {
-            player.play();
-            setIsUserPaused(false);
-            setIsPlaying(true);
-          }
-        } catch (e) {
-          console.warn('Video toggle play error:', e?.message);
-        }
-      }
+      togglePlayPause();
     }
     setLastTap(now);
   };
@@ -154,6 +156,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
             style={styles.videoPlayer}
             contentFit="cover"
             nativeControls={false}
+            pointerEvents="none"
           />
         ) : (
           <Image
@@ -184,12 +187,16 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
           pointerEvents="none"
         />
 
-        {/* Center Pause Indicator */}
+        {/* Center Pause Indicator & Tap-to-play button */}
         {(!isPlaying || isUserPaused) && isVideo && (
-          <View style={styles.playOverlay} pointerEvents="none">
-            <View style={styles.playIconCircle}>
-              <Play size={32} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
-            </View>
+          <View style={styles.playOverlay} pointerEvents="box-none">
+            <TouchableOpacity
+              style={styles.playIconCircle}
+              onPress={togglePlayPause}
+              activeOpacity={0.8}
+            >
+              <Play size={34} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -389,7 +396,8 @@ const styles = StyleSheet.create({
   },
   fullTapLayer: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 2,
+    zIndex: 10,
+    elevation: 10,
   },
   topVignette: {
     position: 'absolute',
@@ -397,6 +405,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 90,
+    zIndex: 3,
   },
   bottomVignette: {
     position: 'absolute',
@@ -404,21 +413,26 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 180,
+    zIndex: 3,
   },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 20,
+    elevation: 20,
   },
   playIconCircle: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+    zIndex: 25,
+    elevation: 25,
   },
   burstHeartWrap: {
     position: 'absolute',

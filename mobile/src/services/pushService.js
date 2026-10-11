@@ -91,6 +91,20 @@ export async function registerForPushNotificationsAsync() {
 export async function scheduleLocalNotification({ title, body, data = {} }) {
   initNotificationHandlerSafe();
   try {
+    if (Platform.OS === 'android') {
+      try {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'FunFlick Activity',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#ff007a',
+          sound: 'default',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          showBadge: true,
+        });
+      } catch (err) {}
+    }
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: title || 'FunFlick',
