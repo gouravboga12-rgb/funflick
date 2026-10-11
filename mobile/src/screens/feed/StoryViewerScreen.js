@@ -13,7 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Heart, Share2, Music } from 'lucide-react-native';
+import { X, Heart, Share2, Music, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { colors } from '../../theme/colors';
@@ -43,7 +43,7 @@ function StoryVideo({ mediaUrl, isPaused }) {
     <VideoView
       player={player}
       style={StyleSheet.absoluteFillObject}
-      contentFit="cover"
+      contentFit="contain"
       nativeControls={false}
     />
   );
@@ -51,7 +51,7 @@ function StoryVideo({ mediaUrl, isPaused }) {
 
 export default function StoryViewerScreen({ route, navigation }) {
   const { story } = route.params || {};
-  const { currentUser, stories: allStories } = useApp();
+  const { currentUser, stories: allStories, recordStoryView } = useApp();
 
   const targetStory = React.useMemo(() => {
     if (story && typeof story === 'object' && (story.stories || story.mediaUrl)) {
@@ -79,6 +79,13 @@ export default function StoryViewerScreen({ route, navigation }) {
   const [likesCount, setLikesCount] = useState(Number(activeStory?.likesCount) || 0);
   const [isPaused, setIsPaused] = useState(false);
 
+  // Record story view immediately upon display
+  useEffect(() => {
+    if (activeStory?.id) {
+      recordStoryView?.(activeStory.id, targetStory?.id || targetStory?.userId);
+    }
+  }, [activeStory?.id, targetStory, recordStoryView]);
+
   useEffect(() => {
     if (activeStory) {
       setIsLiked(Boolean(activeStory.isLiked));
@@ -86,10 +93,23 @@ export default function StoryViewerScreen({ route, navigation }) {
     }
   }, [currentIndex, activeStory]);
 
+  const availableStoryGroups = React.useMemo(() => {
+    return (allStories || []).filter(g => (g.stories && g.stories.length > 0) || g.mediaUrl);
+  }, [allStories]);
+
+  const currentGroupIndex = availableStoryGroups.findIndex(g =>
+    String(g.id) === String(targetStory?.id) ||
+    String(g.userId) === String(targetStory?.userId) ||
+    (g.username && g.username === targetStory?.username)
+  );
+
   const goToNextStory = () => {
     if (currentIndex < rawStories.length - 1) {
       setCurrentIndex(prev => prev + 1);
       progressAnim.setValue(0);
+    } else if (currentGroupIndex >= 0 && currentGroupIndex < availableStoryGroups.length - 1) {
+      const nextGroup = availableStoryGroups[currentGroupIndex + 1];
+      navigation.replace('StoryViewer', { story: nextGroup });
     } else {
       navigation.goBack();
     }
@@ -99,6 +119,9 @@ export default function StoryViewerScreen({ route, navigation }) {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
       progressAnim.setValue(0);
+    } else if (currentGroupIndex > 0) {
+      const prevGroup = availableStoryGroups[currentGroupIndex - 1];
+      navigation.replace('StoryViewer', { story: prevGroup });
     } else {
       progressAnim.setValue(0);
     }
@@ -145,7 +168,6 @@ export default function StoryViewerScreen({ route, navigation }) {
     }
   };
 
-
   const handleShare = async () => {
     try {
       await Share.share({
@@ -160,11 +182,26 @@ export default function StoryViewerScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.storyFrame}>
-        {/* Background Media */}
+        {/* Background Media with 9:16 fitting and zero-crop blur backdrop */}
         {isVideo && displayMedia ? (
-          <StoryVideo mediaUrl={displayMedia} isPaused={isPaused} />
+          <View style={StyleSheet.absoluteFillObject}>
+            <StoryVideo mediaUrl={displayMedia} isPaused={isPaused} />
+          </View>
         ) : displayMedia ? (
-          <Image source={{ uri: displayMedia }} style={styles.mediaBackground} resizeMode="cover" />
+          <View style={StyleSheet.absoluteFillObject}>
+            <Image
+              source={{ uri: displayMedia }}
+              style={StyleSheet.absoluteFillObject}
+              resizeMode="cover"
+              blurRadius={Platform.OS === 'ios' ? 25 : 15}
+            />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
+            <Image
+              source={{ uri: displayMedia }}
+              style={styles.mediaForeground}
+              resizeMode="contain"
+            />
+          </View>
         ) : (
           <View style={[styles.mediaBackground, { backgroundColor: '#120c24' }]} />
         )}
@@ -192,6 +229,25 @@ export default function StoryViewerScreen({ route, navigation }) {
             <View style={{ flex: 2 }} />
           </TouchableWithoutFeedback>
         </View>
+
+        {/* Visible Chevron Navigation Arrows on the sides */}
+        <TouchableOpacity
+          style={styles.leftNavArrow}
+          onPress={goToPrevStory}
+          activeOpacity={0.7}
+          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+        >
+          <ChevronLeft size={24} color="#ffffff" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.rightNavArrow}
+          onPress={goToNextStory}
+          activeOpacity={0.7}
+          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+        >
+          <ChevronRight size={24} color="#ffffff" />
+        </TouchableOpacity>
 
         <SafeAreaView style={styles.contentOverlay} edges={['top', 'bottom']}>
           {/* Top Controls Section */}
@@ -315,8 +371,8 @@ const styles = StyleSheet.create({
   storyFrame: {
     width: '100%',
     height: '100%',
-    maxWidth: 440,
-    aspectRatio: Platform.OS === 'web' ? 9 / 16 : undefined,
+    maxWidth: 480,
+    aspectRatio: 9 / 16,
     maxHeight: '100%',
     position: 'relative',
     overflow: 'hidden',
@@ -326,6 +382,41 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
+  },
+  mediaForeground: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  leftNavArrow: {
+    position: 'absolute',
+    left: 10,
+    top: '50%',
+    transform: [{ translateY: -20 }],
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  rightNavArrow: {
+    position: 'absolute',
+    right: 10,
+    top: '50%',
+    transform: [{ translateY: -20 }],
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   touchArea: {
     ...StyleSheet.absoluteFillObject,

@@ -10,6 +10,7 @@ import {
   Dimensions,
   useWindowDimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -92,11 +93,12 @@ function CreatorAvatarCircle({ avatar, name, username, size = 64 }) {
 }
 
 export const DiscoverScreen = ({ navigation }) => {
-  const { currentUser, posts, toggleFollowCreator, followingUsernames } = useApp();
+  const { currentUser, posts, fetchFeed, toggleFollowCreator, followingUsernames } = useApp();
   const { width: windowWidth } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState('');
   const [liveCreators, setLiveCreators] = useState([]);
   const [isLoadingCreators, setIsLoadingCreators] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Optimistic follow toggle with live counter update
   const handleFollowPress = (creator) => {
@@ -220,6 +222,21 @@ export const DiscoverScreen = ({ navigation }) => {
     navigation.navigate('Inbox', { targetUser: creator });
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (fetchFeed) await fetchFeed();
+      const q = searchQuery.trim();
+      const data = await apiRequest(`/users/search?limit=15${q ? `&q=${encodeURIComponent(q)}` : ''}`);
+      if (data && Array.isArray(data.users)) {
+        setLiveCreators(data.users.filter(u => u.role !== 'moderator' && !u.username?.toLowerCase().startsWith('moderator')));
+      }
+    } catch (e) {
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* 1. Header with funflick Logo + DISCOVER pill */}
@@ -243,6 +260,14 @@ export const DiscoverScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {/* 2. Search Input Bar */}
         <View style={styles.searchBarWrap}>

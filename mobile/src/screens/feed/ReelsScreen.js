@@ -29,6 +29,7 @@ function ReelItem({
   toggleMute,
   toggleLikePost,
   toggleFollowCreator,
+  recordPostView,
   handleShare,
   navigation,
 }) {
@@ -37,6 +38,7 @@ function ReelItem({
   const [isSaved, setIsSaved] = useState(false);
   const [lastTap, setLastTap] = useState(0);
   const heartScale = useRef(new Animated.Value(0)).current;
+  const hasRecordedViewRef = useRef(false);
 
   const player = useVideoPlayer(item.mediaUrl, p => {
     if (!p) return;
@@ -55,15 +57,33 @@ function ReelItem({
   }, [isActive]);
 
   useEffect(() => {
+    hasRecordedViewRef.current = false;
+  }, [item.id]);
+
+  useEffect(() => {
     if (!player) return;
+    let viewTimer = null;
     try {
       if (isActive && isScreenFocused && !isPaused) {
         player.play();
+        // Record view only after 5 seconds of continuous playback
+        if (!hasRecordedViewRef.current && recordPostView) {
+          viewTimer = setTimeout(() => {
+            if (!hasRecordedViewRef.current) {
+              hasRecordedViewRef.current = true;
+              recordPostView(item.id);
+            }
+          }, 5000);
+        }
       } else {
         player.pause();
       }
     } catch {}
-  }, [isActive, isScreenFocused, isPaused, player]);
+
+    return () => {
+      if (viewTimer) clearTimeout(viewTimer);
+    };
+  }, [isActive, isScreenFocused, isPaused, player, item.id, recordPostView]);
 
   useEffect(() => {
     if (player) {
@@ -287,7 +307,7 @@ function ReelItem({
 export const ReelsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const { posts, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator } = useApp();
+  const { posts, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator, recordPostView } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
 
@@ -345,6 +365,7 @@ export const ReelsScreen = ({ navigation }) => {
             toggleMute={toggleMute}
             toggleLikePost={toggleLikePost}
             toggleFollowCreator={toggleFollowCreator}
+            recordPostView={recordPostView}
             handleShare={handleShare}
             navigation={navigation}
           />

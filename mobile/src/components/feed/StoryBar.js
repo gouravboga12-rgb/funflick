@@ -47,6 +47,7 @@ export const StoryBar = ({ onAddStory, onStoryPress }) => {
     username: currentUser?.username || 'you',
     avatar: currentUser?.avatar_url || currentUser?.avatar || userStoryGroup?.avatar || '/brand/default-avatar.svg',
     hasStories: hasMyStories,
+    hasUnseen: userStoryGroup?.hasUnseen === true,
     stories: myStoriesList,
   };
 
@@ -61,7 +62,7 @@ export const StoryBar = ({ onAddStory, onStoryPress }) => {
       name: s.name || s.username?.replace('_official', '') || 'Creator',
       username: s.username,
       avatar: s.avatar || '/brand/default-avatar.svg',
-      hasUnseen: s.hasUnseen !== false,
+      hasUnseen: s.hasUnseen === true,
       stories: s.stories || [],
     }));
 
@@ -102,7 +103,7 @@ export const StoryBar = ({ onAddStory, onStoryPress }) => {
                 <View style={styles.myStoryWrapper}>
                   {item.hasStories ? (
                     <LinearGradient
-                      colors={['#ff8a00', '#ff007a', '#7928ca']}
+                      colors={item.hasUnseen ? ['#ff8a00', '#ff007a', '#7928ca'] : ['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.25)']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.gradientRing}

@@ -197,10 +197,12 @@ export async function sendMessage(req, res) {
     const senderUsername = sender.username || '';
     const senderAvatar = sender.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
 
-    // Insert notification for recipient (if not self-chat)
+    // Insert notification & dispatch device push for recipient (if not self-chat)
     if (!isSelfChat) {
+      const notifSnippet = text?.trim() ? text.trim().slice(0, 80) : (finalMediaType === 'video' ? '🎥 Sent a video' : '📷 Sent a photo');
+
+      // 1. In-app notification
       try {
-        const notifSnippet = text?.trim() ? text.trim().slice(0, 80) : (finalMediaType === 'video' ? '🎥 Sent a video' : '📷 Sent a photo');
         await pool.query(
           `
           INSERT INTO notifications (user_id, actor_id, type, title, message)
@@ -208,9 +210,13 @@ export async function sendMessage(req, res) {
           `,
           [recipientId, senderId, `${senderName} (@${senderUsername})`, notifSnippet]
         );
+      } catch (e) {
+        console.warn('In-app message notification insert warning:', e?.message);
+      }
 
-        // Send instant device push notification (wakes up phone when app is closed)
-        sendPushNotification(recipientId, {
+      // 2. Send instant device push notification (wakes up phone when app is closed / backgrounded)
+      try {
+        await sendPushNotification(recipientId, {
           title: `💬 ${senderName} (@${senderUsername})`,
           body: notifSnippet,
           data: {
@@ -227,8 +233,8 @@ export async function sendMessage(req, res) {
             }
           }
         });
-      } catch (e) {
-        console.warn('Message notification error:', e?.message);
+      } catch (pushErr) {
+        console.warn('Device push notification error for message:', pushErr?.message);
       }
     }
 

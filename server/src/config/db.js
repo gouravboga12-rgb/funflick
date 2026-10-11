@@ -272,7 +272,7 @@ export async function initDatabase() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
         actor_id INT DEFAULT NULL,
-        type ENUM('follow', 'like', 'comment', 'payout', 'system') NOT NULL,
+        type VARCHAR(50) NOT NULL,
         title VARCHAR(200) DEFAULT NULL,
         message TEXT NOT NULL,
         target_id INT DEFAULT NULL,
@@ -281,6 +281,25 @@ export async function initDatabase() {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       ) ENGINE=InnoDB;
     `);
+
+    // Ensure type column in notifications is VARCHAR(50) so 'message'/'chat' are permitted
+    try {
+      await connection.query(`ALTER TABLE notifications MODIFY COLUMN type VARCHAR(50) NOT NULL`);
+    } catch (e) {}
+
+    // Story views tracking table (tracks whether a story has been seen by a user)
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS story_views (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          story_id INT NOT NULL,
+          user_id INT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_story_view (story_id, user_id),
+          INDEX idx_story_user (story_id, user_id)
+        ) ENGINE=InnoDB;
+      `);
+    } catch (e) {}
 
     // Messages table (Instagram-style 1-to-1 direct messaging)
     await connection.query(`

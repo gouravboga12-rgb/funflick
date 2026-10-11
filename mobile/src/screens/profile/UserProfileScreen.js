@@ -14,6 +14,7 @@ import {
   Switch,
   Platform,
   Linking,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -62,6 +63,7 @@ import {
   Copy,
 } from 'lucide-react-native';
 import { SubmitAdRequestModal } from '../../components/user/SubmitAdRequestModal';
+import { FollowListModal } from '../../components/common/FollowListModal';
 import { useApp } from '../../context/AppContext';
 import { uploadMediaToS3 } from '../../services/s3Upload';
 import { apiRequest, setStoredUser, setToken } from '../../services/api';
@@ -103,6 +105,9 @@ export const UserProfileScreen = ({ navigation, route }) => {
   // Dynamic live followers / following count
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [isLoadingFollows, setIsLoadingFollows] = useState(false);
+  const [isFollowModalOpen, setIsFollowModalOpen] = useState(false);
+  const [followModalTab, setFollowModalTab] = useState('followers');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Modals state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -222,7 +227,25 @@ export const UserProfileScreen = ({ navigation, route }) => {
       setEditAvatar(currentUser.avatar_url || currentUser.avatar || '');
       setEditEmail(currentUser.email || '');
     }
-  }, [fetchFollowCounts, currentUser]);
+
+    const unsub = navigation.addListener('focus', () => {
+      fetchFollowCounts();
+    });
+    return unsub;
+  }, [fetchFollowCounts, currentUser, navigation]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        fetchFollowCounts(),
+        fetchFeed ? fetchFeed() : Promise.resolve(),
+      ]);
+    } catch (e) {
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const fetchBlockedUsers = async () => {
     try {
@@ -689,6 +712,14 @@ export const UserProfileScreen = ({ navigation, route }) => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {/* 2. User Info Card */}
         <View style={styles.profileHeaderCard}>
@@ -760,15 +791,29 @@ export const UserProfileScreen = ({ navigation, route }) => {
               <Text style={styles.statLabel}>Posts</Text>
             </View>
             <View style={styles.statDivider} />
-            <View style={styles.statItem}>
+            <TouchableOpacity
+              style={styles.statItem}
+              activeOpacity={0.7}
+              onPress={() => {
+                setFollowModalTab('following');
+                setIsFollowModalOpen(true);
+              }}
+            >
               <Text style={styles.statValue}>{followCounts.following}</Text>
               <Text style={styles.statLabel}>Following</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.statDivider} />
-            <View style={styles.statItem}>
+            <TouchableOpacity
+              style={styles.statItem}
+              activeOpacity={0.7}
+              onPress={() => {
+                setFollowModalTab('followers');
+                setIsFollowModalOpen(true);
+              }}
+            >
               <Text style={styles.statValue}>{followCounts.followers}</Text>
               <Text style={styles.statLabel}>Followers</Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* "My Profile" Gradient Banner Card (View >) */}
@@ -2265,6 +2310,19 @@ export const UserProfileScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+
+      {/* =================================================== */}
+      {/* MODAL 8: FOLLOWERS & FOLLOWING LIST MODAL           */}
+      {/* =================================================== */}
+      <FollowListModal
+        visible={isFollowModalOpen}
+        onClose={() => setIsFollowModalOpen(false)}
+        targetUsername={currentUser?.username}
+        initialTab={followModalTab}
+        currentUsername={currentUser?.username}
+        onRelationshipChanged={fetchFollowCounts}
+        navigation={navigation}
+      />
     </SafeAreaView>
   );
 };

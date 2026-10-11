@@ -11,13 +11,14 @@ export async function sendPushNotification(targetUserId, { title, body, data = {
     const [rows] = await pool.query('SELECT push_token FROM users WHERE id = ?', [targetUserId]);
     if (!rows.length || !rows[0].push_token) return;
 
-    const pushToken = rows[0].push_token;
-    if (!pushToken.startsWith('ExponentPushToken[') && !pushToken.startsWith('ExpoPushToken[')) {
+    const rawToken = String(rows[0].push_token || '').trim().replace(/^["']|["']$/g, '');
+    if (!rawToken.startsWith('ExponentPushToken[') && !rawToken.startsWith('ExpoPushToken[')) {
+      console.log(`User ${targetUserId} has non-expo push token format:`, rawToken);
       return;
     }
 
     const message = {
-      to: pushToken,
+      to: rawToken,
       sound: 'default',
       title: title || 'FunFlick',
       body: body || '',
@@ -39,6 +40,7 @@ export async function sendPushNotification(targetUserId, { title, body, data = {
     });
 
     const result = await response.json();
+    console.log(`Push notification sent to user ${targetUserId}:`, result);
     return result;
   } catch (err) {
     console.warn('Push notification delivery error:', err.message);

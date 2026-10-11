@@ -15,6 +15,7 @@ import {
   Modal,
   Keyboard,
   BackHandler,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -62,8 +63,25 @@ export const InboxScreen = ({ navigation, route }) => {
   const [downloading, setDownloading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const flatListRef = useRef(null);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (activeConvId) {
+        const conv = conversations.find(c => c.id === activeConvId);
+        const partner = conv?.userId || conv?.user?.username;
+        if (partner) await fetchConversationMessages(partner);
+      } else {
+        await fetchLiveConversations();
+      }
+    } catch (e) {
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Poll conversations
   useEffect(() => {
@@ -400,6 +418,14 @@ export const InboxScreen = ({ navigation, route }) => {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+              />
+            }
             renderItem={({ item }) => {
               const isMe = item.sender === 'me';
               return (
@@ -742,6 +768,14 @@ export const InboxScreen = ({ navigation, route }) => {
           data={filteredConvs}
           keyExtractor={item => item.id}
           contentContainerStyle={{ paddingBottom: 110 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.convItem}

@@ -9,6 +9,7 @@ export async function listStories(req, res) {
         s.id, s.user_id, s.media_url, s.media_type, s.caption, s.music, s.sticker, s.created_at, s.status,
         s.likes_count,
         (SELECT COUNT(*) FROM story_likes sl WHERE sl.story_id = s.id AND sl.user_id = ?) AS user_liked,
+        (SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id AND sv.user_id = ?) AS user_viewed,
         u.name, u.username, u.avatar_url,
         (
           CASE 
@@ -31,7 +32,7 @@ export async function listStories(req, res) {
         )
       ORDER BY follow_priority DESC, s.created_at DESC
       LIMIT 100
-    `, [currentUserId, currentUserId, currentUserId, currentUserId, currentUserId]);
+    `, [currentUserId, currentUserId, currentUserId, currentUserId, currentUserId, currentUserId, currentUserId]);
 
     // Group stories by creator
     const grouped = {};
@@ -43,9 +44,13 @@ export async function listStories(req, res) {
           username: row.username,
           name: row.name,
           avatar: row.avatar_url || '/brand/default-avatar.svg',
-          hasUnseen: true,
+          hasUnseen: false,
           stories: []
         };
+      }
+      const isSeen = Boolean(row.user_viewed);
+      if (!isSeen && currentUserId !== row.user_id) {
+        grouped[row.user_id].hasUnseen = true;
       }
       grouped[row.user_id].stories.push({
         id: row.id,
@@ -56,6 +61,7 @@ export async function listStories(req, res) {
         sticker: row.sticker || '',
         likesCount: Number(row.likes_count) || 0,
         isLiked: Boolean(row.user_liked),
+        isViewed: isSeen,
         time: 'Recently',
         created_at: row.created_at
       });
@@ -65,6 +71,22 @@ export async function listStories(req, res) {
   } catch (err) {
     console.error('List stories error:', err);
     return res.status(500).json({ error: 'Failed to fetch stories' });
+  }
+}
+
+export async function recordStoryView(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id || 0;
+    if (userId && id) {
+      await pool.query(
+        'INSERT IGNORE INTO story_views (story_id, user_id) VALUES (?, ?)',
+        [id, userId]
+      );
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    return res.json({ success: true });
   }
 }
 

@@ -11,8 +11,10 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
-import { X, Send, MessageCircle } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { X, Send, MessageCircle, Trash2 } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { apiRequest } from '../../services/api';
 import { colors } from '../../theme/colors';
@@ -23,6 +25,7 @@ export const CommentsModal = ({
   videoId,
   onCommentAdded,
 }) => {
+  const insets = useSafeAreaInsets();
   const { currentUser } = useApp();
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +58,7 @@ export const CommentsModal = ({
     // Optimistic local add
     const tempComment = {
       id: 'temp_' + Date.now(),
+      user_id: currentUser?.id,
       text: trimmed,
       content: trimmed,
       user: currentUser?.username || 'you',
@@ -80,6 +84,30 @@ export const CommentsModal = ({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDeleteComment = (commentId) => {
+    Alert.alert(
+      'Delete Comment',
+      'Are you sure you want to delete this comment?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setComments((prev) => prev.filter((c) => c.id !== commentId));
+            try {
+              await apiRequest(`/videos/${videoId}/comments/${commentId}`, {
+                method: 'DELETE',
+              });
+            } catch (e) {
+              console.warn('Delete comment error:', e?.message);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -133,6 +161,12 @@ export const CommentsModal = ({
               contentContainerStyle={styles.listContent}
               renderItem={({ item }) => {
                 const initial = (item.name || item.user || 'U').charAt(0).toUpperCase();
+                const isOwnComment = Boolean(
+                  (item.user_id && currentUser?.id && Number(item.user_id) === Number(currentUser.id)) ||
+                  (item.user && currentUser?.username && item.user.toLowerCase() === currentUser.username.toLowerCase()) ||
+                  currentUser?.role === 'admin'
+                );
+
                 return (
                   <View style={styles.commentRow}>
                     {item.avatar && !item.avatar.includes('default-avatar') ? (
@@ -147,6 +181,15 @@ export const CommentsModal = ({
                       <View style={styles.commentMeta}>
                         <Text style={styles.userName}>{item.name || item.user}</Text>
                         <Text style={styles.timeText}>{item.time || 'Recently'}</Text>
+                        {isOwnComment && (
+                          <TouchableOpacity
+                            style={styles.deleteBtn}
+                            onPress={() => handleDeleteComment(item.id)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Trash2 size={13} color="#ef4444" />
+                          </TouchableOpacity>
+                        )}
                       </View>
                       <Text style={styles.commentText}>{item.text || item.content}</Text>
                     </View>
@@ -157,7 +200,7 @@ export const CommentsModal = ({
           )}
 
           {/* Bottom Input Bar */}
-          <View style={styles.inputBar}>
+          <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             <TextInput
               style={styles.textInput}
               placeholder="Add a comment..."
@@ -329,5 +372,9 @@ const styles = StyleSheet.create({
   },
   sendBtnActive: {
     backgroundColor: colors.primary,
+  },
+  deleteBtn: {
+    marginLeft: 'auto',
+    padding: 4,
   },
 });

@@ -12,6 +12,7 @@ import {
   Modal,
   TextInput,
   Share,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -35,6 +36,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../context/AppContext';
 import { apiRequest, setStoredUser } from '../../services/api';
+import { FollowListModal } from '../../components/common/FollowListModal';
 import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -68,6 +70,9 @@ export default function CreatorProfileScreen({ route, navigation }) {
   const [userVideos, setUserVideos] = useState([]);
   const [likedVideos, setLikedVideos] = useState([]);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
+  const [isFollowModalOpen, setIsFollowModalOpen] = useState(false);
+  const [followModalTab, setFollowModalTab] = useState('followers');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Tabs: Owner sees Liked videos tab (private to owner). Other users NEVER see Liked tab.
   const tabs = isOwner ? ['Videos', 'Shorts', 'Liked', 'About'] : ['Videos', 'Shorts', 'About'];
@@ -132,6 +137,12 @@ export default function CreatorProfileScreen({ route, navigation }) {
   useEffect(() => {
     fetchCreatorData();
   }, [fetchCreatorData]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchCreatorData();
+    setIsRefreshing(false);
+  };
 
   // Handle follow toggle
   const handleFollowToggle = async () => {
@@ -321,6 +332,14 @@ export default function CreatorProfileScreen({ route, navigation }) {
         renderItem={renderGridItem}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 60 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         ListHeaderComponent={
           <View style={styles.profileSection}>
             {/* Cover Banner */}
@@ -361,14 +380,28 @@ export default function CreatorProfileScreen({ route, navigation }) {
                   <Text style={styles.statNum}>{userVideos.length}</Text>
                   <Text style={styles.statLabel}>Videos</Text>
                 </View>
-                <View style={styles.statBox}>
+                <TouchableOpacity
+                  style={styles.statBox}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setFollowModalTab('followers');
+                    setIsFollowModalOpen(true);
+                  }}
+                >
                   <Text style={styles.statNum}>{followCounts.followers}</Text>
                   <Text style={styles.statLabel}>Followers</Text>
-                </View>
-                <View style={styles.statBox}>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.statBox}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setFollowModalTab('following');
+                    setIsFollowModalOpen(true);
+                  }}
+                >
                   <Text style={styles.statNum}>{followCounts.following}</Text>
                   <Text style={styles.statLabel}>Following</Text>
-                </View>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -569,6 +602,16 @@ export default function CreatorProfileScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+
+      <FollowListModal
+        visible={isFollowModalOpen}
+        onClose={() => setIsFollowModalOpen(false)}
+        targetUsername={targetUsername}
+        initialTab={followModalTab}
+        currentUsername={currentUser?.username}
+        onRelationshipChanged={fetchCreatorData}
+        navigation={navigation}
+      />
     </SafeAreaView>
   );
 }

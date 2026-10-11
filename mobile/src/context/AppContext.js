@@ -142,11 +142,6 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     fetchFeed();
     fetchLiveStories();
-    const interval = setInterval(() => {
-      fetchFeed();
-      fetchLiveStories();
-    }, 10000);
-    return () => clearInterval(interval);
   }, [fetchFeed, fetchLiveStories]);
 
   // Login handler
@@ -263,6 +258,7 @@ export const AppProvider = ({ children }) => {
 
   // Logout handler
   const logout = async () => {
+    sessionSeenAdIdsRef.current.clear();
     await setToken(null);
     await setStoredUser(null);
     setCurrentUser(null);
@@ -618,6 +614,7 @@ export const AppProvider = ({ children }) => {
   const [adsList, setAdsList] = useState([]);
   const [activePopupAd, setActivePopupAd] = useState(null);
   const hasTriggeredAdOnLaunchRef = useRef(false);
+  const sessionSeenAdIdsRef = useRef(new Set());
 
   const isPaidInfluencer = Boolean(
     currentUser?.isInfluencer === true ||
@@ -671,16 +668,61 @@ export const AppProvider = ({ children }) => {
       ? adsList.find(a => a.id === adId)
       : adsList.find(a =>
           a.active &&
-          (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session')
+          (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
+          !sessionSeenAdIdsRef.current.has(a.id)
         );
     if (target) {
+      sessionSeenAdIdsRef.current.add(target.id);
       setActivePopupAd(target);
       recordAdMetric(target.id, 'impression');
     }
   }, [isPaidInfluencer, adsList, recordAdMetric]);
 
   const dismissMobileAd = useCallback(() => {
+    const currentAdId = activePopupAd?.id;
+
+    // Sequential Pop-up Ads Queue: Check if another active Pop-up Ad is in queue for this session
+    if (!isPaidInfluencer && adsList && adsList.length > 0) {
+      const nextPopupAd = adsList.find(a =>
+        a.active &&
+        (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
+        a.id !== currentAdId &&
+        !sessionSeenAdIdsRef.current.has(a.id)
+      );
+
+      if (nextPopupAd) {
+        sessionSeenAdIdsRef.current.add(nextPopupAd.id);
+        setActivePopupAd(nextPopupAd);
+        recordAdMetric(nextPopupAd.id, 'impression');
+        return;
+      }
+    }
+
     setActivePopupAd(null);
+  }, [activePopupAd, isPaidInfluencer, adsList, recordAdMetric]);
+
+  // Story Viewed State Tracker
+  const recordStoryView = useCallback(async (storyId, userGroupId) => {
+    if (!storyId) return;
+    apiRequest(`/stories/${storyId}/view`, { method: 'POST' }).catch(() => {});
+
+    setStories(prev =>
+      prev.map(group => {
+        const hasStory = (group.stories || []).some(s => s.id === storyId);
+        if (hasStory || (userGroupId && (group.id === userGroupId || group.userId === userGroupId))) {
+          const updatedStories = (group.stories || []).map(s =>
+            s.id === storyId ? { ...s, isViewed: true } : s
+          );
+          const allSeen = updatedStories.every(s => s.isViewed);
+          return {
+            ...group,
+            hasUnseen: !allSeen,
+            stories: updatedStories,
+          };
+        }
+        return group;
+      })
+    );
   }, []);
 
   // Notifications State
@@ -892,6 +934,7 @@ export const AppProvider = ({ children }) => {
         posts,
         stories,
         fetchLiveStories,
+        recordStoryView,
         isLoadingFeed,
         fetchFeed,
         isReelsMuted,

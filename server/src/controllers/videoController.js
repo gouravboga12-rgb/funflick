@@ -306,7 +306,7 @@ export async function getComments(req, res) {
   try {
     const { id } = req.params;
     const [rows] = await pool.query(
-      `SELECT c.id, c.content, c.created_at, u.name, u.username, u.avatar_url
+      `SELECT c.id, c.user_id, c.content, c.created_at, u.name, u.username, u.avatar_url
        FROM comments c
        JOIN users u ON c.user_id = u.id
        WHERE c.video_id = ?
@@ -315,6 +315,7 @@ export async function getComments(req, res) {
     );
     const comments = rows.map(r => ({
       id: r.id,
+      user_id: r.user_id,
       text: r.content,
       content: r.content,
       user: r.username,

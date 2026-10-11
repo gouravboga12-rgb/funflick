@@ -25,19 +25,6 @@ export const HomeScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('For You');
   const [activeVideoId, setActiveVideoId] = useState(null);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
-  const hasTriggeredPopupRef = useRef(false);
-
-  // Auto trigger popup ad once for unpaid users upon landing on HomeScreen
-  useEffect(() => {
-    if (isPaidInfluencer) return;
-    if (!hasTriggeredPopupRef.current && adsList && adsList.length > 0) {
-      hasTriggeredPopupRef.current = true;
-      const timer = setTimeout(() => {
-        showMobileAd();
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [isPaidInfluencer, adsList, showMobileAd]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems && viewableItems.length > 0) {

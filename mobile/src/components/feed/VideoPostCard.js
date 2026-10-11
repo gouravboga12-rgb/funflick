@@ -34,6 +34,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [avatarErr, setAvatarErr] = useState(false);
   const heartScale = useRef(new Animated.Value(0)).current;
+  const hasRecordedViewRef = useRef(false);
 
   const isOwner = post.creator?.username === currentUser?.username;
   const isVideo = post.mediaType === 'video' && Boolean(post.mediaUrl);
@@ -55,20 +56,37 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     }
   }, [isActive]);
 
+  useEffect(() => {
+    hasRecordedViewRef.current = false;
+  }, [post.id]);
+
   // Play/pause based on active viewport state, screen focus, and user pause toggle
   useEffect(() => {
     if (!player) return;
+    let viewTimer = null;
     try {
       if (isActive && isFocused && !isUserPaused) {
         player.play();
         setIsPlaying(true);
-        recordPostView(post.id);
+        // Only count view after 5 seconds of continuous playback
+        if (!hasRecordedViewRef.current && recordPostView) {
+          viewTimer = setTimeout(() => {
+            if (!hasRecordedViewRef.current) {
+              hasRecordedViewRef.current = true;
+              recordPostView(post.id);
+            }
+          }, 5000);
+        }
       } else {
         player.pause();
         setIsPlaying(false);
       }
     } catch {}
-  }, [isActive, isFocused, isUserPaused, player, post.id]);
+
+    return () => {
+      if (viewTimer) clearTimeout(viewTimer);
+    };
+  }, [isActive, isFocused, isUserPaused, player, post.id, recordPostView]);
 
   // Sync mute state
   useEffect(() => {

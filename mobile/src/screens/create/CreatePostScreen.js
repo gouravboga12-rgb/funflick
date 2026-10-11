@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,6 +22,8 @@ import {
   MapPin,
   Hash,
   Sparkles,
+  Search,
+  X,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ensureMediaLibraryPermission } from '../../services/permissionsService';
@@ -40,11 +43,14 @@ const CATEGORIES = [
   'Standup',
 ];
 
-const SUGGESTED_LOCATIONS = [
-  'Hyderabad Film City',
-  'Jubilee Hills, Hyderabad',
-  'Mumbai Comedy Central',
-  'Bengaluru Studios',
+const DEFAULT_SUGGESTED_LOCATIONS = [
+  'Madhapur, Serilingampally Mandal, Hyderabad District, Telangana, India - 500081',
+  'Jubilee Hills, Shaikpet Mandal, Hyderabad District, Telangana, India - 500033',
+  'Ramoji Film City, Hayathnagar Mandal, Ranga Reddy District, Telangana, India - 501512',
+  'Gachibowli, Serilingampally Mandal, Rangareddy District, Telangana, India - 500032',
+  'Bandra West, Mumbai Suburban District, Maharashtra, India - 400050',
+  'Koramangala, Bengaluru South Mandal, Bengaluru Urban District, Karnataka, India - 560034',
+  'Connaught Place, New Delhi District, Delhi, India - 110001',
 ];
 
 const TRENDING_TAGS = ['#funflick', '#post', '#comedy', '#bts', '#shootday', '#teluguhumor'];
@@ -82,10 +88,68 @@ export const CreatePostScreen = ({ navigation }) => {
   const [caption, setCaption] = useState('');
   const [category, setCategory] = useState('Comedy');
   const [selectedTags, setSelectedTags] = useState(['#funflick', '#post']);
-  const [location, setLocation] = useState('Hyderabad Film City');
+  const [location, setLocation] = useState('');
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const [locationSearchResults, setLocationSearchResults] = useState([]);
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const isSubmittingRef = useRef(false);
   const [progress, setProgress] = useState(0);
+
+  // Location search effect (Debounced reverse geocoding via Nominatim)
+  useEffect(() => {
+    const q = locationSearchQuery.trim();
+    if (!q || q.length < 2) {
+      setLocationSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingLocation(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=6`,
+          { headers: { 'User-Agent': 'FunFlickApp/1.0' } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const formatted = data.map(item => {
+              const a = item.address || {};
+              const parts = [];
+              const colony = a.suburb || a.neighbourhood || a.village || a.road || a.residential;
+              if (colony) parts.push(colony);
+              const mandal = a.county || a.city || a.town || a.municipality;
+              if (mandal && !parts.includes(mandal)) parts.push(mandal);
+              const dist = a.state_district;
+              if (dist && !parts.includes(dist)) parts.push(dist);
+              if (a.state && !parts.includes(a.state)) parts.push(a.state);
+              if (a.country) parts.push(a.country);
+              let full = parts.join(', ');
+              if (a.postcode) full += ` - ${a.postcode}`;
+              return full || item.display_name;
+            });
+            setLocationSearchResults(formatted);
+          } else {
+            const localMatches = DEFAULT_SUGGESTED_LOCATIONS.filter(l =>
+              l.toLowerCase().includes(q.toLowerCase())
+            );
+            setLocationSearchResults(localMatches);
+          }
+        }
+      } catch (err) {
+        const localMatches = DEFAULT_SUGGESTED_LOCATIONS.filter(l =>
+          l.toLowerCase().includes(q.toLowerCase())
+        );
+        setLocationSearchResults(localMatches);
+      } finally {
+        setIsSearchingLocation(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [locationSearchQuery]);
 
   const handleProcessPhoto = (fileOrAsset) => {
     const size = fileOrAsset.size || fileOrAsset.fileSize || 0;
@@ -320,24 +384,43 @@ export const CreatePostScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Location */}
+        {/* Location Section with Real Search & Geocoding Details */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Location</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-            {SUGGESTED_LOCATIONS.map(loc => {
-              const isSelected = location === loc;
-              return (
-                <TouchableOpacity
-                  key={loc}
-                  onPress={() => setLocation(loc)}
-                  style={[styles.chipPill, isSelected && styles.chipPillActive]}
-                >
-                  <MapPin size={12} color={isSelected ? '#fff' : '#9ca3af'} style={{ marginRight: 4 }} />
-                  <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>{loc}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <MapPin size={13} color="#f472b6" />
+              <Text style={styles.label}>Location</Text>
+              <Text style={styles.optionalText}>(optional)</Text>
+            </View>
+            {location ? (
+              <TouchableOpacity onPress={() => setLocation('')}>
+                <Text style={styles.clearLocationText}>Clear</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {location ? (
+            <View style={styles.selectedLocationCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                <MapPin size={15} color="#f472b6" style={{ marginRight: 6 }} />
+                <Text style={styles.selectedLocationText} numberOfLines={2}>{location}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsLocationModalOpen(true)} style={styles.changeLocBtn}>
+                <Text style={styles.changeLocText}>Change</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.dropdownBtn}
+              onPress={() => setIsLocationModalOpen(true)}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <MapPin size={14} color="#9ca3af" style={{ marginRight: 6 }} />
+                <Text style={styles.placeholderDropdown}>Search area, colony, mandal, district, pincode...</Text>
+              </View>
+              <Search size={14} color="#9ca3af" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Free Upload Guarantee Banner */}
@@ -389,6 +472,94 @@ export const CreatePostScreen = ({ navigation }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Interactive Location Search Modal */}
+      <Modal
+        visible={isLocationModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsLocationModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <MapPin size={18} color="#f472b6" />
+                <Text style={styles.modalTitle}>Search & Tag Location</Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsLocationModalOpen(false)}>
+                <X size={20} color="#9ca3af" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Location Search Input */}
+            <View style={[styles.searchRow, { marginHorizontal: 0, marginBottom: 12 }]}>
+              <Search size={16} color="#9ca3af" style={styles.searchIcon} />
+              <TextInput
+                value={locationSearchQuery}
+                onChangeText={setLocationSearchQuery}
+                placeholder="Type colony, mandal, district, city or pincode..."
+                placeholderTextColor="#6b7280"
+                style={[styles.textInput, styles.searchInput]}
+                autoFocus
+              />
+              {isSearchingLocation ? (
+                <ActivityIndicator size="small" color="#f472b6" style={{ marginRight: 8 }} />
+              ) : locationSearchQuery ? (
+                <TouchableOpacity onPress={() => setLocationSearchQuery('')} style={{ padding: 4 }}>
+                  <X size={14} color="#9ca3af" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Custom Location Option */}
+            {locationSearchQuery.trim().length > 2 && (
+              <TouchableOpacity
+                style={styles.customLocBtn}
+                onPress={() => {
+                  setLocation(locationSearchQuery.trim());
+                  setIsLocationModalOpen(false);
+                  setLocationSearchQuery('');
+                }}
+              >
+                <MapPin size={14} color="#f472b6" style={{ marginRight: 6 }} />
+                <Text style={styles.customLocText}>
+                  Use <Text style={{ color: '#fff', fontWeight: '700' }}>"{locationSearchQuery.trim()}"</Text> as location
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Search Results / Suggested List */}
+            <Text style={styles.locSubheader}>
+              {locationSearchResults.length > 0 ? 'Search Results:' : 'Popular Entertainment & Comedy Locations:'}
+            </Text>
+
+            <ScrollView style={{ maxHeight: 350 }} showsVerticalScrollIndicator={false}>
+              {(locationSearchResults.length > 0 ? locationSearchResults : DEFAULT_SUGGESTED_LOCATIONS).map((loc, idx) => {
+                const isSelected = location === loc;
+                return (
+                  <TouchableOpacity
+                    key={`${loc}_${idx}`}
+                    style={[styles.locationResultRow, isSelected && styles.locationResultRowActive]}
+                    onPress={() => {
+                      setLocation(loc);
+                      setIsLocationModalOpen(false);
+                      setLocationSearchQuery('');
+                    }}
+                  >
+                    <View style={styles.locPinIconCircle}>
+                      <MapPin size={14} color="#f472b6" />
+                    </View>
+                    <Text style={[styles.locationResultText, isSelected && styles.locationResultTextActive]}>
+                      {loc}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -645,5 +816,155 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '900',
+  },
+  optionalText: {
+    color: '#6b7280',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  clearLocationText: {
+    fontSize: 10,
+    color: '#f472b6',
+    fontWeight: '600',
+  },
+  selectedLocationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(244,114,182,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(244,114,182,0.3)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  selectedLocationText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+    flex: 1,
+  },
+  changeLocBtn: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  changeLocText: {
+    fontSize: 10,
+    color: '#f472b6',
+    fontWeight: '700',
+  },
+  dropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#18122c',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  placeholderDropdown: {
+    color: '#6b7280',
+    fontSize: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#120a22',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    padding: 18,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  searchIcon: {
+    marginRight: 6,
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    paddingVertical: 8,
+    fontSize: 12,
+    color: '#fff',
+  },
+  customLocBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(244,114,182,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(244,114,182,0.3)',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+  },
+  customLocText: {
+    fontSize: 11,
+    color: '#d1d5db',
+    flex: 1,
+  },
+  locSubheader: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9ca3af',
+    marginBottom: 8,
+  },
+  locationResultRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  locationResultRowActive: {
+    backgroundColor: 'rgba(244,114,182,0.1)',
+    borderRadius: 10,
+  },
+  locPinIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(244,114,182,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginTop: 2,
+  },
+  locationResultText: {
+    fontSize: 12,
+    color: '#d1d5db',
+    lineHeight: 18,
+    flex: 1,
+  },
+  locationResultTextActive: {
+    color: '#fff',
+    fontWeight: '700',
   },
 });
