@@ -23,10 +23,10 @@ export const AppHeader = ({
   const unreadMessages = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
 
   return (
-    <header className={`sticky top-0 z-30 transition-all duration-300 ease-in-out ${
+    <header className={`sticky top-0 z-30 transition-transform duration-300 ease-in-out ${
       isVisible
-        ? 'translate-y-0 opacity-100 max-h-16'
-        : '-translate-y-full opacity-0 max-h-0 -mb-[52px] pointer-events-none overflow-hidden border-transparent'
+        ? 'translate-y-0'
+        : '-translate-y-full pointer-events-none'
     } ${
       isLight 
         ? 'bg-white/95 border-b border-slate-200/80 shadow-sm' 

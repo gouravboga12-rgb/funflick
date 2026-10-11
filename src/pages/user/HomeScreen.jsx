@@ -44,19 +44,48 @@ export const HomeScreen = () => {
     }
   }, [filteredPosts, activePlayingVideoId, setActivePlayingVideoId]);
 
-  // Instagram-style scroll detection: hides header on scroll down, reveals on slight scroll up
-  const handleScroll = (e) => {
-    const currentScrollY = e.currentTarget.scrollTop;
-    const diff = currentScrollY - lastScrollYRef.current;
+  const feedScrollRef = useRef(null);
 
-    if (diff > 8 && currentScrollY > 40) {
-      setIsHeaderVisible(false);
-    } else if (diff < -5 || currentScrollY <= 20) {
-      setIsHeaderVisible(true);
+  // Instagram-style scroll detection: listens to both window and container scroll so it works on all devices
+  useEffect(() => {
+    let lastY = 0;
+
+    const checkScroll = (currentY) => {
+      const diff = currentY - lastY;
+
+      if (diff > 6 && currentY > 30) {
+        setIsHeaderVisible(false);
+      } else if (diff < -4 || currentY <= 20) {
+        setIsHeaderVisible(true);
+      }
+
+      lastY = currentY;
+    };
+
+    const onWindowScroll = () => {
+      const y = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      checkScroll(y);
+    };
+
+    const onContainerScroll = () => {
+      if (!feedScrollRef.current) return;
+      const y = feedScrollRef.current.scrollTop;
+      checkScroll(y);
+    };
+
+    window.addEventListener('scroll', onWindowScroll, { passive: true });
+    const container = feedScrollRef.current;
+    if (container) {
+      container.addEventListener('scroll', onContainerScroll, { passive: true });
     }
 
-    lastScrollYRef.current = currentScrollY;
-  };
+    return () => {
+      window.removeEventListener('scroll', onWindowScroll);
+      if (container) {
+        container.removeEventListener('scroll', onContainerScroll);
+      }
+    };
+  }, []);
 
   return (
     <div className="w-full flex-1 flex flex-col bg-[#090514] min-h-full">
@@ -72,16 +101,16 @@ export const HomeScreen = () => {
 
       {/* Main Video Feed containing StoryBar and Posts */}
       <div 
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto no-scrollbar space-y-3 snap-y snap-mandatory scroll-smooth"
+        ref={feedScrollRef}
+        className="flex-1 overflow-y-auto no-scrollbar space-y-0 snap-y snap-mandatory scroll-smooth"
       >
         {/* Horizontal Stories Bar (Screen 3 & 4) */}
-        <div className="snap-start">
+        <div className="snap-start mb-2">
           <StoryBar />
         </div>
 
-        {/* Video Posts Feed */}
-        <div className="px-0 sm:px-2 space-y-3">
+        {/* Video Posts Feed - 100% full width, edge-to-edge with no side gaps */}
+        <div className="px-0 space-y-0">
           {filteredPosts.length === 0 ? (
             <div className="mx-4 my-6 p-8 rounded-3xl bg-[#130b26] border border-white/10 text-center space-y-4">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-500/20 via-purple-500/20 to-blue-500/20 text-pink-400 flex items-center justify-center mx-auto border border-pink-500/30">

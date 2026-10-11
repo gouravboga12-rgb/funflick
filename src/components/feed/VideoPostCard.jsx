@@ -288,9 +288,9 @@ export const VideoPostCard = ({ post, isReel = true }) => {
       ref={cardRef} 
       className={`relative ${
         isReel 
-          ? 'h-[calc(100dvh-116px)] sm:max-h-[720px] aspect-[9/16] w-auto max-w-full mx-auto snap-center rounded-2xl sm:rounded-3xl my-1 sm:my-2' 
+          ? 'w-full h-[calc(100dvh-112px)] max-h-[calc(100dvh-112px)] snap-center my-0' 
           : 'w-full aspect-[9/16]'
-      } bg-black overflow-hidden select-none border border-white/10 shadow-2xl flex items-center justify-center`}
+      } bg-black overflow-hidden select-none border-b border-white/10 flex items-center justify-center`}
     >
       {/* Video / Media Player */}
       <div 
