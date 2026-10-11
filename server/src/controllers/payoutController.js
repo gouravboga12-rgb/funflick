@@ -52,19 +52,26 @@ export async function savePayoutDetails(req, res) {
       ]
     );
 
+    const responseDetails = {
+      user_id: userId,
+      userId,
+      payout_method: payout_type,
+      payout_type,
+      bank_name,
+      account_number,
+      ifsc_code,
+      upi_id,
+      phone: finalPhone,
+      phone_number: finalPhone,
+      email: finalEmail,
+      email_id: finalEmail
+    };
+
     return res.json({
       success: true,
       message: 'Payout details saved successfully',
-      details: {
-        userId,
-        payout_type,
-        bank_name,
-        account_number: account_number ? `••••${account_number.slice(-4)}` : '',
-        ifsc_code,
-        upi_id,
-        phone_number: finalPhone,
-        email_id: finalEmail
-      }
+      payoutDetails: responseDetails,
+      details: responseDetails
     });
   } catch (err) {
     console.error('Save payout details error:', err);

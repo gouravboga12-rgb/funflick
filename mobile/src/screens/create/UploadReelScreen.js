@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ArrowLeft,
@@ -270,6 +271,24 @@ export const UploadReelScreen = ({ navigation }) => {
         pct => setProgress(pct)
       );
 
+      // 1b. Generate & upload a real JPEG thumbnail frame
+      let s3ThumbUrl = null;
+      try {
+        if (videoUri) {
+          const thumbResult = await VideoThumbnails.getThumbnailAsync(videoUri, { time: 500 });
+          if (thumbResult && thumbResult.uri) {
+            s3ThumbUrl = await uploadMediaToS3(
+              thumbResult.uri,
+              `thumb_${Date.now()}.jpg`,
+              'image/jpeg',
+              'thumbnails'
+            );
+          }
+        }
+      } catch (thumbErr) {
+        console.warn('Video thumbnail generation notice:', thumbErr?.message);
+      }
+
       // 2. Persist to MySQL database on EC2 (Directly publishes live globally)
       const finalTitle = title.trim() || description.trim().slice(0, 40) || 'Untitled Reel';
       const finalHashtags = selectedTags.map(t => `#${t}`).join(' ');
@@ -281,7 +300,7 @@ export const UploadReelScreen = ({ navigation }) => {
           description: description.trim(),
           category,
           video_url: s3VideoUrl,
-          thumbnail_url: s3VideoUrl,
+          thumbnail_url: s3ThumbUrl || s3VideoUrl,
           duration: videoDuration || 30,
           media_type: 'video',
           hashtags: finalHashtags,

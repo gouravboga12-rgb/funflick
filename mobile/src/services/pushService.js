@@ -97,6 +97,7 @@ export async function scheduleLocalNotification({ title, body, data = {} }) {
         body: body || '',
         data: data,
         sound: 'default',
+        channelId: 'default',
         priority: Notifications.AndroidNotificationPriority.MAX,
       },
       trigger: null,

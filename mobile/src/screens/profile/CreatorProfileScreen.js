@@ -37,6 +37,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../context/AppContext';
 import { apiRequest, setStoredUser } from '../../services/api';
 import { FollowListModal } from '../../components/common/FollowListModal';
+import { VideoThumbnail } from '../../components/common/VideoThumbnail';
 import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -276,10 +277,12 @@ export default function CreatorProfileScreen({ route, navigation }) {
         activeOpacity={0.8}
         onPress={() => navigation.navigate('VideoDetail', { videoId: item.id })}
       >
-        <Image
-          source={{ uri: thumbUri }}
+        <VideoThumbnail
+          thumbnailUrl={item.thumbnail_url || item.thumbnailUrl}
+          videoUrl={item.mediaUrl || item.video_url}
+          posterUrl={item.posterUrl}
           style={styles.gridThumb}
-          resizeMode="cover"
+          fallbackTitle={item.title}
         />
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.75)']}

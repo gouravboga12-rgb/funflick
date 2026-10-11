@@ -340,28 +340,13 @@ export const AppProvider = ({ children }) => {
       })
     );
 
-    try {
-      const endpoint = willFollow ? `/follows/${username}/follow` : `/follows/${username}/unfollow`;
-      const res = await apiRequest(endpoint, { method: 'POST' });
-      if (res && typeof res.following === 'boolean') {
-        setFollowingUsernames(prev => {
-          const next = new Set(prev);
-          if (res.following) {
-            next.add(cleanUser);
-          } else {
-            next.delete(cleanUser);
-          }
-          return next;
-        });
-      }
-    } catch (e) {
-      // Fallback: try /toggle if available
       try {
-        const res2 = await apiRequest(`/follows/${username}/toggle`, { method: 'POST' });
-        if (res2 && typeof res2.following === 'boolean') {
+        const endpoint = willFollow ? `/follows/${username}/follow` : `/follows/${username}/unfollow`;
+        const res = await apiRequest(endpoint, { method: 'POST' });
+        if (res && typeof res.following === 'boolean') {
           setFollowingUsernames(prev => {
             const next = new Set(prev);
-            if (res2.following) {
+            if (res.following) {
               next.add(cleanUser);
             } else {
               next.delete(cleanUser);
@@ -369,11 +354,30 @@ export const AppProvider = ({ children }) => {
             return next;
           });
         }
-      } catch (err2) {
-        console.warn('Toggle follow error:', err2);
+        fetchMyFollowing();
+      } catch (e) {
+        // Fallback: try /toggle if available
+        try {
+          const res2 = await apiRequest(`/follows/${username}/toggle`, { method: 'POST' });
+          if (res2 && typeof res2.following === 'boolean') {
+            setFollowingUsernames(prev => {
+              const next = new Set(prev);
+              if (res2.following) {
+                next.add(cleanUser);
+              } else {
+                next.delete(cleanUser);
+              }
+              return next;
+            });
+          }
+          fetchMyFollowing();
+        } catch (err2) {
+          console.warn('Toggle follow error:', err2);
+        }
       }
-    }
-  }, []);
+    },
+    [fetchMyFollowing]
+  );
 
   // Follow requests state (matching website)
   const [followRequests, setFollowRequests] = useState([]);
@@ -786,9 +790,9 @@ export const AppProvider = ({ children }) => {
     }
   }, [isAuthenticated, fetchAds, fetchNotifications]);
 
-  // Automatic In-App Pop-up Ad trigger for unpaid users
+  // Automatic In-App Pop-up Ad trigger for unpaid users (logged in only)
   useEffect(() => {
-    if (isPaidInfluencer || hasTriggeredAdOnLaunchRef.current) return;
+    if (!isAuthenticated || !currentUser || isPaidInfluencer || hasTriggeredAdOnLaunchRef.current) return;
     if (!adsList || adsList.length === 0) return;
 
     const popupAd = adsList.find(a =>

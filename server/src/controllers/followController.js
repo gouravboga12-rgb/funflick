@@ -18,11 +18,6 @@ export async function followUser(req, res) {
 
     const targetUser = targetRows[0];
 
-    // Cannot follow staff moderator or admin accounts
-    if (targetUser.role === 'moderator' || targetUser.role === 'admin' || targetUser.username === 'super_admin' || targetUser.username?.toLowerCase().startsWith('moderator')) {
-      return res.status(400).json({ error: 'Staff moderator accounts cannot be followed' });
-    }
-
     // Cannot follow self!
     if (targetUser.id === currentUserId) {
       return res.status(400).json({ error: 'You cannot follow yourself' });
@@ -82,10 +77,7 @@ export async function toggleFollowUser(req, res) {
     }
 
     const targetUser = targetRows[0];
-
-    if (targetUser.role === 'moderator' || targetUser.role === 'admin' || targetUser.username === 'super_admin' || targetUser.username?.toLowerCase().startsWith('moderator')) {
-      return res.status(400).json({ error: 'Staff moderator accounts cannot be followed' });
-    }
+    const currentUserId = req.user.id;
 
     if (targetUser.id === currentUserId) {
       return res.status(400).json({ error: 'You cannot follow yourself' });

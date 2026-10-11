@@ -28,6 +28,7 @@ import {
 } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { apiRequest } from '../../services/api';
+import { VideoThumbnail } from '../../components/common/VideoThumbnail';
 import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -93,7 +94,7 @@ function CreatorAvatarCircle({ avatar, name, username, size = 64 }) {
 }
 
 export const DiscoverScreen = ({ navigation }) => {
-  const { currentUser, posts, fetchFeed, toggleFollowCreator, followingUsernames } = useApp();
+  const { currentUser, posts, fetchFeed, toggleFollowCreator, followingUsernames, stories } = useApp();
   const { width: windowWidth } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState('');
   const [liveCreators, setLiveCreators] = useState([]);
@@ -380,10 +381,12 @@ export const DiscoverScreen = ({ navigation }) => {
                     activeOpacity={0.85}
                     onPress={() => navigation.navigate('VideoDetail', { videoId: video.id })}
                   >
-                    <Image
-                      source={{ uri: video.thumbnailUrl || video.posterUrl || video.mediaUrl }}
+                    <VideoThumbnail
+                      thumbnailUrl={video.thumbnailUrl}
+                      videoUrl={video.mediaUrl || video.videoUrl}
+                      posterUrl={video.posterUrl}
                       style={styles.gridVideoThumb}
-                      resizeMode="cover"
+                      fallbackTitle={video.title}
                     />
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.92)']}
@@ -453,16 +456,33 @@ export const DiscoverScreen = ({ navigation }) => {
                   creator.isFollowing
                 );
 
+                const creatorStory = (stories || []).find(s =>
+                  String(s.id) === String(creator.id) ||
+                  String(s.userId) === String(creator.id) ||
+                  (s.username && s.username.toLowerCase() === cleanCreatorUser)
+                );
+                const hasUnseenStory = Boolean(creatorStory && creatorStory.hasUnseen);
+
                 return (
                   <View key={creator.id || creator.username} style={styles.creatorCard}>
-                    {/* Avatar with Gradient Border */}
+                    {/* Avatar with Gradient Border only if unseen stories exist */}
                     <TouchableOpacity
-                      onPress={() => handleOpenCreator(creator)}
+                      onPress={() => {
+                        if (hasUnseenStory && creatorStory) {
+                          navigation.navigate('StoryViewer', { story: creatorStory });
+                        } else {
+                          handleOpenCreator(creator);
+                        }
+                      }}
                       activeOpacity={0.8}
                       style={styles.creatorAvatarWrap}
                     >
                       <LinearGradient
-                        colors={['#ff8a00', '#ff007a', '#7928ca']}
+                        colors={
+                          hasUnseenStory
+                            ? ['#ff8a00', '#ff007a', '#7928ca']
+                            : ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)']
+                        }
                         style={styles.avatarGradientRing}
                       >
                         <View style={styles.avatarInner}>

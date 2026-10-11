@@ -147,14 +147,13 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   return (
     <View style={styles.card}>
       {/* Media Player Container */}
-      <TouchableOpacity activeOpacity={0.96} onPress={handleTap} style={styles.playerContainer}>
+      <View style={styles.playerContainer}>
         {isVideo && player ? (
           <VideoView
             player={player}
             style={styles.videoPlayer}
             contentFit="cover"
             nativeControls={false}
-            pointerEvents="none"
           />
         ) : (
           <Image
@@ -163,6 +162,13 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
             resizeMode="cover"
           />
         )}
+
+        {/* Full-surface tap overlay covering center & entire video */}
+        <TouchableOpacity
+          style={styles.fullTapLayer}
+          activeOpacity={1}
+          onPress={handleTap}
+        />
 
         {/* Top Vignette Overlay */}
         <LinearGradient
@@ -345,7 +351,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
             <Text style={styles.viewsCount}>{formatCount(post.viewsCount || 0)}</Text>
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
 
       {/* Instagram-style Comments Bottom Sheet */}
       <CommentsModal
@@ -380,6 +386,10 @@ const styles = StyleSheet.create({
   videoPlayer: {
     width: '100%',
     height: '100%',
+  },
+  fullTapLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
   },
   topVignette: {
     position: 'absolute',

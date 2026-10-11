@@ -32,6 +32,7 @@ function AdVideoPlayer({ mediaUrl, muted }) {
     if (player) {
       try {
         player.muted = muted;
+        player.play();
       } catch (e) {}
     }
   }, [muted, player]);
@@ -41,7 +42,7 @@ function AdVideoPlayer({ mediaUrl, muted }) {
   return (
     <VideoView
       player={player}
-      style={StyleSheet.absoluteFillObject}
+      style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
       contentFit="cover"
       nativeControls={false}
     />
@@ -116,7 +117,7 @@ export const MobileAdPopup = () => {
     return () => clearInterval(timer);
   }, [ad?.id]);
 
-  if (!ad || isPaidInfluencer) {
+  if (!ad || !currentUser || isPaidInfluencer) {
     return null;
   }
 
@@ -136,7 +137,7 @@ export const MobileAdPopup = () => {
 
   return (
     <Modal
-      visible={Boolean(activePopupAd)}
+      visible={Boolean(activePopupAd && currentUser && !isPaidInfluencer)}
       transparent
       animationType="fade"
       onRequestClose={handleClose}
@@ -186,7 +187,16 @@ export const MobileAdPopup = () => {
           {/* Ad Media Display */}
           <View style={styles.mediaContainer}>
             {isVideo ? (
-              <AdVideoPlayer key={ad.id} mediaUrl={ad.mediaUrl} muted={muted} />
+              <>
+                {Boolean(ad.thumbnailUrl || ad.posterUrl) && (
+                  <Image
+                    source={{ uri: ad.thumbnailUrl || ad.posterUrl }}
+                    style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+                    resizeMode="cover"
+                  />
+                )}
+                <AdVideoPlayer key={ad.id} mediaUrl={ad.mediaUrl} muted={muted} />
+              </>
             ) : (
               <Image
                 source={{ uri: ad.mediaUrl || ad.thumbnailUrl }}

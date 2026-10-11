@@ -124,7 +124,7 @@ export const WalletScreen = ({ navigation }) => {
     const startOfThisYear = new Date(now.getFullYear(), 0, 1);
 
     return payoutHistory.filter(p => {
-      const pDate = new Date(p.payment_date || p.paidAt || p.created_at || Date.now());
+      const pDate = new Date(p.paid_at || p.payment_date || p.paidAt || p.created_at || Date.now());
 
       if (timeFilter === 'TODAY' && pDate < startOfToday) return false;
       if (timeFilter === '7D' && pDate < sevenDaysAgo) return false;
@@ -293,9 +293,15 @@ export const WalletScreen = ({ navigation }) => {
         }),
       });
 
-      if (res && res.payoutDetails) {
-        setRegisteredDetails(res.payoutDetails);
-      }
+      const updated = res?.payoutDetails || res?.details || {
+        payout_method: payoutMethod,
+        payout_type: payoutMethod,
+        bank_name: payoutBankName.trim(),
+        account_number: payoutAccountNum.trim(),
+        ifsc_code: payoutIfsc.trim().toUpperCase(),
+        upi_id: payoutUpiId.trim(),
+      };
+      setRegisteredDetails(updated);
       setIsPayoutModalOpen(false);
       Alert.alert('Saved', 'Your payout destination details have been updated!');
     } catch (e) {

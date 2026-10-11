@@ -300,9 +300,10 @@ export default function StoryViewerScreen({ route, navigation }) {
               <TouchableOpacity
                 style={styles.closeBtn}
                 onPress={() => navigation.goBack()}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                activeOpacity={0.7}
               >
-                <X size={18} color="#fff" />
+                <X size={20} color="#fff" />
               </TouchableOpacity>
             </View>
 
@@ -365,15 +366,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   storyFrame: {
+    flex: 1,
     width: '100%',
     height: '100%',
-    maxWidth: 480,
-    aspectRatio: 9 / 16,
-    maxHeight: '100%',
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: '#000000',
@@ -401,7 +398,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
+    zIndex: 15,
   },
   rightNavArrow: {
     position: 'absolute',
@@ -416,7 +413,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
+    zIndex: 15,
   },
   touchArea: {
     ...StyleSheet.absoluteFillObject,
@@ -424,8 +421,8 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   contentOverlay: {
-    flex: 1,
-    zIndex: 2,
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
     justifyContent: 'space-between',
     pointerEvents: 'box-none',
   },
