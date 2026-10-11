@@ -63,6 +63,14 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
 
   // Play/pause based on active viewport state, screen focus, and user pause toggle
   useEffect(() => {
+    console.log('[DBG][VideoPostCard] play-pause decision:', {
+      postId: post.id,
+      hasPlayer: Boolean(player),
+      isActive,
+      isFocused,
+      isUserPaused,
+      decision: isActive && isFocused && !isUserPaused ? 'PLAY' : 'PAUSE',
+    });
     if (!player) return;
     let viewTimer = null;
     try {

@@ -62,6 +62,14 @@ function ReelItem({
   }, [item.id]);
 
   useEffect(() => {
+    console.log('[DBG][ReelsScreen] play-pause decision:', {
+      reelId: item.id,
+      hasPlayer: Boolean(player),
+      isActive,
+      isScreenFocused,
+      isPaused,
+      decision: isActive && isScreenFocused && !isPaused ? 'PLAY' : 'PAUSE',
+    });
     if (!player) return;
     let viewTimer = null;
     try {

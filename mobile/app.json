@@ -69,7 +69,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "expo-image"
     ],
     "extra": {
       "eas": {
