@@ -691,6 +691,7 @@ export const AppProvider = ({ children }) => {
   // Ads State
   const [adsList, setAdsList] = useState([]);
   const [activePopupAd, setActivePopupAd] = useState(null);
+  const adsListRef = useRef([]);
   const hasTriggeredAdOnLaunchRef = useRef(false);
   const sessionSeenAdIdsRef = useRef(new Set());
 
@@ -714,6 +715,7 @@ export const AppProvider = ({ children }) => {
     try {
       const data = await apiRequest('/ads');
       if (data && Array.isArray(data.ads)) {
+        adsListRef.current = data.ads;
         setAdsList(data.ads);
         return data.ads;
       }
@@ -735,13 +737,30 @@ export const AppProvider = ({ children }) => {
 
   const showMobileAd = useCallback((adId) => {
     if (isPaidInfluencer) return; // Paid / Influencer members NEVER see any ads!
-    const target = adId
-      ? adsList.find(a => a.id === adId)
-      : adsList.find(a =>
-          a.active &&
-          (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
-          !sessionSeenAdIdsRef.current.has(a.id)
-        );
+    const list = adsListRef.current?.length > 0 ? adsListRef.current : adsList;
+    const activeAds = (list || []).filter(a => a.active);
+    if (!activeAds.length) return;
+
+    let target = null;
+    if (adId) {
+      target = activeAds.find(a => a.id === adId);
+    } else {
+      // 1. Try finding unshown popup ad
+      target = activeAds.find(a =>
+        (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
+        !sessionSeenAdIdsRef.current.has(a.id)
+      );
+      // 2. Fallback to any unshown active ad
+      if (!target) {
+        target = activeAds.find(a => !sessionSeenAdIdsRef.current.has(a.id));
+      }
+      // 3. If all seen, reset session cache and show first active popup ad
+      if (!target) {
+        sessionSeenAdIdsRef.current.clear();
+        target = activeAds.find(a => a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open') || activeAds[0];
+      }
+    }
+
     if (target) {
       sessionSeenAdIdsRef.current.add(target.id);
       setActivePopupAd(target);
@@ -868,23 +887,24 @@ export const AppProvider = ({ children }) => {
     }
   }, [isAuthenticated, fetchAds, fetchNotifications, fetchLiveConversations]);
 
-  // Automatic In-App Pop-up Ad trigger for unpaid users (logged in only)
+  // Automatic In-App Pop-up Ad trigger for unpaid / normal users
   useEffect(() => {
-    if (!isAuthenticated || !currentUser || isPaidInfluencer || hasTriggeredAdOnLaunchRef.current) return;
-    if (!adsList || adsList.length === 0) return;
+    if (isPaidInfluencer || hasTriggeredAdOnLaunchRef.current) return;
+    const list = adsListRef.current?.length > 0 ? adsListRef.current : adsList;
+    if (!list || list.length === 0) return;
 
-    const popupAd = adsList.find(a =>
+    const popupAd = list.find(a =>
       a.active && (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session')
     );
 
     if (popupAd) {
-      hasTriggeredAdOnLaunchRef.current = true;
       const timer = setTimeout(() => {
+        hasTriggeredAdOnLaunchRef.current = true;
         showMobileAd(popupAd.id);
-      }, 2500);
+      }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, isPaidInfluencer, adsList, showMobileAd]);
+  }, [isPaidInfluencer, adsList, showMobileAd]);
 
   // Direct Redirection for External Notifications (Chats, Payments, Violations, Activities)
   const handleNotificationClick = useCallback((notifData) => {

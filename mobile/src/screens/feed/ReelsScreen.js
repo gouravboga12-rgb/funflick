@@ -106,12 +106,14 @@ function ReelItem({
   useEffect(() => {
     if (!player) return;
     const sub = player.addListener?.('playingChange', (event) => {
-      setIsPaused(!event.isPlaying);
+      if (isActive && event.isPlaying) {
+        setIsPaused(false);
+      }
     });
     return () => {
       sub?.remove?.();
     };
-  }, [player]);
+  }, [player, isActive]);
 
   const triggerHeartBurst = () => {
     heartScale.setValue(0);
@@ -198,8 +200,8 @@ function ReelItem({
           pointerEvents="none"
         />
 
-        {/* Center Pause/Play Indicator */}
-        {isPaused && (
+        {/* Center Pause/Play Indicator: only on active reel when paused */}
+        {isActive && isPaused && (
           <View style={styles.pausedOverlay} pointerEvents="box-none">
             <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.8}>
               <Play size={36} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
@@ -347,9 +349,19 @@ function ReelItem({
 export const ReelsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const { posts, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator, recordPostView } = useApp();
+  const {
+    posts,
+    isReelsMuted,
+    toggleMute,
+    toggleLikePost,
+    toggleFollowCreator,
+    recordPostView,
+    showMobileAd,
+    isPaidInfluencer,
+  } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
+  const reelsScrolledCountRef = useRef(0);
 
   const videoPosts = posts.filter(
     p => p.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(p.mediaUrl || '')
@@ -357,7 +369,13 @@ export const ReelsScreen = ({ navigation }) => {
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0) {
-      setCurrentIndex(viewableItems[0].index || 0);
+      const newIdx = viewableItems[0].index || 0;
+      setCurrentIndex(newIdx);
+      reelsScrolledCountRef.current += 1;
+      // Trigger ad every 5 reels scrolled for unpaid / normal users
+      if (!isPaidInfluencer && reelsScrolledCountRef.current > 0 && reelsScrolledCountRef.current % 5 === 0) {
+        showMobileAd?.();
+      }
     }
   }).current;
 

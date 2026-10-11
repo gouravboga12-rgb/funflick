@@ -11,6 +11,8 @@ import {
   Platform,
   Share,
   Alert,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -84,6 +86,9 @@ export default function StoryViewerScreen({ route, navigation }) {
   const [likesCount, setLikesCount] = useState(Number(activeStory?.likesCount) || 0);
   const [isPaused, setIsPaused] = useState(false);
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Record story view immediately upon display
   useEffect(() => {
     if (activeStory?.id) {
@@ -136,7 +141,7 @@ export default function StoryViewerScreen({ route, navigation }) {
     let anim;
     progressAnim.setValue(0);
 
-    if (!isPaused) {
+    if (!isPaused && !showDeleteModal) {
       anim = Animated.timing(progressAnim, {
         toValue: 1,
         duration: STORY_DURATION,
@@ -154,7 +159,7 @@ export default function StoryViewerScreen({ route, navigation }) {
     return () => {
       if (anim) anim.stop();
     };
-  }, [currentIndex, isPaused]);
+  }, [currentIndex, isPaused, showDeleteModal]);
 
   const handleToggleLike = async () => {
     if (!activeStory?.id) return;
@@ -190,42 +195,41 @@ export default function StoryViewerScreen({ route, navigation }) {
     )
   );
 
-  const handleDeleteStory = () => {
-    if (!activeStory?.id) return;
+  const handleOpenDeleteModal = () => {
     setIsPaused(true);
-    Alert.alert(
-      'Delete Story',
-      'Are you sure you want to delete this story? It will be permanently removed.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => setIsPaused(false),
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await apiRequest(`/stories/${activeStory.id}`, { method: 'DELETE' });
-              fetchLiveStories?.();
-              if (rawStories.length > 1) {
-                if (currentIndex < rawStories.length - 1) {
-                  goToNextStory();
-                } else {
-                  goToPrevStory();
-                }
-              } else {
-                navigation.goBack();
-              }
-            } catch (e) {
-              Alert.alert('Error', e?.message || 'Failed to delete story');
-              setIsPaused(false);
-            }
-          },
-        },
-      ]
-    );
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    const storyIdToDelete = activeStory?.id || targetStory?.id;
+    if (!storyIdToDelete) {
+      setShowDeleteModal(false);
+      setIsPaused(false);
+      return;
+    }
+    try {
+      setIsDeleting(true);
+      await apiRequest(`/stories/${storyIdToDelete}`, { method: 'DELETE' });
+      if (fetchLiveStories) {
+        await fetchLiveStories();
+      }
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+      if (rawStories.length > 1) {
+        if (currentIndex < rawStories.length - 1) {
+          goToNextStory();
+        } else {
+          goToPrevStory();
+        }
+      } else {
+        navigation.goBack();
+      }
+    } catch (e) {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+      Alert.alert('Error', e?.message || 'Failed to delete story');
+      setIsPaused(false);
+    }
   };
 
   const handleShare = async () => {
@@ -242,8 +246,9 @@ export default function StoryViewerScreen({ route, navigation }) {
 
   const panGesture = Gesture.Pan()
     .runOnJS(true)
-    .activeOffsetY([15, 1000])
-    .activeOffsetX([-25, 25])
+    .cancelsTouchesInView(false)
+    .activeOffsetY([20, 1000])
+    .activeOffsetX([-30, 30])
     .onUpdate((e) => {
       if (e.translationY > 0 && Math.abs(e.translationY) > Math.abs(e.translationX) * 0.7) {
         translateY.setValue(e.translationY);
@@ -383,9 +388,9 @@ export default function StoryViewerScreen({ route, navigation }) {
           pointerEvents="box-none"
         >
           {/* Top Controls Section */}
-          <View style={styles.topSection}>
+          <View style={styles.topSection} pointerEvents="box-none">
             {/* Instagram-style Segmented Progress Bar */}
-            <View style={styles.progressBarContainer}>
+            <View style={styles.progressBarContainer} pointerEvents="none">
               {rawStories.map((_, idx) => (
                 <View key={idx} style={styles.progressBarBg}>
                   {idx < currentIndex ? (
@@ -410,8 +415,8 @@ export default function StoryViewerScreen({ route, navigation }) {
             </View>
 
             {/* Creator Info Header */}
-            <View style={styles.header}>
-              <View style={styles.creatorRow}>
+            <View style={styles.header} pointerEvents="box-none">
+              <View style={styles.creatorRow} pointerEvents="box-none">
                 {targetStory?.avatar && !targetStory.avatar.includes('default-avatar') ? (
                   <Image source={{ uri: targetStory.avatar }} style={styles.avatar} />
                 ) : (
@@ -419,7 +424,7 @@ export default function StoryViewerScreen({ route, navigation }) {
                     <Text style={styles.initialText}>{(targetStory?.name || targetStory?.username || 'F').charAt(0).toUpperCase()}</Text>
                   </View>
                 )}
-                <View>
+                <View pointerEvents="box-none">
                   <Text style={styles.creatorName}>
                     {targetStory?.isMe ? (currentUser?.name || 'Your Story') : (targetStory?.name || targetStory?.username || 'Creator')}
                   </Text>
@@ -429,12 +434,12 @@ export default function StoryViewerScreen({ route, navigation }) {
                 </View>
               </View>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }} pointerEvents="box-none">
                 {isOwner && (
                   <TouchableOpacity
                     style={styles.deleteBtn}
-                    onPress={handleDeleteStory}
-                    hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                    onPress={handleOpenDeleteModal}
+                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
                     activeOpacity={0.7}
                   >
                     <Trash2 size={18} color="#ffffff" />
@@ -443,7 +448,7 @@ export default function StoryViewerScreen({ route, navigation }) {
                 <TouchableOpacity
                   style={styles.closeBtn}
                   onPress={() => navigation.goBack()}
-                  hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                  hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
                   activeOpacity={0.7}
                 >
                   <X size={20} color="#fff" />
@@ -503,6 +508,56 @@ export default function StoryViewerScreen({ route, navigation }) {
         </View>
       </Animated.View>
     </GestureDetector>
+
+    {/* Custom Delete Confirmation Modal: 100% reliable tap & execution on all devices */}
+    <Modal
+      visible={showDeleteModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        if (!isDeleting) {
+          setShowDeleteModal(false);
+          setIsPaused(false);
+        }
+      }}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={styles.deleteModalCard}>
+          <View style={styles.deleteModalIconWrap}>
+            <Trash2 size={28} color="#ef4444" />
+          </View>
+          <Text style={styles.deleteModalTitle}>Delete Story?</Text>
+          <Text style={styles.deleteModalDesc}>
+            This story will be permanently removed from your profile and feed.
+          </Text>
+          <View style={styles.deleteModalButtons}>
+            <TouchableOpacity
+              style={styles.cancelModalBtn}
+              onPress={() => {
+                setShowDeleteModal(false);
+                setIsPaused(false);
+              }}
+              disabled={isDeleting}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.cancelModalBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.confirmDeleteModalBtn}
+              onPress={handleConfirmDelete}
+              disabled={isDeleting}
+              activeOpacity={0.8}
+            >
+              {isDeleting ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.confirmDeleteModalBtnText}>Delete</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   </View>
 );
 }
@@ -608,8 +663,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 4,
-    zIndex: 40,
-    elevation: 40,
+    zIndex: 120,
+    elevation: 120,
   },
   creatorRow: {
     flexDirection: 'row',
@@ -651,20 +706,101 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.4)',
-    zIndex: 50,
-    elevation: 50,
+    zIndex: 130,
+    elevation: 130,
   },
   deleteBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(239,68,68,0.75)',
+    backgroundColor: 'rgba(239,68,68,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.4)',
-    zIndex: 50,
-    elevation: 50,
+    zIndex: 130,
+    elevation: 130,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    zIndex: 999,
+  },
+  deleteModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#1b1433',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 25,
+  },
+  deleteModalIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(239,68,68,0.3)',
+  },
+  deleteModalTitle: {
+    color: '#ffffff',
+    fontSize: 19,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  deleteModalDesc: {
+    color: '#9ca3af',
+    fontSize: 13.5,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  cancelModalBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  cancelModalBtnText: {
+    color: '#e5e7eb',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  confirmDeleteModalBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmDeleteModalBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   viewerMusicBadge: {
     alignSelf: 'flex-start',
