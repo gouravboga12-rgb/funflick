@@ -20,8 +20,13 @@ export async function listVideos(req, res) {
       WHERE v.status = 'Approved' 
         AND (v.moderation_status IS NULL OR v.moderation_status != 'Rejected')
         AND (u.status IS NULL OR u.status != 'Suspended')
+        AND (
+          COALESCE(u.is_private, 0) = 0
+          OR u.id = ?
+          OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ? AND f.following_id = u.id)
+        )
     `;
-    const params = [currentUserId, currentUserId];
+    const params = [currentUserId, currentUserId, currentUserId, currentUserId];
 
     if (category && category !== 'All') {
       query += ' AND v.category = ?';

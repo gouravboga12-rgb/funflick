@@ -105,10 +105,19 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     ]).start();
   };
 
+  const tapTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    };
+  }, []);
+
   const togglePlayPause = () => {
     if (!player) return;
     try {
-      if (isPlaying && !isUserPaused) {
+      const currentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (isPlaying && !isUserPaused);
+      if (currentlyPlaying) {
         player.pause();
         setIsUserPaused(true);
         setIsPlaying(false);
@@ -126,13 +135,22 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 280;
     if (now - lastTap < DOUBLE_TAP_DELAY) {
-      // Double tap -> Like with burst animation
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+        tapTimeoutRef.current = null;
+      }
       if (!post.isLiked) {
         toggleLikePost(post.id);
       }
       triggerHeartBurst();
     } else {
-      togglePlayPause();
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+      }
+      tapTimeoutRef.current = setTimeout(() => {
+        togglePlayPause();
+        tapTimeoutRef.current = null;
+      }, 180);
     }
     setLastTap(now);
   };
@@ -155,6 +173,8 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
             player={player}
             style={styles.videoPlayer}
             contentFit="cover"
+            surfaceType="textureView"
+            useExoShutter={false}
             nativeControls={false}
             pointerEvents="none"
           />

@@ -74,6 +74,8 @@ export default function CreatorProfileScreen({ route, navigation }) {
   const [isFollowModalOpen, setIsFollowModalOpen] = useState(false);
   const [followModalTab, setFollowModalTab] = useState('followers');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeStoryGroup, setActiveStoryGroup] = useState(null);
+  const [hasStories, setHasStories] = useState(false);
 
   // Tabs: Owner sees Liked videos tab (private to owner). Other users NEVER see Liked tab.
   const tabs = isOwner ? ['Videos', 'Shorts', 'Liked', 'About'] : ['Videos', 'Shorts', 'About'];
@@ -128,12 +130,42 @@ export default function CreatorProfileScreen({ route, navigation }) {
         );
         setUserVideos(filtered);
       }
+
+      // 4. Fetch user stories (Instagram style: visible by opening profile)
+      const storiesRes = await apiRequest(`/stories?username=${encodeURIComponent(targetUsername)}`).catch(() => null);
+      if (
+        storiesRes &&
+        Array.isArray(storiesRes.stories) &&
+        storiesRes.stories.length > 0 &&
+        Array.isArray(storiesRes.stories[0].stories) &&
+        storiesRes.stories[0].stories.length > 0
+      ) {
+        setActiveStoryGroup(storiesRes.stories[0]);
+        setHasStories(true);
+      } else {
+        setActiveStoryGroup(null);
+        setHasStories(false);
+      }
     } catch (e) {
       console.warn('Failed to fetch creator profile:', e);
     } finally {
       setLoading(false);
     }
   }, [targetUsername, isOwner, currentUser, posts]);
+
+  const handleAvatarPress = () => {
+    if (activeStoryGroup && activeStoryGroup.stories && activeStoryGroup.stories.length > 0) {
+      navigation.navigate('StoryViewer', {
+        story: activeStoryGroup,
+      });
+    } else if (isOwner) {
+      Alert.alert(
+        'Story Status',
+        'You have no active stories right now. Tap the Add Story button on Home to upload a story!',
+        [{ text: 'Got it' }]
+      );
+    }
+  };
 
   useEffect(() => {
     fetchCreatorData();
@@ -355,9 +387,13 @@ export default function CreatorProfileScreen({ route, navigation }) {
 
             {/* Avatar & Real Stats Row */}
             <View style={styles.avatarStatsRow}>
-              <View style={styles.avatarWrap}>
+              <TouchableOpacity
+                activeOpacity={hasStories || isOwner ? 0.8 : 1}
+                onPress={handleAvatarPress}
+                style={styles.avatarWrap}
+              >
                 <LinearGradient
-                  colors={['#ff007a', '#7928ca', '#0070f3']}
+                  colors={hasStories ? ['#ff007a', '#ff4b2b', '#7928ca'] : ['#475569', '#334155']}
                   style={styles.avatarBorder}
                 >
                   {displayAvatar ? (
@@ -375,7 +411,7 @@ export default function CreatorProfileScreen({ route, navigation }) {
                     <Text style={styles.verifiedCheck}>✓</Text>
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
 
               {/* Stats: Videos, Followers, Following */}
               <View style={styles.statsContainer}>

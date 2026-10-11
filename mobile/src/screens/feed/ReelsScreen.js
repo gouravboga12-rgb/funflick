@@ -93,6 +93,14 @@ function ReelItem({
     }
   }, [isReelsMuted, player]);
 
+  const tapTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    };
+  }, []);
+
   const triggerHeartBurst = () => {
     heartScale.setValue(0);
     Animated.sequence([
@@ -101,26 +109,42 @@ function ReelItem({
     ]).start();
   };
 
+  const togglePlayPause = () => {
+    if (!player) return;
+    try {
+      const currentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (!isPaused);
+      if (currentlyPlaying) {
+        player.pause();
+        setIsPaused(true);
+      } else {
+        player.play();
+        setIsPaused(false);
+      }
+    } catch (e) {
+      console.warn('Reel toggle play error:', e?.message);
+    }
+  };
+
   const handleTap = () => {
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300;
+    const DOUBLE_TAP_DELAY = 280;
     if (now - lastTap < DOUBLE_TAP_DELAY) {
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+        tapTimeoutRef.current = null;
+      }
       if (!item.isLiked) {
         toggleLikePost(item.id);
       }
       triggerHeartBurst();
     } else {
-      if (player) {
-        try {
-          if (!isPaused) {
-            player.pause();
-            setIsPaused(true);
-          } else {
-            player.play();
-            setIsPaused(false);
-          }
-        } catch {}
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
       }
+      tapTimeoutRef.current = setTimeout(() => {
+        togglePlayPause();
+        tapTimeoutRef.current = null;
+      }, 180);
     }
     setLastTap(now);
   };
@@ -133,6 +157,8 @@ function ReelItem({
             player={player}
             style={styles.fullscreenVideo}
             contentFit="cover"
+            surfaceType="textureView"
+            useExoShutter={false}
             nativeControls={false}
             pointerEvents="none"
           />
@@ -160,10 +186,10 @@ function ReelItem({
 
         {/* Center Pause/Play Indicator */}
         {isPaused && (
-          <View style={styles.pausedOverlay} pointerEvents="none">
-            <View style={styles.pausedCircle}>
+          <View style={styles.pausedOverlay} pointerEvents="box-none">
+            <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.8}>
               <Play size={36} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
-            </View>
+            </TouchableOpacity>
           </View>
         )}
 

@@ -13,7 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, Heart, Share2, Music, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { X, Heart, Share2, Music, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { colors } from '../../theme/colors';
@@ -42,8 +42,10 @@ function StoryVideo({ mediaUrl, isPaused }) {
   return (
     <VideoView
       player={player}
-      style={StyleSheet.absoluteFillObject}
+      style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
       contentFit="contain"
+      surfaceType="textureView"
+      useExoShutter={false}
       nativeControls={false}
       pointerEvents="none"
     />
@@ -53,7 +55,7 @@ function StoryVideo({ mediaUrl, isPaused }) {
 export default function StoryViewerScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { story } = route.params || {};
-  const { currentUser, stories: allStories, recordStoryView } = useApp();
+  const { currentUser, stories: allStories, recordStoryView, fetchLiveStories } = useApp();
 
   const targetStory = React.useMemo(() => {
     if (story && typeof story === 'object' && (story.stories || story.mediaUrl)) {
@@ -170,6 +172,54 @@ export default function StoryViewerScreen({ route, navigation }) {
     }
   };
 
+  const isOwner = Boolean(
+    currentUser && (
+      targetStory?.isUser ||
+      targetStory?.isMe ||
+      String(targetStory?.userId) === String(currentUser?.id) ||
+      (targetStory?.username && targetStory?.username.toLowerCase() === currentUser?.username?.toLowerCase()) ||
+      String(activeStory?.user_id) === String(currentUser?.id)
+    )
+  );
+
+  const handleDeleteStory = () => {
+    if (!activeStory?.id) return;
+    setIsPaused(true);
+    Alert.alert(
+      'Delete Story',
+      'Are you sure you want to delete this story? It will be permanently removed.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => setIsPaused(false),
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiRequest(`/stories/${activeStory.id}`, { method: 'DELETE' });
+              fetchLiveStories?.();
+              if (rawStories.length > 1) {
+                if (currentIndex < rawStories.length - 1) {
+                  goToNextStory();
+                } else {
+                  goToPrevStory();
+                }
+              } else {
+                navigation.goBack();
+              }
+            } catch (e) {
+              Alert.alert('Error', e?.message || 'Failed to delete story');
+              setIsPaused(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleShare = async () => {
     try {
       await Share.share({
@@ -187,7 +237,7 @@ export default function StoryViewerScreen({ route, navigation }) {
         {/* Background Media with 9:16 fitting and zero-crop blur backdrop */}
         {isVideo && displayMedia ? (
           <View style={StyleSheet.absoluteFillObject}>
-            <StoryVideo mediaUrl={displayMedia} isPaused={isPaused} />
+            <StoryVideo key={displayMedia} mediaUrl={displayMedia} isPaused={isPaused} />
           </View>
         ) : displayMedia ? (
           <View style={StyleSheet.absoluteFillObject}>
@@ -308,14 +358,26 @@ export default function StoryViewerScreen({ route, navigation }) {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={styles.closeBtn}
-                onPress={() => navigation.goBack()}
-                hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-                activeOpacity={0.7}
-              >
-                <X size={20} color="#fff" />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {isOwner && (
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={handleDeleteStory}
+                    hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                    activeOpacity={0.7}
+                  >
+                    <Trash2 size={18} color="#ffffff" />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.closeBtn}
+                  onPress={() => navigation.goBack()}
+                  hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                  activeOpacity={0.7}
+                >
+                  <X size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Music Track Badge */}
@@ -514,6 +576,18 @@ const styles = StyleSheet.create({
     zIndex: 50,
     elevation: 50,
   },
+  deleteBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(239,68,68,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+    zIndex: 50,
+    elevation: 50,
+  },
   viewerMusicBadge: {
     alignSelf: 'flex-start',
     marginLeft: 16,
@@ -566,7 +640,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingBottom: Platform.OS === 'android' ? 28 : 20,
     gap: 12,
     zIndex: 40,
     elevation: 40,

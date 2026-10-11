@@ -3,6 +3,92 @@ import pool from '../config/db.js';
 export async function listStories(req, res) {
   try {
     const currentUserId = req.user?.id || 0;
+    const { userId, username } = req.query;
+
+    let targetUserId = null;
+    if (userId) {
+      targetUserId = Number(userId);
+    } else if (username) {
+      const [uRows] = await pool.query('SELECT id FROM users WHERE username = ? LIMIT 1', [username]);
+      if (uRows.length > 0) {
+        targetUserId = uRows[0].id;
+      }
+    }
+
+    // 1. Profile Story Viewing (when specific user is requested)
+    if (targetUserId) {
+      const [targetUserRows] = await pool.query('SELECT id, is_private FROM users WHERE id = ?', [targetUserId]);
+      if (targetUserRows.length === 0) {
+        return res.json({ stories: [] });
+      }
+
+      const isPrivate = Boolean(targetUserRows[0].is_private);
+      if (isPrivate && currentUserId !== targetUserId) {
+        const [followRows] = await pool.query(
+          'SELECT id FROM follows WHERE follower_id = ? AND following_id = ? LIMIT 1',
+          [currentUserId, targetUserId]
+        );
+        if (followRows.length === 0) {
+          return res.status(403).json({
+            error: 'This account is private. Follow this user to view their stories.',
+            isPrivate: true,
+            stories: []
+          });
+        }
+      }
+
+      const [rows] = await pool.query(`
+        SELECT 
+          s.id, s.user_id, s.media_url, s.media_type, s.caption, s.music, s.sticker, s.created_at, s.status,
+          s.likes_count,
+          (SELECT COUNT(*) FROM story_likes sl WHERE sl.story_id = s.id AND sl.user_id = ?) AS user_liked,
+          (SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id AND sv.user_id = ?) AS user_viewed,
+          u.name, u.username, u.avatar_url
+        FROM stories s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.user_id = ?
+          AND (s.expires_at IS NULL OR s.expires_at > NOW()) 
+          AND (s.status = 'Approved' OR s.status IS NULL) 
+          AND (u.status IS NULL OR u.status != 'Suspended')
+        ORDER BY s.created_at ASC
+      `, [currentUserId, currentUserId, targetUserId]);
+
+      if (rows.length === 0) {
+        return res.json({ stories: [] });
+      }
+
+      return res.json({
+        stories: [{
+          id: `st_user_${targetUserId}`,
+          userId: targetUserId,
+          username: rows[0]?.username || '',
+          name: rows[0]?.name || '',
+          avatar: rows[0]?.avatar_url || '/brand/default-avatar.svg',
+          hasUnseen: rows.some(r => !r.user_viewed && currentUserId !== targetUserId),
+          stories: rows.map(row => ({
+            id: row.id,
+            mediaUrl: row.media_url,
+            mediaType: row.media_type,
+            caption: row.caption || '',
+            music: row.music || '',
+            sticker: row.sticker || '',
+            likesCount: Number(row.likes_count) || 0,
+            isLiked: Boolean(row.user_liked),
+            isViewed: Boolean(row.user_viewed),
+            time: 'Active 24h',
+            created_at: row.created_at
+          }))
+        }]
+      });
+    }
+
+    // 2. Homepage Story Tray:
+    // Instagram Rule: Only display stories from:
+    // - The logged-in user themselves
+    // - Accounts the logged-in user follows
+    if (!currentUserId) {
+      return res.json({ stories: [] });
+    }
 
     const [rows] = await pool.query(`
       SELECT 
@@ -11,13 +97,7 @@ export async function listStories(req, res) {
         (SELECT COUNT(*) FROM story_likes sl WHERE sl.story_id = s.id AND sl.user_id = ?) AS user_liked,
         (SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id AND sv.user_id = ?) AS user_viewed,
         u.name, u.username, u.avatar_url,
-        (
-          CASE 
-            WHEN s.user_id = ? THEN 2
-            WHEN EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ? AND f.following_id = s.user_id) THEN 1
-            ELSE 0
-          END
-        ) AS follow_priority
+        (CASE WHEN s.user_id = ? THEN 1 ELSE 0 END) AS is_self
       FROM stories s
       JOIN users u ON s.user_id = u.id
       WHERE (s.expires_at IS NULL OR s.expires_at > NOW()) 
@@ -26,13 +106,12 @@ export async function listStories(req, res) {
         AND s.media_url NOT LIKE '%unsplash.com%'
         AND (s.caption IS NULL OR (s.caption NOT LIKE 'Testing user%' AND s.caption NOT LIKE 'Test Story%'))
         AND (
-          COALESCE(u.is_private, 0) = 0
-          OR s.user_id = ?
+          s.user_id = ?
           OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ? AND f.following_id = s.user_id)
         )
-      ORDER BY follow_priority DESC, s.created_at DESC
+      ORDER BY is_self DESC, s.created_at DESC
       LIMIT 100
-    `, [currentUserId, currentUserId, currentUserId, currentUserId, currentUserId, currentUserId, currentUserId]);
+    `, [currentUserId, currentUserId, currentUserId, currentUserId, currentUserId]);
 
     // Group stories by creator
     const grouped = {};
@@ -239,12 +318,23 @@ export async function createStory(req, res) {
 export async function deleteStory(req, res) {
   try {
     const { id } = req.params;
-    await pool.query('DELETE FROM stories WHERE id = ? AND (user_id = ? OR ? = 1)', [
-      id,
-      req.user.id,
-      req.user.role === 'admin' ? 1 : 0
-    ]);
-    return res.json({ success: true, message: 'Story deleted' });
+    const userId = req.user.id;
+    const isAdmin = req.user.role === 'admin' || req.user.isAdminSession;
+
+    const [storyRows] = await pool.query('SELECT user_id FROM stories WHERE id = ?', [id]);
+    if (storyRows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    if (storyRows[0].user_id !== userId && !isAdmin) {
+      return res.status(403).json({ error: 'You can only delete your own stories' });
+    }
+
+    await pool.query('DELETE FROM story_likes WHERE story_id = ?', [id]);
+    await pool.query('DELETE FROM story_views WHERE story_id = ?', [id]);
+    await pool.query('DELETE FROM stories WHERE id = ?', [id]);
+
+    return res.json({ success: true, message: 'Story deleted successfully', storyId: id });
   } catch (err) {
     console.error('Delete story error:', err);
     return res.status(500).json({ error: 'Failed to delete story' });

@@ -44,6 +44,8 @@ function AdVideoPlayer({ mediaUrl, muted }) {
       player={player}
       style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
       contentFit="cover"
+      surfaceType="textureView"
+      useExoShutter={false}
       nativeControls={false}
     />
   );

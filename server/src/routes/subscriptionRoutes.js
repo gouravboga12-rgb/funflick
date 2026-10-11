@@ -6,7 +6,10 @@ import {
   createPlanAdmin, 
   deletePlanAdmin, 
   subscribeUser,
-  getUserSubscriptionStatus 
+  getUserSubscriptionStatus,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  renderCheckoutPage
 } from '../controllers/subscriptionController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -14,6 +17,11 @@ const router = Router();
 
 // Public / User side: get active plans
 router.get('/plans', getActivePlans);
+
+// Razorpay Official Checkout & Verification (Mobile + Web)
+router.post('/create-order', authenticateToken, createRazorpayOrder);
+router.post('/verify-payment', authenticateToken, verifyRazorpayPayment);
+router.get('/checkout-page', renderCheckoutPage);
 
 // User side: activate or extend subscription
 router.post('/subscribe', authenticateToken, subscribeUser);

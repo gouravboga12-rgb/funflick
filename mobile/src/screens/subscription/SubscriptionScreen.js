@@ -22,7 +22,8 @@ import {
   Award,
 } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
-import { apiRequest, setStoredUser } from '../../services/api';
+import { apiRequest, setStoredUser, getToken, API_BASE_URL } from '../../services/api';
+import * as WebBrowser from 'expo-web-browser';
 import { colors } from '../../theme/colors';
 
 // Default mock plans matching image copy 37.png and website
@@ -172,55 +173,69 @@ export const SubscriptionScreen = ({ navigation }) => {
     setProcessingPlanId(plan.id);
 
     try {
-      const paymentId = `pay_app_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const res = await apiRequest('/subscriptions/subscribe', {
+      // 1. Create real Razorpay order on backend
+      const orderRes = await apiRequest('/subscriptions/create-order', {
         method: 'POST',
         body: JSON.stringify({
           planId: plan.id,
-          planName: plan.name,
           price: plan.price,
-          durationDays: plan.durationDays,
-          paymentId,
         }),
       });
 
-      // Update current user state with influencer role
-      if (currentUser) {
-        const updatedUser = {
-          ...currentUser,
-          isInfluencer: true,
-          subscriptionPlan: plan.name,
-        };
-        setCurrentUser(updatedUser);
-        await setStoredUser(updatedUser);
+      if (!orderRes || !orderRes.orderId) {
+        throw new Error(orderRes?.error || 'Could not initiate Razorpay payment order.');
       }
 
-      // Reload status
-      await loadSubscriptionData();
+      // 2. Build secure Razorpay checkout URL
+      const token = await getToken();
+      const checkoutUrl = `${API_BASE_URL}/subscriptions/checkout-page?orderId=${encodeURIComponent(orderRes.orderId)}&amount=${encodeURIComponent(orderRes.amount)}&planName=${encodeURIComponent(plan.name)}&planId=${encodeURIComponent(plan.id)}&token=${encodeURIComponent(token || '')}&name=${encodeURIComponent(currentUser?.name || currentUser?.username || '')}&email=${encodeURIComponent(currentUser?.email || '')}&phone=${encodeURIComponent(currentUser?.phone || '')}`;
 
-      Alert.alert(
-        '🎉 Subscription Activated!',
-        `Congratulations! You are now subscribed to ${plan.name}. Your influencer pass and creator monetization tools are active!`,
-        [{ text: 'Awesome!', onPress: () => {} }]
+      // 3. Open Razorpay checkout page via in-app browser session
+      const authResult = await WebBrowser.openAuthSessionAsync(
+        checkoutUrl,
+        'funflick://payment-success'
       );
+
+      // 4. Always reload status from backend (only verified server payments activate)
+      const freshStatus = await apiRequest('/subscriptions/my-status').catch(() => null);
+
+      if (freshStatus?.isActive) {
+        setSubStatus(freshStatus);
+        if (currentUser) {
+          const updatedUser = {
+            ...currentUser,
+            isInfluencer: true,
+            subscriptionPlan: freshStatus.planName || plan.name,
+            subscriptionExpiresAt: freshStatus.expiresAt,
+          };
+          setCurrentUser(updatedUser);
+          await setStoredUser(updatedUser);
+        }
+
+        Alert.alert(
+          '🎉 Subscription Activated!',
+          `Congratulations! You are now subscribed to ${plan.name}. Your influencer pass and creator monetization tools are active!`,
+          [{ text: 'Awesome!', onPress: () => {} }]
+        );
+      } else if (authResult.type === 'cancel' || authResult.type === 'dismiss') {
+        // User closed or cancelled without completing payment
+      } else {
+        Alert.alert(
+          'Payment Incomplete',
+          'Payment was not completed. If amount was debited, your subscription will activate automatically once confirmed.'
+        );
+      }
     } catch (err) {
       console.warn('Purchase error:', err);
-      // Fallback local update if network issue
-      if (currentUser) {
-        const updatedUser = {
-          ...currentUser,
-          isInfluencer: true,
-          subscriptionPlan: plan.name,
-        };
-        setCurrentUser(updatedUser);
-        await setStoredUser(updatedUser);
-      }
-      Alert.alert('Activated!', `You are now upgraded to ${plan.name}!`);
+      Alert.alert(
+        'Payment Gateway Error',
+        err.message || 'Unable to connect to payment gateway. Please try again.'
+      );
     } finally {
       setProcessingPlanId(null);
       setTimeout(() => {
         isPurchasingRef.current = false;
-      }, 1000);
+      }, 800);
     }
   };
 

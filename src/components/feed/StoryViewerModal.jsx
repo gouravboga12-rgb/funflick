@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
+import { X, Heart, ChevronLeft, ChevronRight, Share2, Volume2, VolumeX, Trash2, Music } from 'lucide-react';
 
 export const StoryViewerModal = () => {
   const navigate = useNavigate();
-  const { activeStoryGroup, setActiveStoryGroup, showToast } = useApp();
+  const { activeStoryGroup, setActiveStoryGroup, showToast, currentUser, fetchLiveStories } = useApp();
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     setCurrentIdx(0);
@@ -18,12 +21,31 @@ export const StoryViewerModal = () => {
   const stories = activeStoryGroup?.stories || [];
   const currentStory = stories[currentIdx] || stories[0];
 
+  const isOwner = Boolean(
+    currentUser && (
+      activeStoryGroup?.isUser ||
+      String(activeStoryGroup?.userId) === String(currentUser?.id) ||
+      (activeStoryGroup?.username && activeStoryGroup?.username.toLowerCase() === currentUser?.username?.toLowerCase()) ||
+      String(currentStory?.userId) === String(currentUser?.id)
+    )
+  );
+
   useEffect(() => {
     if (currentStory) {
       setIsLiked(Boolean(currentStory.isLiked));
       setLikesCount(Number(currentStory.likesCount) || 0);
     }
   }, [currentStory, currentIdx]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+      videoRef.current.volume = 1.0;
+      if (!isMuted) {
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  }, [isMuted, currentIdx]);
 
   if (!activeStoryGroup || !activeStoryGroup.stories || activeStoryGroup.stories.length === 0) {
     return null;
@@ -40,6 +62,37 @@ export const StoryViewerModal = () => {
   const handlePrev = () => {
     if (currentIdx > 0) {
       setCurrentIdx(prev => prev - 1);
+    }
+  };
+
+  const handleDeleteStory = async () => {
+    if (!currentStory?.id || isDeleting) return;
+    if (!window.confirm('Are you sure you want to delete this story?')) return;
+
+    setIsDeleting(true);
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    try {
+      const res = await fetch(`/api/stories/${currentStory.id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        showToast?.('Story deleted successfully', 'success');
+        const remaining = stories.filter(s => s.id !== currentStory.id);
+        if (remaining.length > 0) {
+          setActiveStoryGroup({ ...activeStoryGroup, stories: remaining });
+          setCurrentIdx(prev => Math.min(prev, remaining.length - 1));
+        } else {
+          setActiveStoryGroup(null);
+        }
+        fetchLiveStories?.();
+      } else {
+        showToast?.('Failed to delete story', 'error');
+      }
+    } catch (err) {
+      showToast?.('Network error deleting story', 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -99,11 +152,12 @@ export const StoryViewerModal = () => {
         <div className="absolute inset-0 z-0">
           {(currentStory.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(currentStory.mediaUrl || '')) ? (
             <video
+              ref={videoRef}
               src={currentStory.mediaUrl}
               autoPlay
               playsInline
               loop
-              muted
+              muted={isMuted}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -153,13 +207,47 @@ export const StoryViewerModal = () => {
               </div>
             </div>
 
-            <button 
-              onClick={() => setActiveStoryGroup(null)}
-              className="p-1.5 rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-md transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {/* Top Right Actions: Mute/Unmute, Delete (if owner), Close */}
+            <div className="flex items-center gap-2">
+              <button 
+                type="button"
+                onClick={() => setIsMuted(m => !m)}
+                className="p-1.5 rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-md transition"
+                title={isMuted ? 'Unmute Story' : 'Mute Story'}
+              >
+                {isMuted ? <VolumeX className="w-4 h-4 text-pink-400" /> : <Volume2 className="w-4 h-4 text-white" />}
+              </button>
+
+              {isOwner && (
+                <button 
+                  type="button"
+                  onClick={handleDeleteStory}
+                  disabled={isDeleting}
+                  className="p-1.5 rounded-full bg-red-600/60 hover:bg-red-600 text-white backdrop-blur-md transition"
+                  title="Delete Story"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+
+              <button 
+                type="button"
+                onClick={() => setActiveStoryGroup(null)}
+                className="p-1.5 rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-md transition"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
+
+          {/* Music Track Badge */}
+          {currentStory.music && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[11px] text-white">
+              <Music className="w-3 h-3 text-pink-400" />
+              <span className="truncate max-w-[200px]">{currentStory.music}</span>
+            </div>
+          )}
         </div>
 
         {/* Tap navigation hotzones */}

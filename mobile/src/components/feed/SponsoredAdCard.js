@@ -100,8 +100,10 @@ export const SponsoredAdCard = ({ ad, isActive = false }) => {
         {isVideo && player ? (
           <VideoView
             player={player}
-            style={StyleSheet.absoluteFillObject}
+            style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
             contentFit="cover"
+            surfaceType="textureView"
+            useExoShutter={false}
             nativeControls={false}
           />
         ) : (
