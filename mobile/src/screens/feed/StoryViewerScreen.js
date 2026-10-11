@@ -16,7 +16,8 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Heart, Share2, Music, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { VideoView, useVideoPlayer } from 'expo-video';
+import { VideoView } from 'expo-video';
+import { useManagedPlayer } from '../../hooks/useManagedPlayer';
 import { colors } from '../../theme/colors';
 import { apiRequest } from '../../services/api';
 import { useApp } from '../../context/AppContext';
@@ -25,18 +26,12 @@ const { width, height } = Dimensions.get('window');
 const STORY_DURATION = 5000;
 
 function StoryVideo({ mediaUrl, isPaused }) {
-  const player = useVideoPlayer(mediaUrl, p => {
-    if (!p) return;
-    p.loop = false;
-    p.play();
+  const player = useManagedPlayer({
+    source: mediaUrl,
+    shouldPlay: !isPaused,
+    isMuted: false,
+    loop: false,
   });
-
-  useEffect(() => {
-    if (player) {
-      if (isPaused) player.pause();
-      else player.play();
-    }
-  }, [isPaused, player]);
 
   if (!player) return null;
 

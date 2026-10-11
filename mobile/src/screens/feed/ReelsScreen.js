@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { VideoView, useVideoPlayer } from 'expo-video';
+import { VideoView } from 'expo-video';
+import { useManagedPlayer } from '../../hooks/useManagedPlayer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Music, Bookmark, Plus, Eye, Check } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +26,7 @@ function ReelItem({
   item,
   isActive,
   isScreenFocused,
+  isAdPopupOpen,
   reelHeight,
   isReelsMuted,
   toggleMute,
@@ -41,13 +43,17 @@ function ReelItem({
   const heartScale = useRef(new Animated.Value(0)).current;
   const hasRecordedViewRef = useRef(false);
 
-  const player = useVideoPlayer(item.mediaUrl, p => {
-    if (!p) return;
-    p.loop = true;
-    p.muted = isReelsMuted;
-    if (isActive && isScreenFocused && !isPaused) {
-      p.play();
-    }
+  const effectiveIsScreenFocused = isScreenFocused && !isAdPopupOpen;
+  const shouldPlay = isActive && effectiveIsScreenFocused && !isPaused;
+
+  const player = useManagedPlayer({
+    source: item.mediaUrl,
+    shouldPlay,
+    isMuted: isReelsMuted,
+    loop: true,
+    onPlayingChange: (isPlayingNow) => {
+      setIsPaused(!isPlayingNow);
+    },
   });
 
   // Reset paused state when scrolling away to another reel
@@ -67,40 +73,24 @@ function ReelItem({
       hasPlayer: Boolean(player),
       isActive,
       isScreenFocused,
+      isAdPopupOpen,
+      effectiveIsScreenFocused,
       isPaused,
-      decision: isActive && isScreenFocused && !isPaused ? 'PLAY' : 'PAUSE',
+      decision: shouldPlay ? 'PLAY' : 'PAUSE',
     });
-    if (!player) return;
-    let viewTimer = null;
-    try {
-      if (isActive && isScreenFocused && !isPaused) {
-        player.play();
-        // Record view only after 5 seconds of continuous playback
-        if (!hasRecordedViewRef.current && recordPostView) {
-          viewTimer = setTimeout(() => {
-            if (!hasRecordedViewRef.current) {
-              hasRecordedViewRef.current = true;
-              recordPostView(item.id);
-            }
-          }, 5000);
-        }
-      } else {
-        player.pause();
-      }
-    } catch {}
+  }, [item.id, player, isActive, isScreenFocused, isAdPopupOpen, effectiveIsScreenFocused, isPaused, shouldPlay]);
 
-    return () => {
-      if (viewTimer) clearTimeout(viewTimer);
-    };
-  }, [isActive, isScreenFocused, isPaused, player, item.id, recordPostView]);
-
+  // Record view after 5 seconds of continuous active playback
   useEffect(() => {
-    if (player) {
-      try {
-        player.muted = isReelsMuted;
-      } catch {}
-    }
-  }, [isReelsMuted, player]);
+    if (!shouldPlay || hasRecordedViewRef.current || !recordPostView) return;
+    const viewTimer = setTimeout(() => {
+      if (!hasRecordedViewRef.current) {
+        hasRecordedViewRef.current = true;
+        recordPostView(item.id);
+      }
+    }, 5000);
+    return () => clearTimeout(viewTimer);
+  }, [shouldPlay, item.id, recordPostView]);
 
   const tapTimeoutRef = useRef(null);
 
@@ -351,7 +341,7 @@ function ReelItem({
 export const ReelsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const { posts, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator, recordPostView } = useApp();
+  const { posts, isReelsMuted, toggleMute, toggleLikePost, toggleFollowCreator, recordPostView, isAdPopupOpen } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
 
@@ -404,6 +394,7 @@ export const ReelsScreen = ({ navigation }) => {
             item={item}
             isActive={index === currentIndex}
             isScreenFocused={isFocused}
+            isAdPopupOpen={isAdPopupOpen}
             reelHeight={containerHeight}
             isReelsMuted={isReelsMuted}
             toggleMute={toggleMute}

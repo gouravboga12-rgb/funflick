@@ -691,6 +691,7 @@ export const AppProvider = ({ children }) => {
   // Ads State
   const [adsList, setAdsList] = useState([]);
   const [activePopupAd, setActivePopupAd] = useState(null);
+  const isAdPopupOpen = Boolean(activePopupAd);
   const hasTriggeredAdOnLaunchRef = useRef(false);
   const sessionSeenAdIdsRef = useRef(new Set());
 
@@ -1062,6 +1063,7 @@ export const AppProvider = ({ children }) => {
         deleteUserPost,
         adsList,
         activePopupAd,
+        isAdPopupOpen,
         fetchAds,
         showMobileAd,
         dismissMobileAd,

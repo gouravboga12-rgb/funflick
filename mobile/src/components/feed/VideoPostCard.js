@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Share, Dimensions, Animated } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { VideoView, useVideoPlayer } from 'expo-video';
+import { VideoView } from 'expo-video';
+import { useManagedPlayer } from '../../hooks/useManagedPlayer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, Play, Music, Plus, Eye, Check } from 'lucide-react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -25,7 +26,7 @@ function formatCount(num) {
 
 export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const isFocused = useIsFocused();
-  const { toggleLikePost, recordPostView, toggleFollowCreator, isReelsMuted, toggleMute, currentUser } = useApp();
+  const { toggleLikePost, recordPostView, toggleFollowCreator, isReelsMuted, toggleMute, currentUser, isAdPopupOpen } = useApp();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isUserPaused, setIsUserPaused] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
@@ -40,14 +41,21 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const isOwner = post.creator?.username === currentUser?.username;
   const isVideo = post.mediaType === 'video' && Boolean(post.mediaUrl);
 
-  const player = useVideoPlayer(isVideo ? post.mediaUrl : null, p => {
-    if (!p) return;
-    p.loop = true;
-    p.muted = isReelsMuted;
-    if (isActive && isFocused && !isUserPaused) {
-      p.play();
-      setIsPlaying(true);
-    }
+  // Treat feed video as unfocused when an interstitial ad popup is open
+  const effectiveIsFocused = isFocused && !isAdPopupOpen;
+  const shouldPlay = isActive && effectiveIsFocused && !isUserPaused;
+
+  const player = useManagedPlayer({
+    source: isVideo ? post.mediaUrl : null,
+    shouldPlay,
+    isMuted: isReelsMuted,
+    loop: true,
+    onPlayingChange: (isPlayingNow) => {
+      setIsPlaying(isPlayingNow);
+      if (!isPlayingNow) {
+        setIsUserPaused(true);
+      }
+    },
   });
 
   // Reset user manual pause state when scrolling away to another reel
@@ -61,80 +69,31 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     hasRecordedViewRef.current = false;
   }, [post.id]);
 
-  // Play/pause based on active viewport state, screen focus, and user pause toggle
+  // [DBG] Play/pause decision logging
   useEffect(() => {
     console.log('[DBG][VideoPostCard] play-pause decision:', {
       postId: post.id,
       hasPlayer: Boolean(player),
       isActive,
       isFocused,
+      isAdPopupOpen,
+      effectiveIsFocused,
       isUserPaused,
-      decision: isActive && isFocused && !isUserPaused ? 'PLAY' : 'PAUSE',
+      decision: shouldPlay ? 'PLAY' : 'PAUSE',
     });
-    if (!player) return;
-    let viewTimer = null;
-    try {
-      if (isActive && isFocused && !isUserPaused) {
-        player.play();
-        setIsPlaying(true);
-        // Only count view after 5 seconds of continuous playback
-        if (!hasRecordedViewRef.current && recordPostView) {
-          viewTimer = setTimeout(() => {
-            if (!hasRecordedViewRef.current) {
-              hasRecordedViewRef.current = true;
-              recordPostView(post.id);
-            }
-          }, 5000);
-        }
-      } else {
-        player.pause();
-        setIsPlaying(false);
+  }, [post.id, player, isActive, isFocused, isAdPopupOpen, effectiveIsFocused, isUserPaused, shouldPlay]);
+
+  // Record view after 5 seconds of continuous active playback
+  useEffect(() => {
+    if (!shouldPlay || hasRecordedViewRef.current || !recordPostView) return;
+    const viewTimer = setTimeout(() => {
+      if (!hasRecordedViewRef.current) {
+        hasRecordedViewRef.current = true;
+        recordPostView(post.id);
       }
-    } catch {}
-
-    return () => {
-      if (viewTimer) clearTimeout(viewTimer);
-    };
-  }, [isActive, isFocused, isUserPaused, player, post.id, recordPostView]);
-
-  // Sync mute state
-  useEffect(() => {
-    if (player) {
-      try {
-        player.muted = isReelsMuted;
-      } catch {}
-    }
-  }, [isReelsMuted, player]);
-
-  const triggerHeartBurst = () => {
-    heartScale.setValue(0);
-    Animated.sequence([
-      Animated.spring(heartScale, { toValue: 1.2, friction: 3, useNativeDriver: true }),
-      Animated.timing(heartScale, { toValue: 0, duration: 250, useNativeDriver: true }),
-    ]).start();
-  };
-
-  const tapTimeoutRef = useRef(null);
-
-  useEffect(() => {
-    return () => {
-      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-    };
-  }, []);
-
-  // Sync state with native player events
-  useEffect(() => {
-    if (!player) return;
-    const sub = player.addListener?.('playingChange', (event) => {
-      setIsPlaying(event.isPlaying);
-      if (!event.isPlaying) {
-        setIsUserPaused(true);
-      }
-    });
-    return () => {
-      sub?.remove?.();
-    };
-  }, [player]);
+    }, 5000);
+    return () => clearTimeout(viewTimer);
+  }, [shouldPlay, post.id, recordPostView]);
 
   const togglePlayPause = () => {
     if (!player) return;
