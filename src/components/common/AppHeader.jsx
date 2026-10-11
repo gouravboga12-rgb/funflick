@@ -11,7 +11,8 @@ export const AppHeader = ({
   searchIcon = false,
   tabs = null,
   activeTab = null,
-  onTabChange = null
+  onTabChange = null,
+  isVisible = true
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -22,11 +23,15 @@ export const AppHeader = ({
   const unreadMessages = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
 
   return (
-    <header className={`sticky top-0 z-30 ${
+    <header className={`sticky top-0 z-30 transition-all duration-300 ease-in-out ${
+      isVisible
+        ? 'translate-y-0 opacity-100 max-h-16'
+        : '-translate-y-full opacity-0 max-h-0 -mb-[52px] pointer-events-none overflow-hidden border-transparent'
+    } ${
       isLight 
         ? 'bg-white/95 border-b border-slate-200/80 shadow-sm' 
         : 'bg-[#090614]/95 border-b border-white/5'
-    } backdrop-blur-md transition-all`}>
+    } backdrop-blur-md`}>
       <div className="px-4 py-2.5 flex items-center justify-between gap-3">
         {/* If tabs are present (like Screen 3 Home Feed) */}
         {tabs ? (

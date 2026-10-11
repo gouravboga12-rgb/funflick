@@ -128,7 +128,7 @@ export const SponsoredAdCard = ({ ad }) => {
       {/* Media Display Area */}
       <div 
         onClick={handleOpenAdOverlay}
-        className="relative w-full aspect-[9/16] bg-black overflow-hidden flex items-center justify-center cursor-pointer group"
+        className="relative w-full aspect-[9/16] max-h-[calc(100dvh-180px)] bg-black overflow-hidden flex items-center justify-center cursor-pointer group"
       >
         {isVideo ? (
           <>

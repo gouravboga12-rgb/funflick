@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { AppHeader } from '../../components/common/AppHeader';
@@ -16,6 +16,8 @@ export const HomeScreen = () => {
   const navigate = useNavigate();
   const { posts, blockedUsers, activePlayingVideoId, setActivePlayingVideoId, adsList, isAuthenticated, currentUser } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
 
   const isPaidInfluencer = Boolean(
     currentUser?.isInfluencer ||
@@ -42,24 +44,44 @@ export const HomeScreen = () => {
     }
   }, [filteredPosts, activePlayingVideoId, setActivePlayingVideoId]);
 
+  // Instagram-style scroll detection: hides header on scroll down, reveals on slight scroll up
+  const handleScroll = (e) => {
+    const currentScrollY = e.currentTarget.scrollTop;
+    const diff = currentScrollY - lastScrollYRef.current;
+
+    if (diff > 8 && currentScrollY > 40) {
+      setIsHeaderVisible(false);
+    } else if (diff < -5 || currentScrollY <= 20) {
+      setIsHeaderVisible(true);
+    }
+
+    lastScrollYRef.current = currentScrollY;
+  };
+
   return (
     <div className="w-full flex-1 flex flex-col bg-[#090514] min-h-full">
-      {/* Top Header with Tab Switcher & Search (Screen 3) */}
+      {/* Top Header with Tab Switcher & Search (Screen 3) - Instagram-style auto-hiding */}
       <AppHeader
         showLogo={true}
         searchIcon={true}
         tabs={['For You', 'Trending', 'Latest']}
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        isVisible={isHeaderVisible}
       />
 
       {/* Main Video Feed containing StoryBar and Posts */}
-      <div className="flex-1 overflow-y-auto no-scrollbar space-y-3">
+      <div 
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto no-scrollbar space-y-3 snap-y snap-mandatory scroll-smooth"
+      >
         {/* Horizontal Stories Bar (Screen 3 & 4) */}
-        <StoryBar />
+        <div className="snap-start">
+          <StoryBar />
+        </div>
 
         {/* Video Posts Feed */}
-        <div className="px-0 sm:px-2 space-y-4">
+        <div className="px-0 sm:px-2 space-y-3">
           {filteredPosts.length === 0 ? (
             <div className="mx-4 my-6 p-8 rounded-3xl bg-[#130b26] border border-white/10 text-center space-y-4">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-500/20 via-purple-500/20 to-blue-500/20 text-pink-400 flex items-center justify-center mx-auto border border-pink-500/30">
