@@ -26,6 +26,7 @@ import {
   Heart,
   MessageCircle,
   UserPlus,
+  Hash
 } from 'lucide-react';
 import { VideoThumbnail } from '../../components/common/VideoThumbnail';
 
