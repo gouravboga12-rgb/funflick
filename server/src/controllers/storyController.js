@@ -318,7 +318,7 @@ export async function createStory(req, res) {
 export async function deleteStory(req, res) {
   try {
     const rawId = req.params.id;
-    const cleanId = String(rawId).replace(/^st_/, '').replace(/^story_/, '');
+    const cleanId = String(rawId).replace(/^st_user_/, '').replace(/^st_/, '').replace(/^story_/, '');
     const userId = req.user.id;
     const isAdmin = req.user.role === 'admin' || 
                     req.user.role === 'super_admin' || 
@@ -327,7 +327,10 @@ export async function deleteStory(req, res) {
                     req.user.username === 'mrspysoal_16' ||
                     req.user.username === 'gourav.boga1';
 
-    const [storyRows] = await pool.query('SELECT id, user_id FROM stories WHERE id = ? OR id = ?', [cleanId, rawId]);
+    let [storyRows] = await pool.query('SELECT id, user_id FROM stories WHERE id = ? OR id = ?', [cleanId, rawId]);
+    if (storyRows.length === 0 && (String(rawId).startsWith('st_user_') || cleanId === String(userId))) {
+      [storyRows] = await pool.query('SELECT id, user_id FROM stories WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [cleanId]);
+    }
     if (storyRows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }

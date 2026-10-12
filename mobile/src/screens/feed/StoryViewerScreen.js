@@ -76,7 +76,7 @@ function StoryVideo({ mediaUrl, isPaused }) {
 export default function StoryViewerScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { story } = route.params || {};
-  const { currentUser, stories: allStories, recordStoryView, fetchLiveStories } = useApp();
+  const { currentUser, stories: allStories, recordStoryView, fetchLiveStories, deleteStory } = useApp();
 
   const targetStory = React.useMemo(() => {
     if (story && typeof story === 'object' && (story.stories || story.mediaUrl)) {
@@ -92,12 +92,22 @@ export default function StoryViewerScreen({ route, navigation }) {
     return story || null;
   }, [story, allStories]);
 
-  const rawStories = targetStory?.stories && targetStory.stories.length > 0
-    ? targetStory.stories
-    : (targetStory?.mediaUrl ? [targetStory] : []);
+  const rawStories = React.useMemo(() => {
+    return targetStory?.stories && targetStory.stories.length > 0
+      ? targetStory.stories
+      : (targetStory?.mediaUrl ? [targetStory] : []);
+  }, [targetStory]);
+
+  const [storiesList, setStoriesList] = useState(rawStories);
+
+  useEffect(() => {
+    if (rawStories && rawStories.length > 0) {
+      setStoriesList(rawStories);
+    }
+  }, [rawStories]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const activeStory = rawStories[currentIndex] || rawStories[0];
+  const activeStory = storiesList[currentIndex] || storiesList[0];
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const [isLiked, setIsLiked] = useState(Boolean(activeStory?.isLiked));
@@ -136,7 +146,7 @@ export default function StoryViewerScreen({ route, navigation }) {
   const goToNextStory = () => {
     currentProgressRef.current = 0;
     progressAnim.setValue(0);
-    if (currentIndex < rawStories.length - 1) {
+    if (currentIndex < storiesList.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else if (currentGroupIndex >= 0 && currentGroupIndex < availableStoryGroups.length - 1) {
       const nextGroup = availableStoryGroups[currentGroupIndex + 1];
@@ -234,25 +244,31 @@ export default function StoryViewerScreen({ route, navigation }) {
     }
     try {
       setIsDeleting(true);
-      await apiRequest(`/stories/${storyIdToDelete}`, { method: 'DELETE' });
-      if (fetchLiveStories) {
-        await fetchLiveStories();
+      if (deleteStory) {
+        await deleteStory(storyIdToDelete);
+      } else {
+        await apiRequest(`/stories/${storyIdToDelete}`, { method: 'DELETE' });
+        if (fetchLiveStories) await fetchLiveStories();
       }
+
       setIsDeleting(false);
       setShowDeleteModal(false);
-      if (rawStories.length > 1) {
-        if (currentIndex < rawStories.length - 1) {
-          goToNextStory();
-        } else {
-          goToPrevStory();
-        }
-      } else {
+
+      const remaining = storiesList.filter(s => String(s.id) !== String(storyIdToDelete));
+      if (remaining.length === 0) {
         navigation.goBack();
+      } else {
+        setStoriesList(remaining);
+        const nextIdx = Math.min(currentIndex, remaining.length - 1);
+        setCurrentIndex(nextIdx);
+        currentProgressRef.current = 0;
+        progressAnim.setValue(0);
+        setIsPaused(false);
       }
     } catch (e) {
       setIsDeleting(false);
       setShowDeleteModal(false);
-      Alert.alert('Error', e?.message || 'Failed to delete story');
+      Alert.alert('Delete Failed', e?.message || 'Could not delete story. Please try again.');
       setIsPaused(false);
     }
   };
@@ -420,7 +436,7 @@ export default function StoryViewerScreen({ route, navigation }) {
           <View style={styles.topSection} pointerEvents="box-none">
             {/* Instagram-style Segmented Progress Bar */}
             <View style={styles.progressBarContainer} pointerEvents="none">
-              {rawStories.map((_, idx) => (
+              {storiesList.map((_, idx) => (
                 <View key={idx} style={styles.progressBarBg}>
                   {idx < currentIndex ? (
                     <View style={[styles.progressBarFill, { width: '100%' }]} />

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Share } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Share, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Share2, AlertCircle, Home } from 'lucide-react-native';
 import { VideoPostCard } from '../../components/feed/VideoPostCard';
 import { apiRequest } from '../../services/api';
+import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
 export const VideoDetailScreen = ({ route, navigation }) => {
   const { id, videoId } = route.params || {};
   const activeId = id || videoId;
+  const { posts } = useApp();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -31,6 +33,16 @@ export const VideoDetailScreen = ({ route, navigation }) => {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [activeId]);
+
+  // Synchronize with context posts whenever updated (likes, comments, etc.)
+  useEffect(() => {
+    if (activeId && posts && posts.length > 0) {
+      const match = posts.find(p => String(p.id) === String(activeId));
+      if (match) {
+        setPost(prev => (prev ? { ...prev, ...match } : match));
+      }
+    }
+  }, [posts, activeId]);
 
   const handleShare = async () => {
     try {
@@ -80,9 +92,11 @@ export const VideoDetailScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.cardPadding}>
-        <VideoPostCard post={post} isActive={true} navigation={navigation} />
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.cardPadding}>
+          <VideoPostCard post={post} isActive={true} navigation={navigation} />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -161,5 +175,9 @@ const styles = StyleSheet.create({
   },
   cardPadding: {
     padding: 12,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 24,
   },
 });

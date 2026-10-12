@@ -298,15 +298,18 @@ export const AppProvider = ({ children }) => {
   };
 
   // Toggle like
-  const toggleLikePost = async (videoId) => {
+  const toggleLikePost = useCallback(async (videoId) => {
+    if (!videoId) return null;
+    const strId = String(videoId);
     setPosts(prev =>
       prev.map(p => {
-        if (p.id === videoId) {
+        if (String(p.id) === strId) {
           const nextLiked = !p.isLiked;
+          const currentCount = Number(p.likesCount) || 0;
           return {
             ...p,
             isLiked: nextLiked,
-            likesCount: nextLiked ? p.likesCount + 1 : Math.max(0, p.likesCount - 1),
+            likesCount: nextLiked ? currentCount + 1 : Math.max(0, currentCount - 1),
           };
         }
         return p;
@@ -314,18 +317,21 @@ export const AppProvider = ({ children }) => {
     );
 
     try {
-      await apiRequest(`/videos/${videoId}/like`, { method: 'POST' });
+      const data = await apiRequest(`/videos/${videoId}/like`, { method: 'POST' });
+      return data;
     } catch (e) {
-      console.warn('Toggle like error:', e);
+      console.warn('Toggle like error:', e?.message || e);
+      return null;
     }
-  };
+  }, []);
 
   // Record view count
-  const recordPostView = async (videoId) => {
+  const recordPostView = useCallback(async (videoId) => {
+    if (!videoId) return;
     try {
       await apiRequest(`/videos/${videoId}/view`, { method: 'POST' });
     } catch (e) {}
-  };
+  }, []);
 
   // Following graph state
   const [followingUsernames, setFollowingUsernames] = useState(new Set());
@@ -1023,6 +1029,38 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
   }, []);
 
+  const deleteStory = useCallback(async (storyId) => {
+    if (!storyId) return false;
+    const strId = String(storyId);
+
+    // 1. Immediate optimistic removal from state across the entire mobile application
+    setStories(prev => {
+      return prev.map(group => {
+        if (!group.stories || group.stories.length === 0) return group;
+        const filtered = group.stories.filter(s => String(s.id) !== strId);
+        return {
+          ...group,
+          stories: filtered,
+        };
+      }).filter(group => {
+        if (group.isUser) return true;
+        return group.stories && group.stories.length > 0;
+      });
+    });
+
+    // 2. Perform backend deletion
+    try {
+      await apiRequest(`/stories/${storyId}`, { method: 'DELETE' });
+      // 3. Sync live stories from server
+      await fetchLiveStories();
+      return true;
+    } catch (e) {
+      console.warn('Delete story error in context:', e?.message || e);
+      await fetchLiveStories();
+      throw e;
+    }
+  }, [fetchLiveStories]);
+
   return (
     <AppContext.Provider
       value={{
@@ -1039,6 +1077,7 @@ export const AppProvider = ({ children }) => {
         posts,
         stories,
         fetchLiveStories,
+        deleteStory,
         recordStoryView,
         isLoadingFeed,
         fetchFeed,

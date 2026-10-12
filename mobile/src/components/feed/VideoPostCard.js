@@ -28,14 +28,22 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const { toggleLikePost, recordPostView, toggleFollowCreator, isReelsMuted, toggleMute, currentUser } = useApp();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isUserPaused, setIsUserPaused] = useState(false);
+  const [isLiked, setIsLiked] = useState(Boolean(post.isLiked || post.user_liked));
+  const [likesCount, setLikesCount] = useState(Number(post.likesCount ?? post.likes_count ?? 0));
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
-  const [commentsCount, setCommentsCount] = useState(Number(post.commentsCount) || 0);
+  const [commentsCount, setCommentsCount] = useState(Number(post.commentsCount ?? post.comments_count ?? 0));
   const [lastTap, setLastTap] = useState(0);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [avatarErr, setAvatarErr] = useState(false);
   const heartScale = useRef(new Animated.Value(0)).current;
   const hasRecordedViewRef = useRef(false);
+
+  useEffect(() => {
+    setIsLiked(Boolean(post.isLiked || post.user_liked));
+    setLikesCount(Number(post.likesCount ?? post.likes_count ?? 0));
+    setCommentsCount(Number(post.commentsCount ?? post.comments_count ?? 0));
+  }, [post.id, post.isLiked, post.user_liked, post.likesCount, post.likes_count, post.commentsCount, post.comments_count]);
 
   const isOwner = post.creator?.username === currentUser?.username;
   const isVideo = post.mediaType === 'video' && Boolean(post.mediaUrl);
@@ -156,8 +164,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
 
     if (!player) return;
     try {
-      const isCurrentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (isPlaying && !isUserPaused);
-      if (isCurrentlyPlaying) {
+      if (!isUserPaused) {
         player.pause();
         setIsUserPaused(true);
         setIsPlaying(false);
@@ -167,7 +174,25 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         setIsPlaying(true);
       }
     } catch (e) {
-      console.warn('Video toggle play error:', e?.message);
+      console.warn('Video toggle play error:', e?.message || e);
+    }
+  };
+
+  const handleLikePress = async () => {
+    const nextLiked = !isLiked;
+    setIsLiked(nextLiked);
+    setLikesCount(prev => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+    if (nextLiked) {
+      triggerHeartBurst();
+    }
+    try {
+      if (toggleLikePost) {
+        await toggleLikePost(post.id);
+      } else {
+        await apiRequest(`/videos/${post.id}/like`, { method: 'POST' });
+      }
+    } catch (e) {
+      console.warn('Like press error:', e?.message || e);
     }
   };
 
@@ -181,10 +206,11 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         clearTimeout(tapTimeoutRef.current);
         tapTimeoutRef.current = null;
       }
-      if (!post.isLiked && toggleLikePost) {
-        toggleLikePost(post.id);
+      if (!isLiked) {
+        handleLikePress();
+      } else {
+        triggerHeartBurst();
       }
-      triggerHeartBurst();
     } else {
       if (tapTimeoutRef.current) {
         clearTimeout(tapTimeoutRef.current);
@@ -383,18 +409,15 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
           <TouchableOpacity
             style={styles.actionBtn}
             activeOpacity={0.7}
-            onPress={() => {
-              toggleLikePost(post.id);
-              if (!post.isLiked) triggerHeartBurst();
-            }}
+            onPress={handleLikePress}
           >
             <Heart
               size={26}
-              color={post.isLiked ? '#ff007a' : '#fff'}
-              fill={post.isLiked ? '#ff007a' : 'transparent'}
+              color={isLiked ? '#ff007a' : '#fff'}
+              fill={isLiked ? '#ff007a' : 'transparent'}
               strokeWidth={2}
             />
-            <Text style={styles.actionCount}>{formatCount(post.likesCount)}</Text>
+            <Text style={styles.actionCount}>{formatCount(likesCount)}</Text>
           </TouchableOpacity>
 
           {/* Comment */}
@@ -473,8 +496,8 @@ const styles = StyleSheet.create({
   fullTapLayer: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
-    zIndex: 10,
-    elevation: 10,
+    zIndex: 2,
+    elevation: 2,
   },
   topVignette: {
     position: 'absolute',
@@ -482,7 +505,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 90,
-    zIndex: 3,
+    zIndex: 1,
   },
   bottomVignette: {
     position: 'absolute',
@@ -490,14 +513,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 180,
-    zIndex: 3,
+    zIndex: 1,
   },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 25,
-    elevation: 25,
+    zIndex: 40,
+    elevation: 40,
   },
   playIconCircle: {
     width: 68,
@@ -508,8 +531,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.4)',
-    zIndex: 30,
-    elevation: 30,
+    zIndex: 45,
+    elevation: 45,
   },
   burstHeartWrap: {
     position: 'absolute',
@@ -528,14 +551,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
+    zIndex: 35,
+    elevation: 35,
   },
   bottomOverlay: {
     position: 'absolute',
     bottom: 14,
     left: 14,
     right: 68,
-    zIndex: 5,
+    zIndex: 30,
+    elevation: 30,
   },
   creatorRow: {
     flexDirection: 'row',
@@ -624,7 +649,8 @@ const styles = StyleSheet.create({
     right: 10,
     alignItems: 'center',
     gap: 14,
-    zIndex: 6,
+    zIndex: 35,
+    elevation: 35,
   },
   avatarActionWrap: {
     position: 'relative',

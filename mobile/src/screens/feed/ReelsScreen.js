@@ -150,8 +150,7 @@ function ReelItem({
 
     if (!player) return;
     try {
-      const isCurrentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (!isPaused);
-      if (isCurrentlyPlaying) {
+      if (!isPaused) {
         player.pause();
         setIsPaused(true);
       } else {
@@ -159,7 +158,7 @@ function ReelItem({
         setIsPaused(false);
       }
     } catch (e) {
-      console.warn('Reel toggle play error:', e?.message);
+      console.warn('Reel toggle play error:', e?.message || e);
     }
   };
 
@@ -592,7 +591,8 @@ const styles = StyleSheet.create({
     right: 12,
     alignItems: 'center',
     gap: 16,
-    zIndex: 10,
+    zIndex: 35,
+    elevation: 35,
   },
   avatarWrap: {
     position: 'relative',
@@ -663,7 +663,8 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 14,
     right: 76,
-    zIndex: 10,
+    zIndex: 30,
+    elevation: 30,
   },
   creatorRow: {
     flexDirection: 'row',
