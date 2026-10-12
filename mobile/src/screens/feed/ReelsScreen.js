@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated, Platform } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -123,7 +123,31 @@ function ReelItem({
     ]).start();
   };
 
+  const webVideoRef = useRef(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && webVideoRef.current) {
+      webVideoRef.current.muted = isReelsMuted;
+      if (isActive && isScreenFocused && !isPaused) {
+        webVideoRef.current.play().catch(() => {});
+      } else {
+        webVideoRef.current.pause();
+      }
+    }
+  }, [isActive, isScreenFocused, isPaused, isReelsMuted]);
+
   const togglePlayPause = () => {
+    if (Platform.OS === 'web' && webVideoRef.current) {
+      if (!isPaused && !webVideoRef.current.paused) {
+        webVideoRef.current.pause();
+        setIsPaused(true);
+      } else {
+        webVideoRef.current.play().catch(() => {});
+        setIsPaused(false);
+      }
+      return;
+    }
+
     if (!player) return;
     try {
       const isCurrentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (!isPaused);
@@ -168,16 +192,33 @@ function ReelItem({
   return (
     <View style={[styles.reelContainer, { height: reelHeight }]}>
       <TouchableOpacity activeOpacity={1} onPress={handleMediaPress} style={styles.mediaTouch}>
-        {player ? (
-          <VideoView
-            player={player}
-            style={styles.fullscreenVideo}
-            contentFit="cover"
-            surfaceType="textureView"
-            useExoShutter={false}
-            nativeControls={false}
-            pointerEvents="none"
-          />
+        {isVideo ? (
+          Platform.OS === 'web' ? (
+            <video
+              ref={webVideoRef}
+              src={item.mediaUrl}
+              autoPlay
+              playsInline
+              loop
+              muted={isReelsMuted}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                backgroundColor: '#000000',
+              }}
+            />
+          ) : player ? (
+            <VideoView
+              player={player}
+              style={styles.fullscreenVideo}
+              contentFit="cover"
+              surfaceType="textureView"
+              useExoShutter={false}
+              nativeControls={false}
+              pointerEvents="none"
+            />
+          ) : null
         ) : (
           <Image
             source={{ uri: item.posterUrl || item.thumbnailUrl || item.mediaUrl }}

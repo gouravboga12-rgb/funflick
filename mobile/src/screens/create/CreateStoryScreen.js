@@ -59,8 +59,26 @@ const showAppAlert = (title, message, buttons) => {
   }
 };
 
-// Helper video preview component using expo-video
+// Helper video preview component supporting both Web and Native
 function StoryVideoPreview({ videoUri }) {
+  if (Platform.OS === 'web') {
+    return (
+      <video
+        src={videoUri}
+        autoPlay
+        loop
+        muted
+        playsInline
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          backgroundColor: '#000000',
+        }}
+      />
+    );
+  }
+
   const player = useVideoPlayer(videoUri, p => {
     if (!p) return;
     p.loop = true;

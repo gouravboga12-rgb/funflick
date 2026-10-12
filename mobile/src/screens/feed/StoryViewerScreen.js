@@ -27,6 +27,24 @@ const { width, height } = Dimensions.get('window');
 const STORY_DURATION = 5000;
 
 function StoryVideo({ mediaUrl, isPaused }) {
+  if (Platform.OS === 'web') {
+    return (
+      <video
+        src={mediaUrl}
+        autoPlay
+        playsInline
+        muted={false}
+        loop={false}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          backgroundColor: '#000000',
+        }}
+      />
+    );
+  }
+
   const player = useVideoPlayer(mediaUrl, p => {
     if (!p) return;
     p.loop = false;

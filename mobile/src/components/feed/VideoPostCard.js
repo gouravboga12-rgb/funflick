@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Share, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Share, Dimensions, Animated, Platform } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -114,6 +114,21 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     };
   }, []);
 
+  const webVideoRef = useRef(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && webVideoRef.current) {
+      webVideoRef.current.muted = isReelsMuted;
+      if (isActive && isFocused && !isUserPaused) {
+        webVideoRef.current.play().catch(() => {});
+        setIsPlaying(true);
+      } else {
+        webVideoRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  }, [isActive, isFocused, isUserPaused, isReelsMuted]);
+
   // Sync state with native player events
   useEffect(() => {
     if (!player) return;
@@ -126,6 +141,19 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   }, [player]);
 
   const togglePlayPause = () => {
+    if (Platform.OS === 'web' && webVideoRef.current) {
+      if (!isUserPaused && !webVideoRef.current.paused) {
+        webVideoRef.current.pause();
+        setIsUserPaused(true);
+        setIsPlaying(false);
+      } else {
+        webVideoRef.current.play().catch(() => {});
+        setIsUserPaused(false);
+        setIsPlaying(true);
+      }
+      return;
+    }
+
     if (!player) return;
     try {
       const isCurrentlyPlaying = (typeof player.playing === 'boolean') ? player.playing : (isPlaying && !isUserPaused);
@@ -182,16 +210,33 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     <View style={styles.card}>
       {/* Media Player Container */}
       <View style={styles.playerContainer}>
-        {isVideo && player ? (
-          <VideoView
-            player={player}
-            style={styles.videoPlayer}
-            contentFit="cover"
-            surfaceType="textureView"
-            useExoShutter={false}
-            nativeControls={false}
-            pointerEvents="none"
-          />
+        {isVideo ? (
+          Platform.OS === 'web' ? (
+            <video
+              ref={webVideoRef}
+              src={post.mediaUrl}
+              autoPlay
+              playsInline
+              loop
+              muted={isReelsMuted}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                backgroundColor: '#000000',
+              }}
+            />
+          ) : player ? (
+            <VideoView
+              player={player}
+              style={styles.videoPlayer}
+              contentFit="cover"
+              surfaceType="textureView"
+              useExoShutter={false}
+              nativeControls={false}
+              pointerEvents="none"
+            />
+          ) : null
         ) : (
           <Image
             source={{ uri: post.mediaUrl || post.posterUrl }}

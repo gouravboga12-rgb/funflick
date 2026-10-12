@@ -7,6 +7,7 @@ import {
   Image,
   Dimensions,
   Linking,
+  Platform,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,11 +18,13 @@ import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+const isVideoExt = (url) => typeof url === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(url);
 
 export const SponsoredAdCard = ({ ad, isActive = false }) => {
   const isFocused = useIsFocused();
   const { isReelsMuted, toggleMute, recordAdMetric, isPaidInfluencer } = useApp();
   const hasRecordedImpression = useRef(false);
+  const webVideoRef = useRef(null);
 
   if (!ad || isPaidInfluencer) return null;
 
@@ -32,7 +35,11 @@ export const SponsoredAdCard = ({ ad, isActive = false }) => {
     )
   );
 
-  const player = useVideoPlayer(isVideo ? ad?.mediaUrl : null, p => {
+  const validPoster = (!isVideoExt(ad?.thumbnailUrl) && ad?.thumbnailUrl)
+    ? ad.thumbnailUrl
+    : (!isVideoExt(ad?.posterUrl) && ad?.posterUrl ? ad.posterUrl : null);
+
+  const player = useVideoPlayer(isVideo && Platform.OS !== 'web' ? ad?.mediaUrl : null, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
@@ -40,6 +47,17 @@ export const SponsoredAdCard = ({ ad, isActive = false }) => {
       p.play();
     }
   });
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && webVideoRef.current) {
+      webVideoRef.current.muted = isReelsMuted;
+      if (isFocused) {
+        webVideoRef.current.play().catch(() => {});
+      } else {
+        webVideoRef.current.pause();
+      }
+    }
+  }, [isFocused, isReelsMuted]);
 
   useEffect(() => {
     if (!player) return;
@@ -97,18 +115,38 @@ export const SponsoredAdCard = ({ ad, isActive = false }) => {
 
       {/* Media Display */}
       <View style={styles.mediaWrapper}>
-        {isVideo && player ? (
-          <VideoView
-            player={player}
-            style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
-            contentFit="cover"
-            surfaceType="textureView"
-            useExoShutter={false}
-            nativeControls={false}
-          />
+        {isVideo ? (
+          Platform.OS === 'web' ? (
+            <video
+              ref={webVideoRef}
+              src={ad.mediaUrl}
+              autoPlay
+              playsInline
+              loop
+              muted={isReelsMuted}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                backgroundColor: '#000000',
+              }}
+            />
+          ) : player ? (
+            <VideoView
+              player={player}
+              style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+              contentFit="cover"
+              surfaceType="textureView"
+              useExoShutter={false}
+              nativeControls={false}
+            />
+          ) : null
         ) : (
           <Image
-            source={{ uri: ad.mediaUrl || ad.thumbnailUrl }}
+            source={{ uri: validPoster || ad.mediaUrl }}
             style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
             resizeMode="cover"
           />

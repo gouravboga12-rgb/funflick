@@ -19,8 +19,83 @@ import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+const isVideoExt = (url) => typeof url === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(url);
+
+// Web-specific video player element to bypass browser autoplay restrictions cleanly
+function WebAdVideoPlayer({ mediaUrl, muted, setMuted, setIsLoading }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    setIsLoading?.(true);
+    video.muted = muted;
+
+    const attemptPlay = () => {
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsLoading?.(false);
+          })
+          .catch((err) => {
+            console.warn('Web ad autoplay with audio blocked, falling back to muted autoplay:', err);
+            video.muted = true;
+            setMuted?.(true);
+            video.play()
+              .then(() => setIsLoading?.(false))
+              .catch(() => setIsLoading?.(false));
+          });
+      }
+    };
+
+    if (video.readyState >= 2) {
+      attemptPlay();
+    } else {
+      video.addEventListener('canplay', attemptPlay, { once: true });
+    }
+
+    return () => {
+      video.removeEventListener('canplay', attemptPlay);
+    };
+  }, [mediaUrl]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = muted;
+      if (videoRef.current.paused) {
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  }, [muted]);
+
+  return (
+    <video
+      ref={videoRef}
+      src={mediaUrl}
+      autoPlay
+      playsInline
+      loop
+      muted={muted}
+      onWaiting={() => setIsLoading?.(true)}
+      onPlaying={() => setIsLoading?.(false)}
+      onError={() => setIsLoading?.(false)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        backgroundColor: '#000000',
+      }}
+    />
+  );
+}
+
 // Dedicated Video Player subcomponent to safely invoke useVideoPlayer only when video is active
-function AdVideoPlayer({ mediaUrl, muted }) {
+function NativeAdVideoPlayer({ mediaUrl, muted, setIsLoading }) {
   const player = useVideoPlayer(mediaUrl, p => {
     if (!p) return;
     p.loop = true;
@@ -37,6 +112,18 @@ function AdVideoPlayer({ mediaUrl, muted }) {
     }
   }, [muted, player]);
 
+  useEffect(() => {
+    if (!player) return;
+    const sub = player.addListener ? player.addListener('statusChange', (status) => {
+      if (status?.status === 'readyToPlay' || status?.isPlaying) {
+        setIsLoading?.(false);
+      }
+    }) : null;
+    return () => {
+      sub?.remove?.();
+    };
+  }, [player, setIsLoading]);
+
   if (!player) return null;
 
   return (
@@ -47,6 +134,26 @@ function AdVideoPlayer({ mediaUrl, muted }) {
       surfaceType="textureView"
       useExoShutter={false}
       nativeControls={false}
+    />
+  );
+}
+
+function AdVideoPlayer({ mediaUrl, muted, setMuted, setIsLoading }) {
+  if (Platform.OS === 'web') {
+    return (
+      <WebAdVideoPlayer
+        mediaUrl={mediaUrl}
+        muted={muted}
+        setMuted={setMuted}
+        setIsLoading={setIsLoading}
+      />
+    );
+  }
+  return (
+    <NativeAdVideoPlayer
+      mediaUrl={mediaUrl}
+      muted={muted}
+      setIsLoading={setIsLoading}
     />
   );
 }
@@ -72,6 +179,7 @@ export const MobileAdPopup = () => {
   );
 
   const [muted, setMuted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
   const [canClose, setCanClose] = useState(false);
 
@@ -82,6 +190,10 @@ export const MobileAdPopup = () => {
       /\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.mediaUrl || '')
     )
   );
+
+  const validPoster = (!isVideoExt(ad?.thumbnailUrl) && ad?.thumbnailUrl)
+    ? ad.thumbnailUrl
+    : (!isVideoExt(ad?.posterUrl) && ad?.posterUrl ? ad.posterUrl : null);
 
   // Countdown timer before close is permitted
   useEffect(() => {
@@ -183,18 +295,29 @@ export const MobileAdPopup = () => {
           <View style={styles.mediaContainer}>
             {isVideo ? (
               <>
-                {Boolean(ad.thumbnailUrl || ad.posterUrl) && (
+                {Boolean(validPoster) && (
                   <Image
-                    source={{ uri: ad.thumbnailUrl || ad.posterUrl }}
+                    source={{ uri: validPoster }}
                     style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
                     resizeMode="cover"
                   />
                 )}
-                <AdVideoPlayer key={ad.id} mediaUrl={ad.mediaUrl} muted={muted} />
+                <AdVideoPlayer
+                  key={ad.id}
+                  mediaUrl={ad.mediaUrl}
+                  muted={muted}
+                  setMuted={setMuted}
+                  setIsLoading={setIsLoading}
+                />
+                {isLoading && (
+                  <View style={styles.loadingOverlay} pointerEvents="none">
+                    <ActivityIndicator size="large" color={colors.primary || '#ec4899'} />
+                  </View>
+                )}
               </>
             ) : (
               <Image
-                source={{ uri: ad.mediaUrl || ad.thumbnailUrl }}
+                source={{ uri: validPoster || ad.mediaUrl }}
                 style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
                 resizeMode="cover"
               />
@@ -366,5 +489,12 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 5,
   },
 });
