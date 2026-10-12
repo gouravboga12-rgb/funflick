@@ -42,4 +42,6 @@ client_secret*.json
 
 # Temporary screenshot captures
 /image*.png
+Screenshot*
+scratch_*
 *.mp4

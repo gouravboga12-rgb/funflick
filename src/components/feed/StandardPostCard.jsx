@@ -140,7 +140,7 @@ export const StandardPostCard = ({ post }) => {
             <div className="flex items-center gap-1.5 flex-wrap">
               <span 
                 onClick={() => navigate(`/creator/${post.creator?.username || 'creator'}`)}
-                className="font-extrabold text-xs text-white hover:underline cursor-pointer truncate"
+                className="font-extrabold text-sm sm:text-[15px] text-white hover:underline cursor-pointer truncate"
               >
                 {post.creator?.name || 'FunFlick Creator'}
               </span>
@@ -156,10 +156,10 @@ export const StandardPostCard = ({ post }) => {
               )}
             </div>
 
-            <div className="flex items-center gap-2 text-[10px] text-gray-400">
+            <div className="flex items-center gap-2 text-xs text-gray-400">
               <span 
                 onClick={() => navigate(`/creator/${post.creator?.username || 'creator'}`)}
-                className="hover:text-pink-300 cursor-pointer"
+                className="hover:text-pink-300 cursor-pointer font-medium"
               >
                 @{post.creator?.username || 'user'}
               </span>
@@ -321,26 +321,33 @@ export const StandardPostCard = ({ post }) => {
       <div className="px-4 pb-4 space-y-1.5">
         {/* Likes Count */}
         <div className="pt-1">
-          <span className="text-xs font-bold text-white">
+          <span className="text-sm font-bold text-white">
             {formatNumber(post.likesCount)} {post.likesCount === 1 ? 'like' : 'likes'}
           </span>
         </div>
 
+        {/* Post Title (if present and distinct) */}
+        {post.title && post.title !== post.caption && (
+          <h4 className="text-[15px] sm:text-base font-extrabold text-white leading-tight">
+            {post.title}
+          </h4>
+        )}
+
         {/* Caption */}
-        <div className="text-xs text-gray-200 leading-relaxed">
+        <div className="text-sm sm:text-[15px] text-gray-100 leading-relaxed">
           <span 
             onClick={() => navigate(`/creator/${post.creator?.username || 'creator'}`)}
-            className="font-extrabold text-white mr-1.5 hover:underline cursor-pointer"
+            className="font-extrabold text-sm sm:text-[15px] text-white mr-1.5 hover:underline cursor-pointer"
           >
             @{post.creator?.username || 'creator'}
           </span>
           <span className={captionExpanded ? '' : 'line-clamp-2'}>
-            {renderCaption(post.caption)}
+            {renderCaption(post.caption || post.title)}
           </span>
-          {post.caption?.length > 80 && (
+          {(post.caption || post.title)?.length > 80 && (
             <button
               onClick={() => setCaptionExpanded(!captionExpanded)}
-              className="text-gray-400 font-bold hover:text-white ml-1 inline-block text-[11px]"
+              className="text-pink-300 font-bold hover:text-white ml-1 inline-block text-xs sm:text-sm"
             >
               {captionExpanded ? 'less' : '...more'}
             </button>
@@ -351,7 +358,7 @@ export const StandardPostCard = ({ post }) => {
         {(post.commentsCount > 0 || (post.comments && post.comments.length > 0)) && (
           <button
             onClick={() => setShowComments(true)}
-            className="text-gray-400 text-[11px] font-medium hover:text-gray-300 block pt-0.5"
+            className="text-gray-400 text-xs font-medium hover:text-gray-300 block pt-0.5"
           >
             View all {post.commentsCount || post.comments?.length || 0} comments
           </button>

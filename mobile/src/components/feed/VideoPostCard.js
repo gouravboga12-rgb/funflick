@@ -225,7 +225,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const handleShare = async () => {
     try {
       const appLink = `funflick://video/${post.id}`;
-      const webLink = `https://funflick-theta.vercel.app/video/${post.id}?source=app`;
+      const webLink = `https://funflick.in/video/${post.id}?source=app`;
       await Share.share({
         title: post.title || 'FunFlick Reel',
         message: `Watch "${post.title || 'this reel'}" on FunFlick App! 📲 ${appLink}\n\nOr watch online: ${webLink}`,
@@ -359,6 +359,11 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
             onPress={() => setCaptionExpanded(prev => !prev)}
             style={styles.captionWrap}
           >
+            {post.title && post.title !== post.caption ? (
+              <Text style={styles.postTitleHeading} numberOfLines={1}>
+                {post.title}
+              </Text>
+            ) : null}
             <Text
               style={styles.captionText}
               numberOfLines={captionExpanded ? undefined : 2}
@@ -583,7 +588,7 @@ const styles = StyleSheet.create({
   },
   creatorHandle: {
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '800',
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
@@ -610,7 +615,7 @@ const styles = StyleSheet.create({
   },
   followText: {
     color: '#ffffff',
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
   },
   followingText: {
@@ -619,17 +624,26 @@ const styles = StyleSheet.create({
   captionWrap: {
     marginBottom: 6,
   },
+  postTitleHeading: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 3,
+    textShadowColor: 'rgba(0,0,0,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
   captionText: {
     color: 'rgba(255,255,255,0.95)',
-    fontSize: 13.5,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 20,
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   moreText: {
-    color: '#d1d5db',
-    fontSize: 12,
+    color: '#f472b6',
+    fontSize: 12.5,
     fontWeight: '700',
     marginTop: 2,
   },
@@ -648,7 +662,7 @@ const styles = StyleSheet.create({
   },
   audioTitle: {
     color: '#e5e7eb',
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '600',
   },
   rightActionsBar: {
@@ -696,7 +710,7 @@ const styles = StyleSheet.create({
   },
   actionCount: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
@@ -708,7 +722,7 @@ const styles = StyleSheet.create({
   },
   viewsCount: {
     color: '#f472b6',
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: '800',
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_BASE_URL = 'http://98.130.142.69/api';
+export const API_BASE_URL = 'https://funflick.in/api';
 
 const TOKEN_KEY = 'funflick_token';
 const USER_KEY = 'funflick_user';

@@ -112,7 +112,7 @@ export const VideoDetailScreen = ({ route, navigation }) => {
     try {
       const targetPost = post || videoList[currentIndex] || { id: activeId };
       const appLink = `funflick://video/${targetPost.id}`;
-      const webLink = `https://funflick-theta.vercel.app/video/${targetPost.id}?source=app`;
+      const webLink = `https://funflick.in/video/${targetPost.id}?source=app`;
       await Share.share({
         title: targetPost.title || 'FunFlick Reel',
         message: `Watch "${targetPost.title || 'this reel'}" on FunFlick App! 📲 ${appLink}\n\nOr watch online: ${webLink}`,

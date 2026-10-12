@@ -13,6 +13,18 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+// Safely extract a display hostname; never throw during render on malformed URLs
+const getDisplayHost = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return 'funflick.in';
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return 'funflick.in';
+  try {
+    return new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`).hostname || 'funflick.in';
+  } catch {
+    return 'funflick.in';
+  }
+};
+
 export const SponsoredAdCard = ({ ad }) => {
   const { recordAdImpression, recordAdClick, showMobileAd, theme, activePopupAd, currentUser } = useApp();
   const isLight = theme === 'light';
@@ -23,14 +35,12 @@ export const SponsoredAdCard = ({ ad }) => {
     (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
   );
 
-  if (!ad || isPaidInfluencer) return null;
-
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
   const hasRecordedImpression = useRef(false);
 
-  const isVideo = (
+  const isVideo = Boolean(ad) && (
     ad.type === 'video' ||
     /\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.mediaUrl || '') ||
     (typeof ad.mediaUrl === 'string' && ad.mediaUrl.startsWith('data:video/'))
@@ -46,11 +56,14 @@ export const SponsoredAdCard = ({ ad }) => {
 
   // Record impression once when ad card appears in feed
   useEffect(() => {
-    if (!hasRecordedImpression.current && ad.id) {
+    if (!hasRecordedImpression.current && ad?.id && !isPaidInfluencer) {
       hasRecordedImpression.current = true;
       if (recordAdImpression) recordAdImpression(ad.id);
     }
-  }, [ad.id, recordAdImpression]);
+  }, [ad?.id, recordAdImpression, isPaidInfluencer]);
+
+  // Early return must come AFTER all hooks (Rules of Hooks)
+  if (!ad || isPaidInfluencer) return null;
 
   const handleTogglePlay = (e) => {
     e.stopPropagation();
@@ -111,7 +124,7 @@ export const SponsoredAdCard = ({ ad }) => {
             <span className="text-[10px] text-gray-400 flex items-center gap-1">
               <span>Sponsored</span>
               <span>•</span>
-              <span className="text-pink-300 truncate">{ad.actionUrl ? new URL(ad.actionUrl.startsWith('http') ? ad.actionUrl : `https://${ad.actionUrl}`).hostname : 'funflick.in'}</span>
+              <span className="text-pink-300 truncate">{getDisplayHost(ad.actionUrl)}</span>
             </span>
           </div>
         </div>

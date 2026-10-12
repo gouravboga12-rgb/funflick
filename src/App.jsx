@@ -113,6 +113,7 @@ function AppRoutes() {
           <Route path="/discover" element={<MobileAppWrapper><DiscoverScreen /></MobileAppWrapper>} />
           <Route path="/video/:id" element={<MobileAppWrapper><VideoDetailScreen /></MobileAppWrapper>} />
           <Route path="/creator/:username" element={<MobileAppWrapper><CreatorProfileScreen /></MobileAppWrapper>} />
+          <Route path="/profile/:username" element={<MobileAppWrapper><CreatorProfileScreen /></MobileAppWrapper>} />
           <Route path="/profile" element={<MobileAppWrapper><UserProfileScreen /></MobileAppWrapper>} />
           <Route path="/subscription" element={<MobileAppWrapper><SubscriptionScreen /></MobileAppWrapper>} />
           <Route path="/wallet" element={<MobileAppWrapper><WalletScreen /></MobileAppWrapper>} />

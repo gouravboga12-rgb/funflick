@@ -202,7 +202,7 @@ export const VideoDetailScreen = () => {
         <button onClick={() => navigate(-1)} className="p-1 -ml-1 text-gray-300 hover:text-white">
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <span className="text-sm font-bold text-white font-heading truncate max-w-[200px]">
+        <span className="text-base font-extrabold text-white font-heading truncate max-w-[220px]">
           {post.title || 'Watch Video'}
         </span>
         <button onClick={handleShare} className="p-1.5 text-gray-300 hover:text-white" title="Copy share link">

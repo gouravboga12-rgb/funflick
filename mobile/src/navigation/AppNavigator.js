@@ -39,7 +39,13 @@ const CustomDarkTheme = {
 const prefix = Linking.createURL('/');
 
 const linking = {
-  prefixes: [prefix, 'funflick://', 'https://funflick.in', 'https://funflick-theta.vercel.app'],
+  prefixes: [
+    prefix,
+    'funflick://',
+    'https://funflick.in',
+    'https://www.funflick.in',
+    'https://funflick-theta.vercel.app',
+  ],
   config: {
     screens: {
       Splash: 'splash',
@@ -57,6 +63,9 @@ const linking = {
           videoId: (id) => String(id),
         },
       },
+      CreatorProfile: 'profile/:username',
+      Subscription: 'subscription',
+      Notifications: 'notifications',
       Login: 'login',
       ForgotPassword: 'forgot-password',
       SignUp: 'signup',

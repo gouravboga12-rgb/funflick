@@ -912,12 +912,13 @@ const styles = StyleSheet.create({
   },
   gridVideoTitle: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: '700',
   },
   gridVideoAuthor: {
     color: '#f472b6',
-    fontSize: 10,
+    fontSize: 11,
+    fontWeight: '500',
   },
   sectionWrap: {
     marginTop: 20,
@@ -927,12 +928,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
   },
   sectionSubtitle: {
     color: '#9ca3af',
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 2,
   },
   creatorsScroll: {

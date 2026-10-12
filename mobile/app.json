@@ -11,6 +11,10 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.funflick.app",
+      "associatedDomains": [
+        "applinks:funflick.in",
+        "applinks:www.funflick.in"
+      ],
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "FunFlick requires access to your photo and video gallery so you can upload viral reels, posts, and stories.",
         "NSCameraUsageDescription": "FunFlick requires camera access so you can record videos and snap photos directly within the app."
@@ -39,6 +43,36 @@
           "data": [
             {
               "scheme": "funflick"
+            },
+            {
+              "scheme": "https",
+              "host": "funflick.in",
+              "pathPrefix": "/video"
+            },
+            {
+              "scheme": "https",
+              "host": "funflick.in",
+              "pathPrefix": "/reels"
+            },
+            {
+              "scheme": "https",
+              "host": "funflick.in",
+              "pathPrefix": "/profile"
+            },
+            {
+              "scheme": "https",
+              "host": "www.funflick.in",
+              "pathPrefix": "/video"
+            },
+            {
+              "scheme": "https",
+              "host": "www.funflick.in",
+              "pathPrefix": "/reels"
+            },
+            {
+              "scheme": "https",
+              "host": "www.funflick.in",
+              "pathPrefix": "/profile"
             },
             {
               "scheme": "https",

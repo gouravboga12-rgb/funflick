@@ -369,6 +369,11 @@ export function ReelItem({
           activeOpacity={0.85}
           onPress={() => setCaptionExpanded(prev => !prev)}
         >
+          {item.title && item.title !== item.caption ? (
+            <Text style={styles.reelHeading} numberOfLines={1}>
+              {item.title}
+            </Text>
+          ) : null}
           <Text style={styles.reelTitle} numberOfLines={captionExpanded ? undefined : 2}>
             {item.caption || item.title}
           </Text>
@@ -442,7 +447,7 @@ export const ReelsScreen = ({ navigation }) => {
   const handleShare = async post => {
     try {
       const appLink = `funflick://video/${post.id}`;
-      const webLink = `https://funflick-theta.vercel.app/video/${post.id}?source=app`;
+      const webLink = `https://funflick.in/video/${post.id}?source=app`;
       await Share.share({
         title: post.title || 'FunFlick Reel',
         message: `Watch "${post.title || 'this reel'}" on FunFlick App! 📲 ${appLink}\n\nOr watch online: ${webLink}`,
@@ -637,7 +642,7 @@ const styles = StyleSheet.create({
   },
   sideCount: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
@@ -649,7 +654,7 @@ const styles = StyleSheet.create({
   },
   viewsCount: {
     color: '#f472b6',
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
@@ -686,7 +691,7 @@ const styles = StyleSheet.create({
   },
   creatorTag: {
     color: '#ffffff',
-    fontSize: 15.5,
+    fontSize: 17,
     fontWeight: '800',
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
@@ -708,22 +713,31 @@ const styles = StyleSheet.create({
   },
   followBadgeText: {
     color: '#ffffff',
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
+  },
+  reelHeading: {
+    color: '#ffffff',
+    fontSize: 16.5,
+    fontWeight: '800',
+    marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   reelTitle: {
     color: '#ffffff',
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 15.5,
+    lineHeight: 21,
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   moreToggleText: {
-    color: '#d1d5db',
-    fontSize: 12,
+    color: '#f472b6',
+    fontSize: 13,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 3,
   },
   audioRow: {
     flexDirection: 'row',
@@ -741,7 +755,7 @@ const styles = StyleSheet.create({
   },
   audioText: {
     color: '#e5e7eb',
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '600',
   },
 });
