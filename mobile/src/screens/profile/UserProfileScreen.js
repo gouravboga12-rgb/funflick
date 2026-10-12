@@ -61,6 +61,7 @@ import {
   Play,
   Camera,
   Copy,
+  Edit3,
 } from 'lucide-react-native';
 import { SubmitAdRequestModal } from '../../components/user/SubmitAdRequestModal';
 import { FollowListModal } from '../../components/common/FollowListModal';
@@ -70,6 +71,8 @@ import { apiRequest, setStoredUser, setToken } from '../../services/api';
 import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const CONTENT_CATEGORIES = ['Comedy', 'Stand-up', 'Entertainment', 'Dance', 'Memes', 'Lifestyle', 'Regional'];
 
 function AvatarWithFallback({ avatar, name, username, size = 80 }) {
   const [hasError, setHasError] = useState(false);
@@ -124,6 +127,14 @@ export const UserProfileScreen = ({ navigation, route }) => {
   const [myMediaList, setMyMediaList] = useState([]);
   const [myStoriesList, setMyStoriesList] = useState([]);
   const [isLoadingMyMedia, setIsLoadingMyMedia] = useState(false);
+
+  // Content Library Edit State
+  const [editingContentItem, setEditingContentItem] = useState(null);
+  const [isEditContentModalOpen, setIsEditContentModalOpen] = useState(false);
+  const [editContentTitle, setEditContentTitle] = useState('');
+  const [editContentCaption, setEditContentCaption] = useState('');
+  const [editContentCategory, setEditContentCategory] = useState('Comedy');
+  const [isSavingContentEdit, setIsSavingContentEdit] = useState(false);
 
   useEffect(() => {
     if (posts && posts.length > 0) {
@@ -442,6 +453,62 @@ export const UserProfileScreen = ({ navigation, route }) => {
         }
       }
     );
+  };
+
+  const handleOpenEditContentModal = (item) => {
+    setEditingContentItem(item);
+    setEditContentTitle(item.title || '');
+    setEditContentCaption(item.description || item.caption || '');
+    setEditContentCategory(item.category || 'Comedy');
+    setIsEditContentModalOpen(true);
+  };
+
+  const handleSaveContentEdit = async () => {
+    if (!editingContentItem) return;
+    if (!editContentTitle.trim() && !editContentCaption.trim()) {
+      showAppAlert('Validation Error', 'Please enter a title or caption for your content.');
+      return;
+    }
+
+    setIsSavingContentEdit(true);
+    try {
+      const isVidOrPost = editingContentItem._type === 'video' || editingContentItem._type === 'post' || !editingContentItem._type;
+      if (isVidOrPost) {
+        await apiRequest(`/videos/${editingContentItem.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            title: editContentTitle.trim(),
+            description: editContentCaption.trim(),
+            category: editContentCategory,
+          }),
+        });
+
+        // Update in-memory myMediaList state so UI reflects immediately
+        setMyMediaList(prev => prev.map(m =>
+          String(m.id) === String(editingContentItem.id)
+            ? {
+                ...m,
+                title: editContentTitle.trim(),
+                description: editContentCaption.trim(),
+                caption: editContentCaption.trim(),
+                category: editContentCategory,
+              }
+            : m
+        ));
+
+        // Refresh global feed if available
+        if (fetchFeed) fetchFeed();
+      }
+
+      setIsEditContentModalOpen(false);
+      setEditingContentItem(null);
+      showAppAlert('Success ✅', 'Your content has been updated successfully!');
+    } catch (err) {
+      console.warn('Update content error:', err);
+      showAppAlert('Update Failed', err.message || 'Could not update content. Please try again.');
+    } finally {
+      setIsSavingContentEdit(false);
+    }
   };
 
   const fetchPayoutDetails = async () => {
@@ -1960,19 +2027,175 @@ export const UserProfileScreen = ({ navigation, route }) => {
                           </Text>
                         </View>
 
-                        <TouchableOpacity
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          onPress={() => isStory ? handleDeleteStory(item.id, item.caption) : handleDeleteVideo(item.id, item.title)}
-                          style={{ padding: 8, borderRadius: 8, backgroundColor: 'rgba(244,63,94,0.1)' }}
-                        >
-                          <Trash2 size={16} color="#f43f5e" />
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          {/* Edit Button for Video Reels and Photo Posts */}
+                          {!isStory && (
+                            <TouchableOpacity
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                              onPress={() => handleOpenEditContentModal(item)}
+                              style={{ padding: 8, borderRadius: 8, backgroundColor: 'rgba(56,189,248,0.12)' }}
+                            >
+                              <Edit3 size={16} color="#38bdf8" />
+                            </TouchableOpacity>
+                          )}
+
+                          {/* Delete Button */}
+                          <TouchableOpacity
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            onPress={() => isStory ? handleDeleteStory(item.id, item.caption) : handleDeleteVideo(item.id, item.title)}
+                            style={{ padding: 8, borderRadius: 8, backgroundColor: 'rgba(244,63,94,0.1)' }}
+                          >
+                            <Trash2 size={16} color="#f43f5e" />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     );
                   });
                 })()}
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* =================================================== */}
+      {/* MODAL 5E: EDIT CONTENT DETAILS MODAL (Cloned Web)   */}
+      {/* =================================================== */}
+      <Modal
+        visible={isEditContentModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsEditContentModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '88%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={[styles.settingsHeaderIcon, { backgroundColor: '#38bdf8' }]}>
+                  <Edit3 size={18} color="#ffffff" />
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>Edit Post Details</Text>
+                  <Text style={{ color: '#38bdf8', fontSize: 10.5, fontWeight: '600' }}>
+                    {editingContentItem?._type === 'video' ? 'Reel Video' : 'Photo Post'}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsEditContentModalOpen(false)}
+                style={styles.modalCloseBtn}
+              >
+                <X size={18} color="#cbd5e1" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 14, gap: 14 }}>
+              {/* Media Preview Card */}
+              {editingContentItem && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
+                  <Image
+                    source={{ uri: editingContentItem.thumbnail_url || editingContentItem.thumbnailUrl || editingContentItem.media_url || editingContentItem.mediaUrl }}
+                    style={{ width: 54, height: 54, borderRadius: 8, backgroundColor: '#18122c' }}
+                    resizeMode="cover"
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#ffffff', fontSize: 12.5, fontWeight: '700' }} numberOfLines={1}>
+                      {editingContentItem.title || 'Untitled Post'}
+                    </Text>
+                    <Text style={{ color: '#94a3b8', fontSize: 10.5, marginTop: 2 }}>
+                      Views: {editingContentItem.views_count || editingContentItem.viewsCount || 0}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Title Input */}
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalInputLabel}>POST TITLE</Text>
+                <View style={styles.modalInputBox}>
+                  <TextInput
+                    value={editContentTitle}
+                    onChangeText={setEditContentTitle}
+                    placeholder="Enter post title..."
+                    placeholderTextColor="#64748b"
+                    style={styles.modalTextInput}
+                  />
+                </View>
+              </View>
+
+              {/* Caption Input */}
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalInputLabel}>CAPTION & HASHTAGS</Text>
+                <View style={[styles.modalInputBox, { height: 90, alignItems: 'flex-start', paddingTop: 8 }]}>
+                  <TextInput
+                    value={editContentCaption}
+                    onChangeText={setEditContentCaption}
+                    placeholder="Write a caption or add #hashtags..."
+                    placeholderTextColor="#64748b"
+                    multiline
+                    numberOfLines={3}
+                    style={[styles.modalTextInput, { height: 74, textAlignVertical: 'top' }]}
+                  />
+                </View>
+              </View>
+
+              {/* Category Selection */}
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalInputLabel}>CATEGORY</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
+                  {CONTENT_CATEGORIES.map(cat => {
+                    const isSelected = editContentCategory === cat;
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        onPress={() => setEditContentCategory(cat)}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 12,
+                          backgroundColor: isSelected ? '#ff007a' : 'rgba(255,255,255,0.06)',
+                          borderWidth: 1,
+                          borderColor: isSelected ? '#ff007a' : 'rgba(255,255,255,0.1)',
+                        }}
+                      >
+                        <Text style={{ color: isSelected ? '#ffffff' : '#94a3b8', fontSize: 11, fontWeight: '700' }}>
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Save & Cancel Buttons */}
+              <View style={{ gap: 8, marginTop: 4 }}>
+                <TouchableOpacity
+                  style={styles.saveSettingsSubmitBtn}
+                  onPress={handleSaveContentEdit}
+                  disabled={isSavingContentEdit}
+                >
+                  <LinearGradient
+                    colors={['#ff007a', '#7928ca']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.saveSettingsGradient}
+                  >
+                    {isSavingContentEdit ? (
+                      <ActivityIndicator color="#ffffff" size="small" />
+                    ) : (
+                      <Text style={styles.saveSettingsBtnText}>Save Changes</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setIsEditContentModalOpen(false)}
+                  style={{ paddingVertical: 10, alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '600' }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
