@@ -201,7 +201,7 @@ export default function CreatorProfileScreen({ route, navigation }) {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out @${targetUsername}'s videos on FunFlick! https://funflick-theta.vercel.app/profile/${targetUsername}`,
+        message: `Check out @${targetUsername}'s videos on FunFlick! https://funflick.in/profile/${targetUsername}`,
         title: `@${targetUsername} on FunFlick`,
       });
     } catch (e) {}

@@ -17,7 +17,7 @@ export const Header = ({
       {/* Left: Brand Logo & Title */}
       <View style={styles.left}>
         <Image
-          source={{ uri: 'https://funflick-theta.vercel.app/brand/funflick-logo.png' }}
+          source={{ uri: 'https://funflick.in/brand/funflick-logo.png' }}
           style={styles.logo}
           resizeMode="contain"
         />

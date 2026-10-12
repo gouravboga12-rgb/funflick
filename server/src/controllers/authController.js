@@ -982,7 +982,7 @@ export async function googleAuthStart(req, res) {
     const flow = req.query.flow === 'signup' ? 'signup' : 'login';
     const returnUrl = req.query.returnUrl || 'funflick://auth/callback';
     const clientId = process.env.GOOGLE_CLIENT_ID;
-    const backendCallback = process.env.GOOGLE_CALLBACK_URL || 'https://funflick-theta.vercel.app/api/auth/google/callback';
+    const backendCallback = process.env.GOOGLE_CALLBACK_URL || 'https://funflick.in/api/auth/google/callback';
 
     if (!clientId) {
       return res.status(500).json({ error: 'Google Client ID is not configured on server' });
@@ -1108,7 +1108,7 @@ export async function googleAuthCallback(req, res) {
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const backendCallback = process.env.GOOGLE_CALLBACK_URL || 'https://funflick-theta.vercel.app/api/auth/google/callback';
+    const backendCallback = process.env.GOOGLE_CALLBACK_URL || 'https://funflick.in/api/auth/google/callback';
 
     if (!clientId || !clientSecret) {
       console.error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variable');

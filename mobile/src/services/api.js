@@ -15,7 +15,6 @@ export async function getToken() {
       if (typeof window !== 'undefined' && window.localStorage) {
         const val = window.localStorage.getItem(TOKEN_KEY) || 
                     window.localStorage.getItem('funflick_token') || 
-                    window.localStorage.getItem('funflick_admin_token') ||
                     (window.sessionStorage ? window.sessionStorage.getItem('funflick_token') : null);
         if (val) return val;
       }

@@ -587,7 +587,7 @@ export async function renderCheckoutPage(req, res) {
       name: 'FunFlick',
       description: '${planName || 'Influencer Subscription'}',
       order_id: '${orderId}',
-      image: 'https://funflick-theta.vercel.app/brand/funflick-logo.png',
+      image: 'https://funflick.in/brand/funflick-logo.png',
       prefill: {
         name: '${name}',
         email: '${email}',

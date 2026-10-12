@@ -21,7 +21,7 @@ function formatCount(num) {
   return String(n);
 }
 
-function ReelItem({
+export function ReelItem({
   item,
   isActive,
   isScreenFocused,
@@ -168,6 +168,7 @@ function ReelItem({
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 280;
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      lastTapRef.current = 0;
       if (tapTimeoutRef.current) {
         clearTimeout(tapTimeoutRef.current);
         tapTimeoutRef.current = null;
@@ -177,20 +178,21 @@ function ReelItem({
       }
       triggerHeartBurst();
     } else {
+      lastTapRef.current = now;
       if (tapTimeoutRef.current) {
         clearTimeout(tapTimeoutRef.current);
       }
       tapTimeoutRef.current = setTimeout(() => {
         togglePlayPause();
         tapTimeoutRef.current = null;
-      }, 180);
+      }, 220);
     }
-    lastTapRef.current = now;
   };
 
   return (
     <View style={[styles.reelContainer, { height: reelHeight }]}>
-      <TouchableOpacity activeOpacity={1} onPress={handleMediaPress} style={styles.mediaTouch}>
+      {/* Background Media — wrapped in pointerEvents="none" so native view never captures touch events */}
+      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
         {isVideo ? (
           Platform.OS === 'web' ? (
             <video
@@ -215,7 +217,6 @@ function ReelItem({
               surfaceType="textureView"
               useExoShutter={false}
               nativeControls={false}
-              pointerEvents="none"
             />
           ) : null
         ) : (
@@ -225,6 +226,10 @@ function ReelItem({
             resizeMode="cover"
           />
         )}
+      </View>
+
+      {/* Dedicated Tap Layer Covering Entire Screen */}
+      <TouchableOpacity activeOpacity={1} onPress={handleMediaPress} style={StyleSheet.absoluteFillObject} />
 
         {/* Top Gradient */}
         <LinearGradient
@@ -247,7 +252,6 @@ function ReelItem({
         >
           <Heart size={84} color="#ff007a" fill="#ff007a" />
         </Animated.View>
-      </TouchableOpacity>
 
       {/* Center Pause/Play Indicator: only on active reel when paused */}
       {isPaused && (
@@ -437,9 +441,12 @@ export const ReelsScreen = ({ navigation }) => {
 
   const handleShare = async post => {
     try {
+      const appLink = `funflick://video/${post.id}`;
+      const webLink = `https://funflick-theta.vercel.app/video/${post.id}?source=app`;
       await Share.share({
-        message: `Watch this reel on FunFlick! https://funflick-theta.vercel.app/video/${post.id}`,
-        url: `https://funflick-theta.vercel.app/video/${post.id}`,
+        title: post.title || 'FunFlick Reel',
+        message: `Watch "${post.title || 'this reel'}" on FunFlick App! 📲 ${appLink}\n\nOr watch online: ${webLink}`,
+        url: webLink,
       });
     } catch (e) {}
   };

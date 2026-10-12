@@ -825,7 +825,7 @@ export const UserProfileScreen = ({ navigation, route }) => {
           </TouchableOpacity>
           <View style={styles.brandRow}>
             <Image
-              source={{ uri: 'https://funflick-theta.vercel.app/brand/funflick-logo.png' }}
+              source={{ uri: 'https://funflick.in/brand/funflick-logo.png' }}
               style={styles.headerLogo}
             />
             <Text style={styles.headerBrandText}>
@@ -922,7 +922,7 @@ export const UserProfileScreen = ({ navigation, route }) => {
           {/* Company Badge: FunFlick Creator & Entertainment Network */}
           <View style={styles.companyBadge}>
             <Image
-              source={{ uri: 'https://funflick-theta.vercel.app/brand/funflick-logo.png' }}
+              source={{ uri: 'https://funflick.in/brand/funflick-logo.png' }}
               style={styles.companyBadgeLogo}
             />
             <Text style={styles.companyBadgeText}>

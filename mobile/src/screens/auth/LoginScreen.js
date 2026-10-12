@@ -297,7 +297,7 @@ export default function LoginScreen({ navigation }) {
                 >
                   <Image
                     source={{
-                      uri: acc.avatar_url || 'https://funflick-theta.vercel.app/brand/default-avatar.svg',
+                      uri: acc.avatar_url || 'https://funflick.in/brand/default-avatar.svg',
                     }}
                     style={styles.accAvatar}
                   />

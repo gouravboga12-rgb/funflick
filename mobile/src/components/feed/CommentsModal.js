@@ -89,7 +89,7 @@ export const CommentsModal = ({
       content: trimmed,
       user: currentUser?.username || 'you',
       name: currentUser?.name || 'You',
-      avatar: currentUser?.avatar_url || currentUser?.avatar || 'https://funflick-theta.vercel.app/brand/default-avatar.svg',
+      avatar: currentUser?.avatar_url || currentUser?.avatar || 'https://funflick.in/brand/default-avatar.svg',
       time: 'Just now',
     };
     setComments((prev) => [...prev, tempComment]);

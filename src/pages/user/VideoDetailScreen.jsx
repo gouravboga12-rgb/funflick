@@ -67,7 +67,7 @@ export const VideoDetailScreen = () => {
     setLoading(true);
     setNotFound(false);
 
-    const token = localStorage.getItem('funflick_token') || localStorage.getItem('funflick_admin_token');
+    const token = localStorage.getItem('funflick_token');
     fetch(`/api/videos/${id}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     })
@@ -101,6 +101,16 @@ export const VideoDetailScreen = () => {
       setActivePlayingVideoId(post.id);
     }
   }, [post?.id, setActivePlayingVideoId]);
+
+  // If opened via mobile share (?source=app), attempt deep linking to native app
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('source') === 'app' || params.get('openApp') === 'true') {
+        window.location.href = `funflick://video/${id}`;
+      }
+    } catch (e) {}
+  }, [id]);
 
   const handleShare = () => {
     try {
@@ -198,6 +208,19 @@ export const VideoDetailScreen = () => {
         <button onClick={handleShare} className="p-1.5 text-gray-300 hover:text-white" title="Copy share link">
           <Share2 className="w-5 h-5" />
         </button>
+      </div>
+
+      {/* App Smart Banner for mobile web visitors */}
+      <div className="bg-gradient-to-r from-pink-600/20 via-purple-600/20 to-blue-600/20 border-b border-pink-500/20 px-4 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-pink-300 font-semibold">Have FunFlick App installed?</span>
+        </div>
+        <a
+          href={`funflick://video/${id}`}
+          className="text-xs bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold px-3 py-1 rounded-full shadow hover:opacity-90 transition"
+        >
+          Open App
+        </a>
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar p-2">

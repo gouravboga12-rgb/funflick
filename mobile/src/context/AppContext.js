@@ -157,7 +157,7 @@ export const AppProvider = ({ children }) => {
               name: v.creator_name || 'Creator',
               username: v.creator_username || 'creator',
               avatar: (v.creator_username === 'super_admin')
-                ? (v.creator_avatar && !v.creator_avatar.includes('default-avatar') ? v.creator_avatar : 'https://funflick-theta.vercel.app/brand/funflick-logo.png')
+                ? (v.creator_avatar && !v.creator_avatar.includes('default-avatar') ? v.creator_avatar : 'https://funflick.in/brand/funflick-logo.png')
                 : (v.creator_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'),
             }
           };

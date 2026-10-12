@@ -45,7 +45,7 @@ export const TermsScreen = () => {
             <span>1. Acceptance of Terms</span>
           </h2>
           <p className="text-[11px] text-gray-300">
-            By downloading, accessing, or using the FunFlick mobile application or website (accessible at <span className="text-pink-300">funflick-theta.vercel.app</span>), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please refrain from using the platform.
+            By downloading, accessing, or using the FunFlick mobile application or website (accessible at <span className="text-pink-300">funflick.in</span>), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please refrain from using the platform.
           </p>
         </div>
 

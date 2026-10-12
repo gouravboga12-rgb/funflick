@@ -52,12 +52,12 @@ function CreatorAvatarCircle({ avatar, name, username, size = 64 }) {
   if (username === 'super_admin') {
     imageUri = (avatar && !String(avatar).includes('default-avatar'))
       ? avatar
-      : 'https://funflick-theta.vercel.app/brand/funflick-logo.png';
+      : 'https://funflick.in/brand/funflick-logo.png';
   }
 
   // Ensure relative URLs are converted to absolute public URLs
   if (imageUri && typeof imageUri === 'string' && imageUri.startsWith('/')) {
-    imageUri = `https://funflick-theta.vercel.app${imageUri}`;
+    imageUri = `https://funflick.in${imageUri}`;
   }
 
   const isDefaultOrMissing = !imageUri || String(imageUri).includes('default-avatar') || hasError;
@@ -66,7 +66,7 @@ function CreatorAvatarCircle({ avatar, name, username, size = 64 }) {
     if (username === 'super_admin') {
       return (
         <Image
-          source={{ uri: 'https://funflick-theta.vercel.app/brand/funflick-logo.png' }}
+          source={{ uri: 'https://funflick.in/brand/funflick-logo.png' }}
           style={[styles.avatarCircle, { width: size, height: size, borderRadius: size / 2, backgroundColor: '#18122c' }]}
           resizeMode="cover"
         />
@@ -257,7 +257,7 @@ export const DiscoverScreen = ({ navigation }) => {
       <View style={styles.headerRow}>
         <View style={styles.brandRow}>
           <Image
-            source={{ uri: 'https://funflick-theta.vercel.app/brand/funflick-logo.png' }}
+            source={{ uri: 'https://funflick.in/brand/funflick-logo.png' }}
             style={styles.brandLogo}
           />
           <Text style={styles.brandTitle}>
@@ -551,7 +551,11 @@ export const DiscoverScreen = ({ navigation }) => {
                       { width: dynamicCardWidth, height: dynamicCardHeight }
                     ]}
                     activeOpacity={0.85}
-                    onPress={() => navigation.navigate('VideoDetail', { videoId: video.id })}
+                    onPress={() => navigation.navigate('VideoDetail', {
+                      videoId: video.id,
+                      initialList: displayedTrendingVideos,
+                      initialIndex: idx,
+                    })}
                   >
                     <VideoThumbnail
                       thumbnailUrl={video.thumbnailUrl}

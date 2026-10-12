@@ -47,7 +47,7 @@ export const AppProvider = ({ children }) => {
 
   // Track session authentication (ensure new visitors get Get Started / Splash first)
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem('funflick_authenticated') === 'true' || Boolean(localStorage.getItem('funflick_admin_token'));
+    return sessionStorage.getItem('funflick_authenticated') === 'true' || Boolean(localStorage.getItem('funflick_token'));
   });
 
   // Sync profile data and live feeds directly from AWS MySQL backend on app startup + auto-sync
@@ -67,14 +67,11 @@ export const AppProvider = ({ children }) => {
     };
     window.addEventListener('focus', onWindowFocus);
 
-    // Check admin portal sync
+    // Check admin portal sync (strictly isolated to admin panel calls)
     const adminTok = localStorage.getItem('funflick_admin_token');
     if (adminTok) {
       fetchAdminPendingContent();
       fetchAdminStats();
-      if (!localStorage.getItem('funflick_token')) {
-        localStorage.setItem('funflick_token', adminTok);
-      }
     }
 
     const token = localStorage.getItem('funflick_token');

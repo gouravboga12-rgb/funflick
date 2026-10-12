@@ -43,12 +43,12 @@ export async function searchUsers(req, res) {
       if (r.username === 'super_admin') {
         userAvatar = (userAvatar && !userAvatar.includes('default-avatar'))
           ? userAvatar
-          : 'https://funflick-theta.vercel.app/brand/funflick-logo.png';
+          : 'https://funflick.in/brand/funflick-logo.png';
       } else {
-        userAvatar = userAvatar || 'https://funflick-theta.vercel.app/brand/default-avatar.svg';
+        userAvatar = userAvatar || 'https://funflick.in/brand/default-avatar.svg';
       }
       if (userAvatar && userAvatar.startsWith('/')) {
-        userAvatar = `https://funflick-theta.vercel.app${userAvatar}`;
+        userAvatar = `https://funflick.in${userAvatar}`;
       }
 
       return {

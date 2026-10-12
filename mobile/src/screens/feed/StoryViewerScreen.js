@@ -276,7 +276,7 @@ export default function StoryViewerScreen({ route, navigation }) {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Watch @${targetStory?.username || 'creator'}'s story on FunFlick! https://funflick-theta.vercel.app/feed`,
+        message: `Watch @${targetStory?.username || 'creator'}'s story on FunFlick! https://funflick.in/feed`,
       });
     } catch (e) {}
   };

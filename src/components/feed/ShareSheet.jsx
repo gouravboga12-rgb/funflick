@@ -20,14 +20,20 @@ export const ShareSheet = ({ post, isOpen, onClose, onOpenReport }) => {
   if (!isOpen || !post) return null;
 
   const handleCopyLink = () => {
-    navigator.clipboard?.writeText?.(window.location.origin + '/video/' + post.id);
+    navigator.clipboard?.writeText?.(window.location.origin + '/video/' + post.id + '?source=web');
     setCopied(true);
     showToast('Link copied to clipboard! 📋');
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleShareTo = (platform) => {
-    showToast(`Shared to ${platform}! 🚀`);
+    const shareUrl = window.location.origin + '/video/' + post.id + '?source=web';
+    if (platform === 'WhatsApp') {
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(`Watch "${post.title || 'this video'}" on FunFlick! ` + shareUrl)}`, '_blank');
+    } else {
+      navigator.clipboard?.writeText?.(shareUrl);
+      showToast(`Link copied for ${platform}! 🚀`);
+    }
     onClose();
   };
 

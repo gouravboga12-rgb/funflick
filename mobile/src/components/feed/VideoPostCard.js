@@ -224,9 +224,12 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
 
   const handleShare = async () => {
     try {
+      const appLink = `funflick://video/${post.id}`;
+      const webLink = `https://funflick-theta.vercel.app/video/${post.id}?source=app`;
       await Share.share({
-        message: `Watch "${post.title}" on FunFlick! https://funflick-theta.vercel.app/video/${post.id}`,
-        url: `https://funflick-theta.vercel.app/video/${post.id}`,
+        title: post.title || 'FunFlick Reel',
+        message: `Watch "${post.title || 'this reel'}" on FunFlick App! 📲 ${appLink}\n\nOr watch online: ${webLink}`,
+        url: webLink,
       });
     } catch (e) {}
   };

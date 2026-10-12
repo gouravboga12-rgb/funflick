@@ -31,6 +31,26 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "funflick"
+            },
+            {
+              "scheme": "https",
+              "host": "funflick-theta.vercel.app",
+              "pathPrefix": "/video"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
