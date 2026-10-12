@@ -243,16 +243,14 @@ export const AdminUsersScreen = () => {
                             </button>
                           )}
 
-                          {u.role !== 'admin' && u.username !== 'super_admin' && (
-                            <button
-                              onClick={() => handleDeleteUser(u.id, u.username)}
-                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-red-600/15 hover:bg-red-600/25 text-red-400 hover:text-red-300 border border-red-500/20 transition inline-flex items-center gap-1"
-                              title="Permanently delete user and all associated content"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete</span>
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleDeleteUser(u.id, u.username)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-red-600/15 hover:bg-red-600/25 text-red-400 hover:text-red-300 border border-red-500/20 transition inline-flex items-center gap-1"
+                            title="Permanently delete user and all associated content"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
