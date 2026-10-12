@@ -618,7 +618,11 @@ const styles = StyleSheet.create({
     elevation: 40,
   },
   touchArea: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 90,
+    bottom: 100,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     zIndex: 1,
   },
