@@ -20,7 +20,8 @@ import {
   MapPin,
   Tag,
   Save,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles
 } from 'lucide-react';
 
 const CATEGORIES = ['Comedy', 'Stand-up', 'Entertainment', 'Dance', 'Memes', 'Lifestyle', 'Regional'];
@@ -38,20 +39,24 @@ export const MyContentScreen = () => {
     deleteUserPost, 
     updateUserPost, 
     currentUser, 
-    showToast 
+    showToast,
+    stories,
+    fetchLiveStories
   } = useApp();
 
   React.useEffect(() => {
     if (fetchMyMedia) fetchMyMedia();
+    if (fetchLiveStories) fetchLiveStories();
   }, []);
 
   const [activeTab, setActiveTab] = useState(
-    initialTab === 'liked' ? 'Liked' : initialTab === 'saved' ? 'Saved' : 'Posts'
+    initialTab === 'liked' ? 'Liked' : initialTab === 'saved' ? 'Saved' : initialTab === 'stories' ? 'Stories' : 'Posts'
   );
 
   // Modal states for Edit and Delete
   const [editingItem, setEditingItem] = useState(null);
   const [deletingItem, setDeletingItem] = useState(null);
+  const [deletingStory, setDeletingStory] = useState(null);
 
   // Edit form state
   const [editTitle, setEditTitle] = useState('');
@@ -112,11 +117,42 @@ export const MyContentScreen = () => {
     setEditingItem(null);
   };
 
-  // Confirm Delete
+  // Confirm Delete Post / Video
   const handleConfirmDelete = () => {
     if (!deletingItem) return;
     deleteUserPost(deletingItem.id);
     setDeletingItem(null);
+  };
+
+  // Resolve user stories from live stories group
+  const userStoryGroup = (stories || []).find(s => 
+    s.isUser || 
+    String(s.userId) === String(currentUser?.id) || 
+    s.username === currentUser?.username
+  );
+  const userStories = userStoryGroup?.stories || [];
+
+  // Confirm Delete Story
+  const handleConfirmDeleteStory = async () => {
+    if (!deletingStory) return;
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    try {
+      const res = await fetch(`/api/stories/${deletingStory.id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        showToast('Story deleted successfully! 🗑️', 'success');
+        if (fetchLiveStories) fetchLiveStories();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || 'Failed to delete story', 'error');
+      }
+    } catch (e) {
+      showToast('Network error deleting story', 'error');
+    } finally {
+      setDeletingStory(null);
+    }
   };
 
   const likedPosts = posts.filter(p => p.isLiked);
@@ -147,8 +183,10 @@ export const MyContentScreen = () => {
           let count = 0;
           const userMediaList = myMedia || [];
           const userVideos = userMediaList.filter(m => m.mediaType === 'video' || !m.mediaType);
-          if (t === 'Posts') count = userMediaList.length;
+          const userPhotos = userMediaList.filter(m => m.mediaType === 'image');
+          if (t === 'Posts') count = userPhotos.length > 0 ? userPhotos.length : userMediaList.length;
           else if (t === 'Videos') count = userVideos.length;
+          else if (t === 'Stories') count = userStories.length;
           else if (t === 'Liked') count = likedPosts.length;
           else if (t === 'Saved') count = savedPosts.length;
 
@@ -398,10 +436,80 @@ export const MyContentScreen = () => {
           )
         )}
 
-        {(activeTab === 'Stories' || activeTab === 'Drafts') && (
+        {/* STORIES TAB - Manage, view, and delete user stories */}
+        {activeTab === 'Stories' && (() => {
+          return userStories.length === 0 ? (
+            <div className="p-12 text-center text-xs text-gray-400 space-y-3">
+              <Sparkles className="w-10 h-10 text-pink-400/60 mx-auto" />
+              <p className="font-bold text-white text-sm">No stories in your library</p>
+              <p className="text-gray-400 text-xs">Post a 24-hour photo or video story to engage your audience.</p>
+              <button
+                onClick={() => navigate('/create/story')}
+                className="mt-2 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md inline-flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Story</span>
+              </button>
+            </div>
+          ) : (
+            userStories.map(story => (
+              <div
+                key={story.id}
+                className="p-3 rounded-2xl bg-[#140e2b] border border-white/5 flex items-center justify-between gap-3 hover:border-pink-500/30 transition shadow-sm"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-black/40 border border-white/10 shrink-0 relative flex items-center justify-center">
+                    {story.mediaType === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(story.mediaUrl || '') ? (
+                      <video
+                        src={story.mediaUrl}
+                        className="w-full h-full object-cover"
+                        muted
+                      />
+                    ) : (
+                      <img
+                        src={story.mediaUrl}
+                        alt="Story preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80';
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs font-bold text-white font-heading truncate">
+                      {story.caption || 'Active Story'}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border bg-pink-500/20 text-pink-300 border-pink-500/30 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Active 24h</span>
+                      </span>
+                      <span className="text-[10px] text-gray-400">{story.likesCount || 0} likes</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Delete Story Action Button */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => setDeletingStory(story)}
+                    title="Delete Story"
+                    className="p-2.5 rounded-xl bg-white/5 text-gray-300 hover:text-rose-400 hover:bg-rose-500/20 hover:border-rose-500/30 border border-transparent transition active:scale-95"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-400" />
+                  </button>
+                </div>
+              </div>
+            ))
+          );
+        })()}
+
+        {activeTab === 'Drafts' && (
           <div className="p-12 text-center text-xs text-gray-400 space-y-2">
             <Film className="w-8 h-8 text-pink-400 mx-auto opacity-60" />
-            <p className="font-semibold text-white">No {activeTab.toLowerCase()} in your collection</p>
+            <p className="font-semibold text-white">No drafts in your collection</p>
             <p className="text-[11px] text-gray-500">Create new comedy content to see them listed here.</p>
           </div>
         )}
@@ -608,6 +716,64 @@ export const MyContentScreen = () => {
                 className="py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 active:scale-95 transition"
               >
                 Delete Post
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE STORY CONFIRMATION MODAL */}
+      {deletingStory && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-[#130b24] border border-white/10 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/30">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white font-heading">
+                Delete Story?
+              </h3>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Are you sure you want to delete this story? It will be permanently removed from your profile and 24h story ring.
+              </p>
+            </div>
+
+            {/* Story Mini Preview */}
+            <div className="p-3 rounded-2xl bg-black/30 border border-white/5 flex items-center gap-3 text-left">
+              <img
+                src={deletingStory.mediaUrl}
+                alt="Story preview"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80';
+                }}
+                className="w-11 h-11 rounded-xl object-cover shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <span className="text-xs font-bold text-white block truncate">
+                  {deletingStory.caption || 'Active Story'}
+                </span>
+                <span className="text-[10px] text-pink-400 block mt-0.5">
+                  ● Active 24h
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingStory(null)}
+                className="py-2.5 rounded-xl text-xs font-bold bg-white/10 text-gray-300 hover:text-white transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteStory}
+                className="py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 active:scale-95 transition"
+              >
+                Delete Story
               </button>
             </div>
           </div>

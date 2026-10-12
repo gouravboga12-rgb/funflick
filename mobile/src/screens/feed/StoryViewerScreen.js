@@ -113,10 +113,13 @@ export default function StoryViewerScreen({ route, navigation }) {
     (g.username && g.username === targetStory?.username)
   );
 
+  const currentProgressRef = useRef(0);
+
   const goToNextStory = () => {
+    currentProgressRef.current = 0;
+    progressAnim.setValue(0);
     if (currentIndex < rawStories.length - 1) {
       setCurrentIndex(prev => prev + 1);
-      progressAnim.setValue(0);
     } else if (currentGroupIndex >= 0 && currentGroupIndex < availableStoryGroups.length - 1) {
       const nextGroup = availableStoryGroups[currentGroupIndex + 1];
       navigation.replace('StoryViewer', { story: nextGroup });
@@ -126,9 +129,10 @@ export default function StoryViewerScreen({ route, navigation }) {
   };
 
   const goToPrevStory = () => {
+    currentProgressRef.current = 0;
+    progressAnim.setValue(0);
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
-      progressAnim.setValue(0);
     } else if (currentGroupIndex > 0) {
       const prevGroup = availableStoryGroups[currentGroupIndex - 1];
       navigation.replace('StoryViewer', { story: prevGroup });
@@ -139,21 +143,24 @@ export default function StoryViewerScreen({ route, navigation }) {
 
   useEffect(() => {
     let anim;
-    progressAnim.setValue(0);
 
     if (!isPaused && !showDeleteModal) {
+      const remainingTime = Math.max(300, STORY_DURATION * (1 - currentProgressRef.current));
       anim = Animated.timing(progressAnim, {
         toValue: 1,
-        duration: STORY_DURATION,
+        duration: remainingTime,
         useNativeDriver: false,
       });
       anim.start(({ finished }) => {
         if (finished) {
+          currentProgressRef.current = 0;
           goToNextStory();
         }
       });
     } else {
-      progressAnim.stopAnimation();
+      progressAnim.stopAnimation((val) => {
+        currentProgressRef.current = typeof val === 'number' ? val : 0;
+      });
     }
 
     return () => {
@@ -246,9 +253,10 @@ export default function StoryViewerScreen({ route, navigation }) {
 
   const panGesture = Gesture.Pan()
     .runOnJS(true)
+    .minDistance(20)
     .cancelsTouchesInView(false)
-    .activeOffsetY([20, 1000])
-    .activeOffsetX([-30, 30])
+    .activeOffsetY([25, 1000])
+    .activeOffsetX([-35, 35])
     .onUpdate((e) => {
       if (e.translationY > 0 && Math.abs(e.translationY) > Math.abs(e.translationX) * 0.7) {
         translateY.setValue(e.translationY);
@@ -376,17 +384,20 @@ export default function StoryViewerScreen({ route, navigation }) {
         >
           <ChevronRight size={24} color="#ffffff" />
         </TouchableOpacity>
+      </Animated.View>
+    </GestureDetector>
 
-        <View
-          style={[
-            styles.contentOverlay,
-            {
-              paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 24 : 12),
-              paddingBottom: Math.max(insets.bottom, 20),
-            },
-          ]}
-          pointerEvents="box-none"
-        >
+    {/* Top & Bottom Controls Overlay - Isolated from Pan Gesture */}
+    <View
+      style={[
+        styles.contentOverlay,
+        {
+          paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 24 : 12),
+          paddingBottom: Math.max(insets.bottom, 20),
+        },
+      ]}
+      pointerEvents="box-none"
+    >
           {/* Top Controls Section */}
           <View style={styles.topSection} pointerEvents="box-none">
             {/* Instagram-style Segmented Progress Bar */}
@@ -506,8 +517,6 @@ export default function StoryViewerScreen({ route, navigation }) {
             </View>
           </View>
         </View>
-      </Animated.View>
-    </GestureDetector>
 
     {/* Custom Delete Confirmation Modal: 100% reliable tap & execution on all devices */}
     <Modal

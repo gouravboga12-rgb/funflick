@@ -30,6 +30,7 @@ export const CreateStoryScreen = () => {
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [mediaUrl, setMediaUrl] = useState('');
+  const [isVideo, setIsVideo] = useState(false);
   const [caption, setCaption] = useState('');
   const [selectedMusic, setSelectedMusic] = useState('🎵 Telugu Comedy Beats - Trending');
   const [selectedSticker, setSelectedSticker] = useState('');
@@ -49,17 +50,20 @@ export const CreateStoryScreen = () => {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      const isImage = file.type?.startsWith('image/');
-      const maxBytes = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
-      const maxLabel = isImage ? '5MB' : '10MB';
+      const isVid = file.type?.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+      const isImg = file.type?.startsWith('image/');
+      const maxBytes = isVid ? 15 * 1024 * 1024 : 8 * 1024 * 1024;
+      const maxLabel = isVid ? '15MB' : '8MB';
       if (file.size > maxBytes) {
-        showToast(`⚠️ File size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. ${isImage ? 'Photos' : 'Videos'} must be under ${maxLabel}!`, 'error');
+        showToast(`⚠️ File size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. ${isVid ? 'Videos' : 'Photos'} must be under ${maxLabel}!`, 'error');
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
       setSelectedFile(file);
-      setMediaUrl(URL.createObjectURL(file));
-      showToast('Story media selected from device! 📸');
+      setIsVideo(isVid);
+      const url = URL.createObjectURL(file);
+      setMediaUrl(url);
+      showToast(`${isVid ? 'Video' : 'Photo'} selected for story! 📸`);
     }
   };
 
@@ -187,14 +191,25 @@ export const CreateStoryScreen = () => {
       </div>
 
       {/* Center Story Visual Canvas (9:16 Instagram aspect ratio) */}
-      <div className="relative flex-1 w-full max-w-[420px] aspect-[9/16] self-center m-3 rounded-3xl overflow-hidden bg-gray-900 border border-white/10 flex items-center justify-center shadow-2xl">
+      <div className="relative flex-1 w-full max-w-[420px] min-h-[480px] max-h-[75vh] aspect-[9/16] self-center m-3 rounded-3xl overflow-hidden bg-gray-900 border border-white/10 flex items-center justify-center shadow-2xl">
         {mediaUrl ? (
           <>
-            <img
-              src={mediaUrl}
-              alt="Story Canvas"
-              className="w-full h-full object-cover"
-            />
+            {isVideo ? (
+              <video
+                src={mediaUrl}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <img
+                src={mediaUrl}
+                alt="Story Canvas"
+                className="w-full h-full object-cover"
+              />
+            )}
 
             {/* Floating Sticker */}
             {selectedSticker && (

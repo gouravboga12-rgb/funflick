@@ -71,8 +71,10 @@ function StoryVideoPreview({ videoUri }) {
   return (
     <VideoView
       player={player}
-      style={StyleSheet.absoluteFillObject}
+      style={styles.fullMedia}
       contentFit="cover"
+      surfaceType="textureView"
+      useExoShutter={false}
       nativeControls={false}
     />
   );
@@ -144,8 +146,7 @@ export const CreateStoryScreen = ({ navigation }) => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images', 'videos'],
-        allowsEditing: true,
-        aspect: [9, 16],
+        allowsEditing: false,
         quality: 0.9,
         videoMaxDuration: maxStoryDuration,
       });
@@ -171,8 +172,7 @@ export const CreateStoryScreen = ({ navigation }) => {
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images', 'videos'],
-        allowsEditing: true,
-        aspect: [9, 16],
+        allowsEditing: false,
         quality: 0.9,
         videoMaxDuration: maxStoryDuration,
       });
@@ -317,9 +317,9 @@ export const CreateStoryScreen = ({ navigation }) => {
         {mediaUri ? (
           <View style={styles.mediaWrapper}>
             {isVideo ? (
-              <StoryVideoPreview videoUri={mediaUri} />
+              <StoryVideoPreview key={mediaUri} videoUri={mediaUri} />
             ) : (
-              <Image source={{ uri: mediaUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+              <Image source={{ uri: mediaUri }} style={styles.fullMedia} resizeMode="cover" />
             )}
 
             {/* Floating Music Track Sticker (Top-Left) */}
@@ -590,6 +590,17 @@ const styles = StyleSheet.create({
   },
   mediaWrapper: {
     ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  fullMedia: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   musicStickerBadge: {
     position: 'absolute',

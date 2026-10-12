@@ -217,8 +217,8 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
           pointerEvents="none"
         />
 
-        {/* Center Pause Indicator & Tap-to-play button: only on active card when user explicitly paused */}
-        {isActive && isUserPaused && isVideo && (
+        {/* Center Pause Indicator & Tap-to-play button: shown whenever video is paused */}
+        {isUserPaused && isVideo && (
           <View style={styles.playOverlay} pointerEvents="box-none">
             <TouchableOpacity
               style={styles.playIconCircle}

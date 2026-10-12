@@ -35,7 +35,7 @@ export const HomeScreen = ({ navigation }) => {
   }).current;
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 60,
+    itemVisiblePercentThreshold: 35,
   }).current;
 
   const filteredPosts = useMemo(() => {

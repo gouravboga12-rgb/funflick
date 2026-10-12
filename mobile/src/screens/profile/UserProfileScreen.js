@@ -99,7 +99,7 @@ function AvatarWithFallback({ avatar, name, username, size = 80 }) {
 }
 
 export const UserProfileScreen = ({ navigation, route }) => {
-  const { currentUser, setCurrentUser, logout, posts, fetchFeed, deleteUserPost } = useApp();
+  const { currentUser, setCurrentUser, logout, posts, fetchFeed, deleteUserPost, stories, fetchLiveStories } = useApp();
   const [activeMode, setActiveMode] = useState('viewer'); // 'viewer' | 'influencer'
 
   // Dynamic live followers / following count
@@ -119,8 +119,10 @@ export const UserProfileScreen = ({ navigation, route }) => {
   const [isWatchHistoryModalOpen, setIsWatchHistoryModalOpen] = useState(false);
   const [isSavedVideosModalOpen, setIsSavedVideosModalOpen] = useState(false);
   const [isContentLibraryModalOpen, setIsContentLibraryModalOpen] = useState(false);
+  const [contentLibraryTab, setContentLibraryTab] = useState('All');
   const [watchHistoryList, setWatchHistoryList] = useState([]);
   const [myMediaList, setMyMediaList] = useState([]);
+  const [myStoriesList, setMyStoriesList] = useState([]);
   const [isLoadingMyMedia, setIsLoadingMyMedia] = useState(false);
 
   useEffect(() => {
@@ -380,16 +382,29 @@ export const UserProfileScreen = ({ navigation, route }) => {
     );
   };
 
-  // Content Library fetching and deletion
+  // Content Library fetching and deletion (Videos, Posts & Stories)
   const fetchMyMedia = async () => {
     setIsLoadingMyMedia(true);
     try {
-      const res = await apiRequest('/videos/my-media');
-      if (res && Array.isArray(res.media)) {
-        setMyMediaList(res.media);
+      const [mediaRes, storiesRes] = await Promise.all([
+        apiRequest('/videos/my-media').catch(() => ({ media: [] })),
+        currentUser?.id ? apiRequest(`/stories?userId=${currentUser.id}`).catch(() => ({ stories: [] })) : Promise.resolve({ stories: [] })
+      ]);
+
+      if (mediaRes && Array.isArray(mediaRes.media)) {
+        setMyMediaList(mediaRes.media);
+      }
+
+      if (storiesRes && Array.isArray(storiesRes.stories)) {
+        const group = storiesRes.stories.find(g => g.userId === currentUser?.id || g.isUser);
+        const stList = group?.stories || (storiesRes.stories[0]?.stories ? storiesRes.stories[0].stories : storiesRes.stories);
+        setMyStoriesList(Array.isArray(stList) ? stList : []);
+      } else if (stories) {
+        const userGroup = (stories || []).find(s => s.isUser || String(s.userId) === String(currentUser?.id));
+        setMyStoriesList(userGroup?.stories || []);
       }
     } catch (e) {
-      console.warn('Could not fetch my media:', e);
+      console.warn('Could not fetch content library:', e);
     } finally {
       setIsLoadingMyMedia(false);
     }
@@ -397,16 +412,33 @@ export const UserProfileScreen = ({ navigation, route }) => {
 
   const handleDeleteVideo = (videoId, videoTitle) => {
     showAppConfirm(
-      'Delete Video?',
+      'Delete Post?',
       `Are you sure you want to delete "${videoTitle || 'this post'}"?`,
       async () => {
         try {
           await apiRequest(`/videos/${videoId}`, { method: 'DELETE' });
           setMyMediaList(prev => prev.filter(v => v.id !== videoId));
           fetchFeed?.();
-          showAppAlert('Deleted', 'Video deleted successfully');
+          showAppAlert('Deleted', 'Post deleted successfully');
         } catch (err) {
-          showAppAlert('Error', err.message || 'Failed to delete video');
+          showAppAlert('Error', err.message || 'Failed to delete post');
+        }
+      }
+    );
+  };
+
+  const handleDeleteStory = (storyId, storyCaption) => {
+    showAppConfirm(
+      'Delete Story?',
+      'Are you sure you want to delete this story? It will be removed from your 24h story ring.',
+      async () => {
+        try {
+          await apiRequest(`/stories/${storyId}`, { method: 'DELETE' });
+          setMyStoriesList(prev => prev.filter(s => s.id !== storyId));
+          if (fetchLiveStories) fetchLiveStories();
+          showAppAlert('Deleted', 'Story deleted successfully');
+        } catch (err) {
+          showAppAlert('Error', err.message || 'Failed to delete story');
         }
       }
     );
@@ -1755,6 +1787,9 @@ export const UserProfileScreen = ({ navigation, route }) => {
       {/* =================================================== */}
       {/* MODAL 5D: MY CONTENT LIBRARY                        */}
       {/* =================================================== */}
+      {/* =================================================== */}
+      {/* MODAL 5D: MY CONTENT LIBRARY (Videos, Posts & Stories) */}
+      {/* =================================================== */}
       <Modal
         visible={isContentLibraryModalOpen}
         animationType="slide"
@@ -1771,7 +1806,7 @@ export const UserProfileScreen = ({ navigation, route }) => {
                 <View>
                   <Text style={styles.modalTitle}>My Content Library</Text>
                   <Text style={{ color: '#f472b6', fontSize: 10.5, fontWeight: '600' }}>
-                    {myMediaList.length} Uploaded Videos & Reels
+                    {myMediaList.length + myStoriesList.length} Total Uploads & Stories
                   </Text>
                 </View>
               </View>
@@ -1780,77 +1815,162 @@ export const UserProfileScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
 
+            {/* Segmented Filter Tabs: All | Videos | Posts | Stories */}
+            <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
+              {['All', 'Videos', 'Posts', 'Stories'].map(tab => {
+                let badgeCount = 0;
+                const vids = myMediaList.filter(m => m.media_type === 'video' || m.mediaType === 'video' || !m.media_type);
+                const photos = myMediaList.filter(m => m.media_type === 'image' || m.mediaType === 'image');
+                if (tab === 'All') badgeCount = myMediaList.length + myStoriesList.length;
+                else if (tab === 'Videos') badgeCount = vids.length;
+                else if (tab === 'Posts') badgeCount = photos.length;
+                else if (tab === 'Stories') badgeCount = myStoriesList.length;
+
+                const isSelected = contentLibraryTab === tab;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    onPress={() => setContentLibraryTab(tab)}
+                    style={{
+                      paddingHorizontal: 11,
+                      paddingVertical: 6,
+                      borderRadius: 12,
+                      backgroundColor: isSelected ? '#ff007a' : 'rgba(255,255,255,0.06)',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                    }}
+                  >
+                    <Text style={{ color: isSelected ? '#fff' : '#94a3b8', fontSize: 11.5, fontWeight: '700' }}>
+                      {tab}
+                    </Text>
+                    {badgeCount > 0 && (
+                      <View style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: 8, backgroundColor: isSelected ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.1)' }}>
+                        <Text style={{ color: '#fff', fontSize: 9.5, fontWeight: '800' }}>{badgeCount}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             {isLoadingMyMedia ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color="#ff007a" />
               </View>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 10, gap: 10 }}>
-                {myMediaList.length === 0 ? (
-                  <View style={{ alignItems: 'center', paddingVertical: 40, gap: 8 }}>
-                    <Video size={32} color="#64748b" />
-                    <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '800' }}>No Videos Uploaded</Text>
-                    <Text style={{ color: '#94a3b8', fontSize: 11, textAlign: 'center' }}>
-                      You haven't uploaded any reels or videos yet.
-                    </Text>
-                    <TouchableOpacity
-                      style={[styles.modalSaveBtn, { width: 160, marginTop: 12 }]}
-                      onPress={() => {
-                        setIsContentLibraryModalOpen(false);
-                        navigation.navigate('UploadReel');
-                      }}
-                    >
-                      <LinearGradient colors={['#ff007a', '#ff4b2b']} style={styles.modalSaveGradient}>
-                        <Text style={styles.modalSaveText}>Upload Reel</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  myMediaList.map(item => (
-                    <View
-                      key={item.id}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}
-                    >
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => {
-                          setIsContentLibraryModalOpen(false);
-                          navigation.navigate('VideoDetail', { videoId: item.id });
-                        }}
-                        style={{ width: 68, height: 68, borderRadius: 10, overflow: 'hidden', position: 'relative', backgroundColor: '#18122c' }}
-                      >
-                        <Image
-                          source={{ uri: item.thumbnail_url || item.thumbnailUrl || item.media_url || item.mediaUrl }}
-                          style={{ width: '100%', height: '100%' }}
-                          resizeMode="cover"
-                        />
-                        <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' }}>
-                          <Play size={16} color="#fff" fill="#fff" />
-                        </View>
-                      </TouchableOpacity>
+                {(() => {
+                  const vids = myMediaList.filter(m => m.media_type === 'video' || m.mediaType === 'video' || !m.media_type);
+                  const photos = myMediaList.filter(m => m.media_type === 'image' || m.mediaType === 'image');
+                  const storiesItems = myStoriesList;
 
-                      <View style={{ flex: 1, gap: 2 }}>
-                        <Text style={{ color: '#ffffff', fontSize: 12.5, fontWeight: '800' }} numberOfLines={1}>
-                          {item.title || 'Untitled Video'}
-                        </Text>
-                        <Text style={{ color: '#10b981', fontSize: 10, fontWeight: '700' }}>
-                          ● Active • {item.views_count || item.viewsCount || 0} views
-                        </Text>
-                        <Text style={{ color: '#94a3b8', fontSize: 10 }}>
-                          {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Uploaded'}
-                        </Text>
+                  let currentItems = [];
+                  if (contentLibraryTab === 'All') {
+                    currentItems = [
+                      ...storiesItems.map(s => ({ ...s, _type: 'story' })),
+                      ...photos.map(p => ({ ...p, _type: 'post' })),
+                      ...vids.map(v => ({ ...v, _type: 'video' })),
+                    ];
+                  } else if (contentLibraryTab === 'Videos') {
+                    currentItems = vids.map(v => ({ ...v, _type: 'video' }));
+                  } else if (contentLibraryTab === 'Posts') {
+                    currentItems = photos.map(p => ({ ...p, _type: 'post' }));
+                  } else if (contentLibraryTab === 'Stories') {
+                    currentItems = storiesItems.map(s => ({ ...s, _type: 'story' }));
+                  }
+
+                  if (currentItems.length === 0) {
+                    const emptyMeta = {
+                      Stories: { title: 'No Stories Active', desc: "You haven't posted any 24h stories.", btn: 'Add Story', screen: 'CreateStory' },
+                      Posts: { title: 'No Posts Found', desc: "You haven't uploaded any photo posts yet.", btn: 'Create Post', screen: 'CreatePost' },
+                      Videos: { title: 'No Videos Uploaded', desc: "You haven't uploaded any video reels yet.", btn: 'Upload Reel', screen: 'UploadReel' },
+                      All: { title: 'No Content Uploaded', desc: 'Start creating posts, reels, or stories.', btn: 'Upload Reel', screen: 'UploadReel' },
+                    }[contentLibraryTab] || { title: 'No Content', desc: 'No items found in this section.', btn: 'Create Now', screen: 'UploadReel' };
+
+                    return (
+                      <View style={{ alignItems: 'center', paddingVertical: 36, gap: 8 }}>
+                        <Video size={32} color="#64748b" />
+                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '800' }}>{emptyMeta.title}</Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 11, textAlign: 'center' }}>{emptyMeta.desc}</Text>
+                        <TouchableOpacity
+                          style={[styles.modalSaveBtn, { width: 160, marginTop: 12 }]}
+                          onPress={() => {
+                            setIsContentLibraryModalOpen(false);
+                            navigation.navigate(emptyMeta.screen);
+                          }}
+                        >
+                          <LinearGradient colors={['#ff007a', '#ff4b2b']} style={styles.modalSaveGradient}>
+                            <Text style={styles.modalSaveText}>{emptyMeta.btn}</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
                       </View>
+                    );
+                  }
 
-                      <TouchableOpacity
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        onPress={() => handleDeleteVideo(item.id, item.title)}
-                        style={{ padding: 8, borderRadius: 8, backgroundColor: 'rgba(244,63,94,0.1)' }}
+                  return currentItems.map(item => {
+                    const isStory = item._type === 'story';
+                    const isPhoto = item._type === 'post';
+                    const isVid = item._type === 'video';
+
+                    return (
+                      <View
+                        key={(item._type || 'item') + '_' + item.id}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}
                       >
-                        <Trash2 size={16} color="#f43f5e" />
-                      </TouchableOpacity>
-                    </View>
-                  ))
-                )}
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            if (isVid) {
+                              setIsContentLibraryModalOpen(false);
+                              navigation.navigate('VideoDetail', { videoId: item.id });
+                            } else if (isStory) {
+                              setIsContentLibraryModalOpen(false);
+                              navigation.navigate('StoryViewer', { story: { isMe: true, isUser: true, stories: [item] } });
+                            }
+                          }}
+                          style={{ width: 68, height: 68, borderRadius: 10, overflow: 'hidden', position: 'relative', backgroundColor: '#18122c' }}
+                        >
+                          <Image
+                            source={{ uri: item.thumbnail_url || item.thumbnailUrl || item.media_url || item.mediaUrl }}
+                            style={{ width: '100%', height: '100%' }}
+                            resizeMode="cover"
+                          />
+                          {isVid && (
+                            <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' }}>
+                              <Play size={16} color="#fff" fill="#fff" />
+                            </View>
+                          )}
+                          <View style={{ position: 'absolute', top: 3, left: 3, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, backgroundColor: isStory ? '#ec4899' : isPhoto ? '#0284c7' : '#059669' }}>
+                            <Text style={{ color: '#fff', fontSize: 7.5, fontWeight: '900' }}>
+                              {isStory ? 'STORY' : isPhoto ? 'POST' : 'REEL'}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <Text style={{ color: '#ffffff', fontSize: 12.5, fontWeight: '800' }} numberOfLines={1}>
+                            {item.title || item.caption || (isStory ? 'Active Story' : 'Uploaded Post')}
+                          </Text>
+                          <Text style={{ color: isStory ? '#ec4899' : isPhoto ? '#38bdf8' : '#10b981', fontSize: 10, fontWeight: '700' }}>
+                            ● {isStory ? `Active 24h • ${item.likesCount || 0} likes` : `Active • ${item.views_count || item.viewsCount || 0} views`}
+                          </Text>
+                          <Text style={{ color: '#94a3b8', fontSize: 10 }}>
+                            {isStory ? (item.time || 'Live now') : item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Uploaded'}
+                          </Text>
+                        </View>
+
+                        <TouchableOpacity
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          onPress={() => isStory ? handleDeleteStory(item.id, item.caption) : handleDeleteVideo(item.id, item.title)}
+                          style={{ padding: 8, borderRadius: 8, backgroundColor: 'rgba(244,63,94,0.1)' }}
+                        >
+                          <Trash2 size={16} color="#f43f5e" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  });
+                })()}
               </ScrollView>
             )}
           </View>

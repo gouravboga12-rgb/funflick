@@ -200,15 +200,6 @@ function ReelItem({
           pointerEvents="none"
         />
 
-        {/* Center Pause/Play Indicator: only on active reel when paused */}
-        {isActive && isPaused && (
-          <View style={styles.pausedOverlay} pointerEvents="box-none">
-            <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.8}>
-              <Play size={36} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Animated Heart Burst */}
         <Animated.View
           style={[styles.burstHeartWrap, { transform: [{ scale: heartScale }] }]}
@@ -217,6 +208,15 @@ function ReelItem({
           <Heart size={84} color="#ff007a" fill="#ff007a" />
         </Animated.View>
       </TouchableOpacity>
+
+      {/* Center Pause/Play Indicator: only on active reel when paused */}
+      {isPaused && (
+        <View style={styles.pausedOverlay} pointerEvents="box-none">
+          <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.8}>
+            <Play size={36} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Right Floating Actions Bar (Matching Web Reels) */}
       <View style={styles.rightActions} pointerEvents="box-none">
