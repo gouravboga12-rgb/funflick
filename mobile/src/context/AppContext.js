@@ -1189,17 +1189,6 @@ export const AppProvider = ({ children }) => {
     }
   }, [fetchFeed]);
 
-  // Delete a User Post (optimistic feed update + backend DELETE /videos/:id)
-  const deleteUserPost = useCallback(async (postId) => {
-    setPosts(prev => prev.filter(p => String(p.id) !== String(postId)));
-    try {
-      await apiRequest(`/videos/${postId}`, { method: 'DELETE' });
-      fetchFeed();
-    } catch (e) {
-      console.warn('deleteUserPost error:', e);
-    }
-  }, [fetchFeed]);
-
   return (
     <AppContext.Provider
       value={{
