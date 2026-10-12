@@ -506,9 +506,9 @@ export const SignUpScreen = () => {
             className="w-4 h-4 mt-0.5 rounded accent-[#ff007a] cursor-pointer"
           />
           <label htmlFor="terms" className="leading-snug cursor-pointer">
-            I agree to FunFlicks{' '}
-            <span className="text-pink-400 underline">Terms of Service</span> &{' '}
-            <span className="text-pink-400 underline">Privacy Policy</span>
+            I agree to FunFlick's{' '}
+            <Link to="/terms" target="_blank" className="text-pink-400 hover:text-pink-300 underline">Terms & Conditions</Link> &{' '}
+            <Link to="/privacy" target="_blank" className="text-pink-400 hover:text-pink-300 underline">Privacy Policy</Link>
           </label>
         </div>
 

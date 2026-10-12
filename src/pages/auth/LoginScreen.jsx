@@ -241,6 +241,21 @@ export const LoginScreen = () => {
             }}
           />
         </div>
+
+        {/* Legal & Compliance Links */}
+        <div className="pt-3 flex items-center justify-center flex-wrap gap-2 text-[11px] text-gray-400 text-center">
+          <Link to="/terms" className="hover:text-pink-400 hover:underline transition">
+            Terms & Conditions
+          </Link>
+          <span>·</span>
+          <Link to="/privacy" className="hover:text-pink-400 hover:underline transition">
+            Privacy Policy
+          </Link>
+          <span>·</span>
+          <Link to="/refund" className="hover:text-pink-400 hover:underline transition">
+            Refund Policy
+          </Link>
+        </div>
       </form>
 
       {/* Bottom Sign Up Link */}

@@ -987,14 +987,16 @@ export const UserProfileScreen = () => {
             Connecting Viewers, Comedy Creators & Viral Entertainment 🇮🇳
           </p>
 
-          <div className="flex items-center gap-2.5 text-[10px] text-pink-400 font-medium pt-0.5">
-            <span onClick={() => showToast('FunFlick Entertainment Platform', 'info')} className="hover:underline cursor-pointer">About FunFlick</span>
+          <div className="flex items-center justify-center flex-wrap gap-2 text-[10px] text-pink-400 font-medium pt-0.5">
+            <span onClick={() => navigate('/about')} className="hover:underline cursor-pointer">About FunFlick</span>
             <span className="text-gray-600">•</span>
-            <span onClick={() => showToast('Creator Community Guidelines', 'info')} className="hover:underline cursor-pointer">Guidelines</span>
+            <span onClick={() => navigate('/guidelines')} className="hover:underline cursor-pointer">Guidelines</span>
             <span className="text-gray-600">•</span>
-            <span onClick={() => showToast('Privacy Policy', 'info')} className="hover:underline cursor-pointer">Privacy</span>
+            <span onClick={() => navigate('/privacy')} className="hover:underline cursor-pointer">Privacy</span>
             <span className="text-gray-600">•</span>
-            <span onClick={() => showToast('Terms of Service', 'info')} className="hover:underline cursor-pointer">Terms</span>
+            <span onClick={() => navigate('/terms')} className="hover:underline cursor-pointer">Terms</span>
+            <span className="text-gray-600">•</span>
+            <span onClick={() => navigate('/refund')} className="hover:underline cursor-pointer text-pink-300">Refund Policy</span>
           </div>
 
           <span className="text-[9px] text-gray-500 font-mono">

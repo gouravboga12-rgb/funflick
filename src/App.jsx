@@ -24,6 +24,14 @@ import { NotificationsScreen } from './pages/user/NotificationsScreen';
 import { MessagesScreen } from './pages/user/MessagesScreen';
 import { MyContentScreen } from './pages/user/MyContentScreen';
 
+// Legal & Policy Pages
+import { TermsScreen } from './pages/legal/TermsScreen';
+import { PrivacyPolicyScreen } from './pages/legal/PrivacyPolicyScreen';
+import { RefundPolicyScreen } from './pages/legal/RefundPolicyScreen';
+import { GuidelinesScreen } from './pages/legal/GuidelinesScreen';
+import { AboutScreen } from './pages/legal/AboutScreen';
+
+
 // Create Pages
 import { CreatePostScreen } from './pages/user/create/CreatePostScreen';
 import { UploadVideoScreen } from './pages/user/create/UploadVideoScreen';
@@ -90,6 +98,14 @@ function AppRoutes() {
           <Route path="/signup" element={<MobileAppWrapper><SignUpScreen /></MobileAppWrapper>} />
           <Route path="/verify" element={<MobileAppWrapper><VerifyOtpScreen /></MobileAppWrapper>} />
           <Route path="/forgot-password" element={<MobileAppWrapper><ForgotPasswordScreen /></MobileAppWrapper>} />
+
+          {/* Legal & Compliance Routes */}
+          <Route path="/terms" element={<MobileAppWrapper><TermsScreen /></MobileAppWrapper>} />
+          <Route path="/privacy" element={<MobileAppWrapper><PrivacyPolicyScreen /></MobileAppWrapper>} />
+          <Route path="/refund" element={<MobileAppWrapper><RefundPolicyScreen /></MobileAppWrapper>} />
+          <Route path="/refund-policy" element={<MobileAppWrapper><RefundPolicyScreen /></MobileAppWrapper>} />
+          <Route path="/guidelines" element={<MobileAppWrapper><GuidelinesScreen /></MobileAppWrapper>} />
+          <Route path="/about" element={<MobileAppWrapper><AboutScreen /></MobileAppWrapper>} />
 
           {/* User Mobile App Routes */}
           <Route path="/feed" element={<MobileAppWrapper><HomeScreen /></MobileAppWrapper>} />

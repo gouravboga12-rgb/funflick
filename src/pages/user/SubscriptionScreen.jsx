@@ -425,6 +425,17 @@ export const SubscriptionScreen = () => {
           </p>
         </div>
 
+        {/* Non-Refundable Policy Callout */}
+        <div className="text-center text-[10px] text-gray-400 py-1">
+          Subscriptions are non-refundable once activated. See our{' '}
+          <span 
+            onClick={() => navigate('/refund')} 
+            className="text-pink-400 hover:underline cursor-pointer font-semibold"
+          >
+            Cancellation & Refund Policy
+          </span>.
+        </div>
+
       </div>
 
       {/* Bottom Navigation */}

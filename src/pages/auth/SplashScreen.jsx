@@ -82,6 +82,33 @@ export const SplashScreen = () => {
           <span>·</span>
           <span>Earn</span>
         </div>
+
+        {/* Legal & Compliance Footer Links */}
+        <div className="pt-2 flex items-center justify-center flex-wrap gap-2 text-[10px] text-gray-400">
+          <button 
+            type="button"
+            onClick={() => navigate('/terms')}
+            className="hover:text-pink-400 hover:underline transition cursor-pointer"
+          >
+            Terms & Conditions
+          </button>
+          <span>·</span>
+          <button 
+            type="button"
+            onClick={() => navigate('/privacy')}
+            className="hover:text-pink-400 hover:underline transition cursor-pointer"
+          >
+            Privacy Policy
+          </button>
+          <span>·</span>
+          <button 
+            type="button"
+            onClick={() => navigate('/refund')}
+            className="hover:text-pink-400 hover:underline transition cursor-pointer"
+          >
+            Refund Policy
+          </button>
+        </div>
       </motion.div>
     </div>
   );
