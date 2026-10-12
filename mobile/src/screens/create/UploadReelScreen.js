@@ -677,7 +677,7 @@ export const UploadReelScreen = ({ navigation }) => {
           activeOpacity={1}
           onPress={() => setIsCategoryModalOpen(false)}
         >
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 20) + 12 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Category</Text>
               <TouchableOpacity onPress={() => setIsCategoryModalOpen(false)}>
@@ -685,7 +685,7 @@ export const UploadReelScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 300 }}>
+            <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
               {CATEGORIES.map(item => {
                 const isSelected = category === item;
                 return (
@@ -717,7 +717,7 @@ export const UploadReelScreen = ({ navigation }) => {
         onRequestClose={() => setIsLocationModalOpen(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxHeight: '80%' }]}>
+          <View style={[styles.modalSheet, { maxHeight: '80%', paddingBottom: Math.max(insets.bottom, 20) + 12 }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <MapPin size={18} color="#f472b6" />

@@ -60,12 +60,22 @@ export const InboxScreen = ({ navigation, route }) => {
   const [isSending, setIsSending] = useState(false);
   const [attachedMedia, setAttachedMedia] = useState(null);
   const [viewingMedia, setViewingMedia] = useState(null);
+  const [unsendModalItem, setUnsendModalItem] = useState(null);
   const [downloading, setDownloading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const flatListRef = useRef(null);
+  const targetUserHandledRef = useRef(null);
+
+  const handleExitChat = () => {
+    navigation.setParams({ targetUser: undefined, user: undefined });
+    setIsChatOpen?.(false);
+    setActiveConvId(null);
+    setAttachedMedia(null);
+    setUnsendModalItem(null);
+  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -94,28 +104,38 @@ export const InboxScreen = ({ navigation, route }) => {
   useEffect(() => {
     if (!activeConvId) return;
     const backAction = () => {
-      setIsChatOpen?.(false);
-      setActiveConvId(null);
-      setAttachedMedia(null);
+      handleExitChat();
       return true;
     };
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
-  }, [activeConvId, setIsChatOpen]);
+  }, [activeConvId]);
+
+  // Clean up tab bar visibility when screen unmounts
+  useEffect(() => {
+    return () => {
+      setIsChatOpen?.(false);
+    };
+  }, [setIsChatOpen]);
 
   // Handle route param to open direct chat with target user
   useEffect(() => {
     const target = route?.params?.targetUser || route?.params?.user;
     if (target) {
-      const convId = openOrCreateConversation(target);
-      if (convId) {
-        setActiveConvId(convId);
-        setIsChatOpen?.(true);
-        const partner = target.username || target;
-        fetchConversationMessages(partner);
+      const targetKey = String(target.id || target.username || target);
+      if (targetUserHandledRef.current !== targetKey) {
+        targetUserHandledRef.current = targetKey;
+        const convId = openOrCreateConversation(target);
+        if (convId) {
+          setActiveConvId(convId);
+          setIsChatOpen?.(true);
+          const partner = target.username || target;
+          fetchConversationMessages(partner);
+        }
+        navigation.setParams({ targetUser: undefined, user: undefined });
       }
     }
-  }, [route?.params?.targetUser, route?.params?.user, openOrCreateConversation, fetchConversationMessages, setIsChatOpen]);
+  }, [route?.params?.targetUser, route?.params?.user, openOrCreateConversation, fetchConversationMessages, setIsChatOpen, navigation]);
 
   // Load message history when entering active conversation
   useEffect(() => {
@@ -323,38 +343,17 @@ export const InboxScreen = ({ navigation, route }) => {
   };
 
   const handleUnsendMessage = (item) => {
-    const isMe = item.sender === 'me';
+    const isMe = item?.sender === 'me';
     // Strictly restrict delete option: users can ONLY delete/unsend messages they sent themselves!
     if (!isMe) return;
+    setUnsendModalItem(item);
+  };
 
-    const title = 'Unsend Message?';
-    const message = 'Unsending will remove this message from the conversation.';
-    const actionText = 'Unsend';
-
-    if (Platform.OS === 'web') {
-      const confirmed = typeof window !== 'undefined' && window.confirm
-        ? window.confirm(`${title}\n\n${message}`)
-        : true;
-      if (confirmed) {
-        unsendMessage(activeConvId, item.id);
-      }
-      return;
+  const confirmUnsend = () => {
+    if (unsendModalItem && activeConvId) {
+      unsendMessage(activeConvId, unsendModalItem.id);
     }
-
-    Alert.alert(
-      title,
-      message,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: actionText,
-          style: 'destructive',
-          onPress: () => {
-            unsendMessage(activeConvId, item.id);
-          },
-        },
-      ]
-    );
+    setUnsendModalItem(null);
   };
 
   // Render Active Chat View
@@ -365,11 +364,7 @@ export const InboxScreen = ({ navigation, route }) => {
         <View style={styles.chatHeader}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => {
-              setIsChatOpen?.(false);
-              setActiveConvId(null);
-              setAttachedMedia(null);
-            }}
+            onPress={handleExitChat}
           >
             <ChevronLeft size={24} color="#ffffff" />
           </TouchableOpacity>
@@ -676,6 +671,42 @@ export const InboxScreen = ({ navigation, route }) => {
                   {downloading ? 'Downloading...' : 'Download / Save to Device'}
                 </Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Themed Unsend Confirmation Modal */}
+        <Modal
+          visible={Boolean(unsendModalItem)}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setUnsendModalItem(null)}
+        >
+          <View style={styles.unsendModalBackdrop}>
+            <View style={styles.unsendModalCard}>
+              <View style={styles.unsendIconWrap}>
+                <Trash2 size={24} color="#f43f5e" />
+              </View>
+              <Text style={styles.unsendTitle}>Unsend Message?</Text>
+              <Text style={styles.unsendDesc}>
+                Unsending will remove this message from the conversation for everyone.
+              </Text>
+              <View style={styles.unsendActionsRow}>
+                <TouchableOpacity
+                  style={styles.unsendCancelBtn}
+                  onPress={() => setUnsendModalItem(null)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.unsendCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.unsendConfirmBtn}
+                  onPress={confirmUnsend}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.unsendConfirmText}>Unsend</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -1322,5 +1353,78 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  unsendModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  unsendModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#160e29',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    padding: 22,
+    alignItems: 'center',
+  },
+  unsendIconWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(244, 63, 94, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  unsendTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  unsendDesc: {
+    color: '#94a3b8',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  unsendActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  unsendCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unsendCancelText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  unsendConfirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#f43f5e',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unsendConfirmText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

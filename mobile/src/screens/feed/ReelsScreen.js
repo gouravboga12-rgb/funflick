@@ -41,16 +41,28 @@ export function ReelItem({
   const heartScale = useRef(new Animated.Value(0)).current;
   const hasRecordedViewRef = useRef(false);
 
+  // Optimistic like state so likes work instantly in Reels feed and in Discovery/Trending modal
+  const [localLiked, setLocalLiked] = useState(Boolean(item?.isLiked || item?.user_liked));
+  const [localLikesCount, setLocalLikesCount] = useState(Number(item?.likesCount ?? item?.likes_count ?? 0));
+
+  useEffect(() => {
+    setLocalLiked(Boolean(item?.isLiked || item?.user_liked));
+    setLocalLikesCount(Number(item?.likesCount ?? item?.likes_count ?? 0));
+  }, [item?.id, item?.isLiked, item?.user_liked, item?.likesCount, item?.likes_count]);
+
   const mediaUrl = item?.mediaUrl || item?.video_url || item?.videoUrl || '';
   const isVideo = item?.mediaType === 'video' ||
     /\.(mp4|webm|mov|m4v)($|\?)/i.test(mediaUrl) ||
     (!item?.mediaType && !/\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(mediaUrl));
 
-  const player = useVideoPlayer(mediaUrl, p => {
+  // Hardware decoder safeguard: ONLY mount player on active reel when screen is focused
+  const shouldMountPlayer = Boolean(isVideo && isActive && isScreenFocused);
+
+  const player = useVideoPlayer(shouldMountPlayer ? mediaUrl : null, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
-    if (isActive && isScreenFocused && !isPaused) {
+    if (shouldMountPlayer && !isPaused) {
       p.play();
     }
   });
@@ -64,16 +76,16 @@ export function ReelItem({
 
   useEffect(() => {
     hasRecordedViewRef.current = false;
-  }, [item.id]);
+  }, [item?.id]);
 
   useEffect(() => {
     if (!player) return;
     let viewTimer = null;
     try {
-      if (isActive && isScreenFocused && !isPaused) {
+      if (shouldMountPlayer && !isPaused) {
         player.play();
         // Record view only after 5 seconds of continuous playback
-        if (!hasRecordedViewRef.current && recordPostView) {
+        if (!hasRecordedViewRef.current && recordPostView && item?.id) {
           viewTimer = setTimeout(() => {
             if (!hasRecordedViewRef.current) {
               hasRecordedViewRef.current = true;
@@ -89,7 +101,7 @@ export function ReelItem({
     return () => {
       if (viewTimer) clearTimeout(viewTimer);
     };
-  }, [isActive, isScreenFocused, isPaused, player, item.id, recordPostView]);
+  }, [shouldMountPlayer, isPaused, player, item?.id, recordPostView]);
 
   useEffect(() => {
     if (player) {
@@ -106,19 +118,6 @@ export function ReelItem({
       if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     };
   }, []);
-
-  // Sync state with native player events
-  useEffect(() => {
-    if (!player) return;
-    const sub = player.addListener?.('playingChange', (event) => {
-      if (isActive && event.isPlaying) {
-        setIsPaused(false);
-      }
-    });
-    return () => {
-      sub?.remove?.();
-    };
-  }, [player, isActive]);
 
   const triggerHeartBurst = () => {
     heartScale.setValue(0);
@@ -167,6 +166,18 @@ export function ReelItem({
     }
   };
 
+  const handleToggleLike = () => {
+    const nextLiked = !localLiked;
+    setLocalLiked(nextLiked);
+    setLocalLikesCount(prev => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+    if (toggleLikePost && item?.id) {
+      toggleLikePost(item.id);
+    }
+    if (nextLiked) {
+      triggerHeartBurst();
+    }
+  };
+
   const lastTapRef = useRef(0);
 
   const handleMediaPress = () => {
@@ -178,10 +189,11 @@ export function ReelItem({
         clearTimeout(tapTimeoutRef.current);
         tapTimeoutRef.current = null;
       }
-      if (!item.isLiked && toggleLikePost) {
-        toggleLikePost(item.id);
+      if (!localLiked) {
+        handleToggleLike();
+      } else {
+        triggerHeartBurst();
       }
-      triggerHeartBurst();
     } else {
       lastTapRef.current = now;
       if (tapTimeoutRef.current) {
@@ -198,7 +210,7 @@ export function ReelItem({
     <View style={[styles.reelContainer, { height: reelHeight }]}>
       {/* Background Media — wrapped in pointerEvents="none" so native view never captures touch events */}
       <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-        {isVideo ? (
+        {shouldMountPlayer && player ? (
           Platform.OS === 'web' ? (
             <video
               ref={webVideoRef}
@@ -214,7 +226,7 @@ export function ReelItem({
                 backgroundColor: '#000000',
               }}
             />
-          ) : player ? (
+          ) : (
             <VideoView
               player={player}
               style={styles.fullscreenVideo}
@@ -223,10 +235,10 @@ export function ReelItem({
               useExoShutter={false}
               nativeControls={false}
             />
-          ) : null
+          )
         ) : (
           <Image
-            source={{ uri: item.posterUrl || item.thumbnailUrl || item.mediaUrl }}
+            source={{ uri: item.posterUrl || item.thumbnailUrl || item.thumbnail || item.poster || item.mediaUrl }}
             style={styles.fullscreenVideo}
             resizeMode="cover"
           />
@@ -236,27 +248,27 @@ export function ReelItem({
       {/* Dedicated Tap Layer Covering Entire Screen */}
       <TouchableOpacity activeOpacity={1} onPress={handleMediaPress} style={StyleSheet.absoluteFillObject} />
 
-        {/* Top Gradient */}
-        <LinearGradient
-          colors={['rgba(0,0,0,0.6)', 'transparent']}
-          style={styles.topVignette}
-          pointerEvents="none"
-        />
+      {/* Top Gradient */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.6)', 'transparent']}
+        style={styles.topVignette}
+        pointerEvents="none"
+      />
 
-        {/* Bottom Gradient Overlay */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.85)']}
-          style={styles.bottomVignette}
-          pointerEvents="none"
-        />
+      {/* Bottom Gradient Overlay */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.85)']}
+        style={styles.bottomVignette}
+        pointerEvents="none"
+      />
 
-        {/* Animated Heart Burst */}
-        <Animated.View
-          style={[styles.burstHeartWrap, { transform: [{ scale: heartScale }] }]}
-          pointerEvents="none"
-        >
-          <Heart size={84} color="#ff007a" fill="#ff007a" />
-        </Animated.View>
+      {/* Animated Heart Burst */}
+      <Animated.View
+        style={[styles.burstHeartWrap, { transform: [{ scale: heartScale }] }]}
+        pointerEvents="none"
+      >
+        <Heart size={84} color="#ff007a" fill="#ff007a" />
+      </Animated.View>
 
       {/* Center Pause/Play Indicator: only on active reel when paused */}
       {isPaused && (
@@ -291,18 +303,15 @@ export function ReelItem({
         <TouchableOpacity
           style={styles.sideBtn}
           activeOpacity={0.7}
-          onPress={() => {
-            toggleLikePost(item.id);
-            if (!item.isLiked) triggerHeartBurst();
-          }}
+          onPress={handleToggleLike}
         >
           <Heart
             size={28}
-            color={item.isLiked ? '#ff007a' : '#fff'}
-            fill={item.isLiked ? '#ff007a' : 'transparent'}
+            color={localLiked ? '#ff007a' : '#fff'}
+            fill={localLiked ? '#ff007a' : 'transparent'}
             strokeWidth={2}
           />
-          <Text style={styles.sideCount}>{formatCount(item.likesCount)}</Text>
+          <Text style={styles.sideCount}>{formatCount(localLikesCount)}</Text>
         </TouchableOpacity>
 
         {/* Comments */}
@@ -316,7 +325,22 @@ export function ReelItem({
         </TouchableOpacity>
 
         {/* Share */}
-        <TouchableOpacity style={styles.sideBtn} activeOpacity={0.7} onPress={() => handleShare(item)}>
+        <TouchableOpacity
+          style={styles.sideBtn}
+          activeOpacity={0.7}
+          onPress={() => {
+            if (handleShare) {
+              handleShare(item);
+            } else {
+              const shareUrl = `https://funflick.in/video/${item.id}`;
+              Share.share({
+                title: item.title || 'Watch on FunFlick',
+                message: `Watch "${item.title || 'this reel'}" on FunFlick!\n${shareUrl}`,
+                url: shareUrl,
+              }).catch(() => {});
+            }
+          }}
+        >
           <Share2 size={26} color="#fff" strokeWidth={2} />
           <Text style={styles.sideCount}>Share</Text>
         </TouchableOpacity>
@@ -451,12 +475,11 @@ export const ReelsScreen = ({ navigation }) => {
 
   const handleShare = async post => {
     try {
-      const appLink = `funflick://video/${post.id}`;
-      const webLink = `https://funflick.in/video/${post.id}?source=app`;
+      const shareUrl = `https://funflick.in/video/${post?.id}`;
       await Share.share({
-        title: post.title || 'FunFlick Reel',
-        message: `Watch "${post.title || 'this reel'}" on FunFlick App! 📲 ${appLink}\n\nOr watch online: ${webLink}`,
-        url: webLink,
+        title: post?.title || 'Watch on FunFlick',
+        message: `Watch "${post?.title || 'this reel'}" on FunFlick!\n${shareUrl}`,
+        url: shareUrl,
       });
     } catch (e) {}
   };

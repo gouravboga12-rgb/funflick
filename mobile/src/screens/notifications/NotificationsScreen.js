@@ -32,6 +32,36 @@ import { colors } from '../../theme/colors';
 
 const CATEGORIES = ['All', 'Requests', 'Likes', 'Comments', 'Follows', 'System'];
 
+function NotificationAvatar({ avatarUri, initialChar, isSystem, style, fallbackStyle }) {
+  const [imgErr, setImgErr] = useState(false);
+
+  const finalUri = useMemo(() => {
+    if (isSystem) return 'https://funflick.in/brand/funflick-logo.png';
+    if (!avatarUri || imgErr) return null;
+    let uri = String(avatarUri).trim();
+    if (uri.startsWith('/')) {
+      return `https://funflick.in${uri}`;
+    }
+    return uri;
+  }, [avatarUri, imgErr, isSystem]);
+
+  if (finalUri && !imgErr) {
+    return (
+      <Image
+        source={{ uri: finalUri }}
+        style={style || styles.avatarImg}
+        onError={() => setImgErr(true)}
+      />
+    );
+  }
+
+  return (
+    <View style={[style || styles.avatarImg, fallbackStyle || styles.avatarFallback]}>
+      <Text style={styles.avatarInitial}>{initialChar || 'F'}</Text>
+    </View>
+  );
+}
+
 export const NotificationsScreen = ({ navigation }) => {
   const {
     notifications,
@@ -341,13 +371,12 @@ export const NotificationsScreen = ({ navigation }) => {
               {followRequests.map(req => (
                 <View key={req.id} style={styles.requestCard}>
                   <View style={styles.requestAvatarWrap}>
-                    {req.avatar ? (
-                      <Image source={{ uri: req.avatar }} style={styles.requestAvatar} />
-                    ) : (
-                      <View style={[styles.requestAvatar, styles.avatarFallback]}>
-                        <Text style={styles.avatarInitial}>{((req.name || req.username || 'U')[0]).toUpperCase()}</Text>
-                      </View>
-                    )}
+                    <NotificationAvatar
+                      avatarUri={req.avatar}
+                      initialChar={((req.name || req.username || 'U')[0]).toUpperCase()}
+                      style={styles.requestAvatar}
+                      fallbackStyle={styles.avatarFallback}
+                    />
                   </View>
                   <View style={styles.requestInfo}>
                     <Text style={styles.requestUsername} numberOfLines={1}>@{req.username}</Text>
@@ -419,6 +448,11 @@ export const NotificationsScreen = ({ navigation }) => {
           const avatarUri = item.actor_avatar || item.avatar;
           const initialChar = ((item.actor_name || cleanUser || 'F')[0] || 'F').toUpperCase();
 
+          const isSystem = item.type === 'system' ||
+            cleanUser.toLowerCase() === 'super_admin' ||
+            cleanUser.toLowerCase() === 'admin' ||
+            cleanUser.toLowerCase() === 'funflick';
+
           return (
             <TouchableOpacity
               activeOpacity={0.8}
@@ -427,13 +461,11 @@ export const NotificationsScreen = ({ navigation }) => {
             >
               {/* Avatar with Micro Type Badge (matching image copy 54.png) */}
               <View style={styles.avatarContainer}>
-                {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
-                ) : (
-                  <View style={[styles.avatarImg, styles.avatarFallback]}>
-                    <Text style={styles.avatarInitial}>{initialChar}</Text>
-                  </View>
-                )}
+                <NotificationAvatar
+                  avatarUri={item.actor_avatar || item.avatar}
+                  initialChar={initialChar}
+                  isSystem={isSystem}
+                />
 
                 {/* Micro Badge on bottom-right */}
                 <View style={styles.typeBadge}>

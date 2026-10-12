@@ -111,12 +111,11 @@ export const VideoDetailScreen = ({ route, navigation }) => {
   const handleShare = async post => {
     try {
       const targetPost = post || videoList[currentIndex] || { id: activeId };
-      const appLink = `funflick://video/${targetPost.id}`;
-      const webLink = `https://funflick.in/video/${targetPost.id}?source=app`;
+      const shareUrl = `https://funflick.in/video/${targetPost.id}`;
       await Share.share({
-        title: targetPost.title || 'FunFlick Reel',
-        message: `Watch "${targetPost.title || 'this reel'}" on FunFlick App! 📲 ${appLink}\n\nOr watch online: ${webLink}`,
-        url: webLink,
+        title: targetPost.title || 'Watch on FunFlick',
+        message: `Watch "${targetPost.title || 'this reel'}" on FunFlick!\n${shareUrl}`,
+        url: shareUrl,
       });
     } catch (e) {}
   };

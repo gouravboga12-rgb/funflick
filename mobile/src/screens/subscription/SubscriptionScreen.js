@@ -371,7 +371,7 @@ export const SubscriptionScreen = ({ navigation }) => {
                     <View style={{ flex: 1, marginLeft: 10 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={styles.planCardTitle}>{plan.name}</Text>
-                        {plan.label ? (
+                        {plan.label && !plan.popular && !plan.savings ? (
                           <Text style={styles.planCardLabel}>({plan.label})</Text>
                         ) : null}
                       </View>

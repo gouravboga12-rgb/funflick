@@ -45,9 +45,11 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   }, [post.id, post.isLiked, post.user_liked, post.likesCount, post.likes_count, post.commentsCount, post.comments_count]);
 
   const isOwner = post.creator?.username === currentUser?.username;
-  const isVideo = post.mediaType === 'video' && Boolean(post.mediaUrl);
+  const isVideo = (post.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(post.mediaUrl || '')) &&
+                  !/\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(post.mediaUrl || '');
 
-  const player = useVideoPlayer(isVideo ? post.mediaUrl : null, p => {
+  const shouldMountPlayer = isVideo && isActive && isFocused;
+  const player = useVideoPlayer(shouldMountPlayer ? post.mediaUrl : null, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
@@ -224,22 +226,29 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
 
   const handleShare = async () => {
     try {
-      const appLink = `funflick://video/${post.id}`;
-      const webLink = `https://funflick.in/video/${post.id}?source=app`;
-      await Share.share({
-        title: post.title || 'FunFlick Reel',
-        message: `Watch "${post.title || 'this reel'}" on FunFlick App! 📲 ${appLink}\n\nOr watch online: ${webLink}`,
-        url: webLink,
-      });
-    } catch (e) {}
+      const shareUrl = `https://funflick.in/video/${post.id}`;
+      const title = post.title || 'FunFlick Video';
+      await Share.share(
+        {
+          title,
+          message: `Watch "${title}" on FunFlick! 🍿\n${shareUrl}`,
+          url: shareUrl,
+        },
+        {
+          dialogTitle: `Share ${title}`,
+        }
+      );
+    } catch (e) {
+      console.warn('Share error:', e?.message || e);
+    }
   };
 
   return (
     <View style={styles.card}>
       {/* Media Player Container */}
       <View style={styles.playerContainer}>
-        {/* Background Media — wrapped in pointerEvents="none" so native VideoView never intercepts touch events */}
-        <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+        {/* Background Media */}
+        <View style={StyleSheet.absoluteFillObject}>
           {isVideo ? (
             Platform.OS === 'web' ? (
               <video
@@ -256,19 +265,23 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
                   backgroundColor: '#000000',
                 }}
               />
-            ) : player ? (
+            ) : shouldMountPlayer && player ? (
               <VideoView
                 player={player}
                 style={styles.videoPlayer}
                 contentFit="cover"
-                surfaceType="textureView"
-                useExoShutter={false}
                 nativeControls={false}
               />
-            ) : null
+            ) : (
+              <Image
+                source={{ uri: post.posterUrl || post.thumbnailUrl || post.mediaUrl }}
+                style={styles.videoPlayer}
+                resizeMode="cover"
+              />
+            )
           ) : (
             <Image
-              source={{ uri: post.mediaUrl || post.posterUrl }}
+              source={{ uri: post.mediaUrl || post.posterUrl || post.thumbnailUrl }}
               style={styles.videoPlayer}
               resizeMode="cover"
             />

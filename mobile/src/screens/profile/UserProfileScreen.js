@@ -473,9 +473,9 @@ export const UserProfileScreen = ({ navigation, route }) => {
         showAppAlert('Permission Required', 'Please allow access to your media library.');
         return;
       }
-      const isVideo = editingContentItem?._type === 'video';
+      const isVideo = editingContentItem?._type === 'video' || editingContentItem?.media_type === 'video' || editingContentItem?.mediaType === 'video';
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: isVideo ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: isVideo ? ['videos'] : ['images'],
         quality: 0.85,
         allowsEditing: false,
       });
@@ -502,8 +502,16 @@ export const UserProfileScreen = ({ navigation, route }) => {
       if (editContentNewMediaUrl) {
         setIsUploadingEditMedia(true);
         try {
-          const isVideo = editingContentItem._type === 'video';
-          const uploadedUrl = await uploadMediaToS3(editContentNewMediaUrl, isVideo ? 'video' : 'image');
+          const isVideo = editingContentItem._type === 'video' || editingContentItem?.media_type === 'video' || editingContentItem?.mediaType === 'video';
+          const defaultExt = isVideo ? 'mp4' : 'jpg';
+          const defaultMime = isVideo ? 'video/mp4' : 'image/jpeg';
+          const fileName = `edit_${Date.now()}.${defaultExt}`;
+          const uploadedUrl = await uploadMediaToS3(
+            editContentNewMediaUrl,
+            fileName,
+            defaultMime,
+            isVideo ? 'videos' : 'images'
+          );
           finalMediaUrl = uploadedUrl;
         } catch (uploadErr) {
           showAppAlert('Upload Failed', 'Could not upload new media. Saving other changes only.');
