@@ -4,6 +4,7 @@ import {
   toggleUserStatus, 
   suspendUserWithDuration,
   reactivateUser,
+  deleteAdminUser,
   getAdminCreators, 
   getAdminReports, 
   resolveAdminReport,
@@ -58,6 +59,7 @@ router.get('/users', authenticateToken, requireSuperAdmin, getAdminUsers);
 router.put('/users/:id/status', authenticateToken, requireSuperAdmin, toggleUserStatus);
 router.put('/users/:id/suspend', authenticateToken, requireSuperAdmin, suspendUserWithDuration);
 router.put('/users/:id/reactivate', authenticateToken, requireSuperAdmin, reactivateUser);
+router.delete('/users/:id', authenticateToken, requireSuperAdmin, deleteAdminUser);
 router.get('/creators', authenticateToken, requireSuperAdmin, getAdminCreators);
 router.get('/transactions', authenticateToken, requireSuperAdmin, getAdminTransactions);
 router.get('/influencer-media', authenticateToken, requireSuperAdmin, getAdminInfluencerMedia);

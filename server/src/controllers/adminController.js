@@ -1544,4 +1544,59 @@ export async function updateAdminStaff(req, res) {
   }
 }
 
+// Permanently Delete a User Account (with cascading cleanup of all media, subscriptions, and data)
+export async function deleteAdminUser(req, res) {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query('SELECT id, username, email, role FROM users WHERE id = ?', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const targetUser = rows[0];
+    if (targetUser.role === 'admin' || targetUser.username === 'super_admin' || Number(targetUser.id) === 999999) {
+      return res.status(400).json({ error: 'Cannot delete Super Administrator account' });
+    }
+
+    const userId = targetUser.id;
+
+    // 1. Clean stories & story interactions
+    await pool.query('DELETE FROM story_views WHERE user_id = ? OR story_id IN (SELECT id FROM stories WHERE user_id = ?)', [userId, userId]).catch(() => {});
+    await pool.query('DELETE FROM story_likes WHERE user_id = ? OR story_id IN (SELECT id FROM stories WHERE user_id = ?)', [userId, userId]).catch(() => {});
+    await pool.query('DELETE FROM stories WHERE user_id = ?', [userId]).catch(() => {});
+
+    // 2. Clean comments, likes, and uploaded videos/reels/posts
+    await pool.query('DELETE FROM comments WHERE user_id = ? OR video_id IN (SELECT id FROM videos WHERE user_id = ?)', [userId, userId]).catch(() => {});
+    await pool.query('DELETE FROM likes WHERE user_id = ? OR video_id IN (SELECT id FROM videos WHERE user_id = ?)', [userId, userId]).catch(() => {});
+    await pool.query('DELETE FROM videos WHERE user_id = ?', [userId]).catch(() => {});
+
+    // 3. Clean subscriptions and creator payout data
+    await pool.query('DELETE FROM user_subscriptions WHERE user_id = ?', [userId]).catch(() => {});
+    await pool.query('DELETE FROM creator_payout_details WHERE user_id = ?', [userId]).catch(() => {});
+    await pool.query('DELETE FROM creator_payouts WHERE user_id = ?', [userId]).catch(() => {});
+
+    // 4. Clean social relations: follows, messages, blocks, notifications, reports, ad requests
+    await pool.query('DELETE FROM follows WHERE follower_id = ? OR following_id = ?', [userId, userId]).catch(() => {});
+    await pool.query('DELETE FROM messages WHERE sender_id = ? OR recipient_id = ?', [userId, userId]).catch(() => {});
+    await pool.query('DELETE FROM notifications WHERE user_id = ? OR actor_id = ?', [userId, userId]).catch(() => {});
+    await pool.query('DELETE FROM blocked_users WHERE user_id = ? OR blocked_user_id = ?', [userId, userId]).catch(() => {});
+    await pool.query('DELETE FROM content_reports WHERE reporter_id = ? OR reported_user_id = ?', [userId, userId]).catch(() => {});
+    await pool.query('DELETE FROM ad_requests WHERE user_id = ?', [userId]).catch(() => {});
+    if (targetUser.email) {
+      await pool.query('DELETE FROM email_verifications WHERE email = ?', [targetUser.email]).catch(() => {});
+    }
+
+    // 5. Delete the user account from users table
+    await pool.query('DELETE FROM users WHERE id = ?', [userId]);
+
+    return res.json({ 
+      success: true, 
+      message: `Account @${targetUser.username} and all associated content, subscriptions, and data were permanently deleted.` 
+    });
+  } catch (err) {
+    console.error('Delete admin user error:', err);
+    return res.status(500).json({ error: 'Failed to delete user account' });
+  }
+}
+
 

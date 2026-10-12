@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useApp } from '../../context/AppContext';
-import { Search, ShieldAlert, ShieldCheck, UserX, UserCheck, Loader2, Calendar, AlertCircle } from 'lucide-react';
+import { Search, ShieldAlert, ShieldCheck, UserX, UserCheck, Loader2, Calendar, AlertCircle, Trash2 } from 'lucide-react';
 import { SuspendAccountModal } from '../../components/admin/SuspendAccountModal';
 
 export const AdminUsersScreen = () => {
@@ -69,6 +69,32 @@ export const AdminUsersScreen = () => {
       }
     } catch (e) {
       showToast('Error reactivating user', 'error');
+    }
+  };
+
+  // Permanently delete user and cascading data
+  const handleDeleteUser = async (userId, username) => {
+    const confirmed = window.confirm(
+      `⚠️ PERMANENT DELETE WARNING\n\nAre you sure you want to permanently delete user @${username}?\n\nThis will completely delete their account, all uploaded reels, posts, stories, subscriptions, and wallet details from both the app and website.\n\nThis action CANNOT be undone.`
+    );
+    if (!confirmed) return;
+
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        showToast(`🗑️ Account @${username} and all content permanently deleted!`, 'success');
+        fetchUsers();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || 'Failed to delete user', 'error');
+      }
+    } catch (e) {
+      console.error('Delete user error:', e);
+      showToast('Error deleting user account', 'error');
     }
   };
 
@@ -196,25 +222,38 @@ export const AdminUsersScreen = () => {
                         </div>
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        {isSuspended ? (
-                          <button
-                            onClick={() => handleReactivate(u.id, u.username)}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition inline-flex items-center gap-1"
-                            title="Reactivate user immediately"
-                          >
-                            <UserCheck className="w-3.5 h-3.5" />
-                            <span>Reactivate</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => setSuspendingUser({ id: u.id, name: u.name, username: u.username })}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition inline-flex items-center gap-1"
-                            title="Suspend user with duration"
-                          >
-                            <UserX className="w-3.5 h-3.5" />
-                            <span>Suspend</span>
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {isSuspended ? (
+                            <button
+                              onClick={() => handleReactivate(u.id, u.username)}
+                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition inline-flex items-center gap-1"
+                              title="Reactivate user immediately"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                              <span>Reactivate</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setSuspendingUser({ id: u.id, name: u.name, username: u.username })}
+                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition inline-flex items-center gap-1"
+                              title="Suspend user with duration"
+                            >
+                              <UserX className="w-3.5 h-3.5" />
+                              <span>Suspend</span>
+                            </button>
+                          )}
+
+                          {u.role !== 'admin' && u.username !== 'super_admin' && (
+                            <button
+                              onClick={() => handleDeleteUser(u.id, u.username)}
+                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-red-600/15 hover:bg-red-600/25 text-red-400 hover:text-red-300 border border-red-500/20 transition inline-flex items-center gap-1"
+                              title="Permanently delete user and all associated content"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
