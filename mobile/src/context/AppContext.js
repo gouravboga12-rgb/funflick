@@ -1149,6 +1149,57 @@ export const AppProvider = ({ children }) => {
     }
   }, [fetchLiveStories]);
 
+  // Update a User Post (optimistic feed update + backend PUT /videos/:id)
+  const updateUserPost = useCallback(async (postId, updatedFields) => {
+    // 1. Optimistically update global posts feed
+    setPosts(prev => prev.map(p => {
+      if (String(p.id) === String(postId)) {
+        return {
+          ...p,
+          ...updatedFields,
+          title: updatedFields.title || p.title,
+          caption: updatedFields.caption || p.caption,
+          description: updatedFields.caption || p.description,
+          category: updatedFields.category || p.category,
+          mediaUrl: updatedFields.mediaUrl || p.mediaUrl,
+          video_url: updatedFields.mediaUrl || p.video_url,
+          posterUrl: updatedFields.posterUrl || p.posterUrl,
+          thumbnailUrl: updatedFields.posterUrl || p.thumbnailUrl,
+        };
+      }
+      return p;
+    }));
+
+    // 2. Call backend PUT /videos/:id
+    try {
+      await apiRequest(`/videos/${postId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          title: updatedFields.title,
+          description: updatedFields.caption || updatedFields.description,
+          category: updatedFields.category,
+          thumbnail_url: updatedFields.posterUrl || updatedFields.thumbnailUrl || updatedFields.mediaUrl || null,
+          video_url: updatedFields.mediaUrl || null,
+          media_url: updatedFields.mediaUrl || null,
+        }),
+      });
+      fetchFeed();
+    } catch (e) {
+      console.warn('updateUserPost error:', e);
+    }
+  }, [fetchFeed]);
+
+  // Delete a User Post (optimistic feed update + backend DELETE /videos/:id)
+  const deleteUserPost = useCallback(async (postId) => {
+    setPosts(prev => prev.filter(p => String(p.id) !== String(postId)));
+    try {
+      await apiRequest(`/videos/${postId}`, { method: 'DELETE' });
+      fetchFeed();
+    } catch (e) {
+      console.warn('deleteUserPost error:', e);
+    }
+  }, [fetchFeed]);
+
   return (
     <AppContext.Provider
       value={{
@@ -1164,6 +1215,8 @@ export const AppProvider = ({ children }) => {
         hydrateOAuthSession,
         logout,
         posts,
+        setPosts,
+        updateUserPost,
         stories,
         fetchLiveStories,
         deleteStory,

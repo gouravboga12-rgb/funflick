@@ -409,7 +409,14 @@ export async function updateVideo(req, res) {
     const { id } = req.params;
     const { title, description, category, thumbnail_url, video_url, media_url } = req.body;
     const targetMediaUrl = video_url || media_url || null;
-    await pool.query(
+    const targetThumb = thumbnail_url || null;
+    const targetTitle = title ? String(title).trim() : null;
+    const targetDesc = description ? String(description).trim() : null;
+    const targetCat = category ? String(category).trim() : null;
+
+    const isAdmin = req.user.role === 'admin' || req.user.username === 'super_admin' ? 1 : 0;
+
+    const [result] = await pool.query(
       `UPDATE videos SET 
         title = COALESCE(?, title),
         description = COALESCE(?, description),
@@ -417,8 +424,23 @@ export async function updateVideo(req, res) {
         thumbnail_url = COALESCE(?, thumbnail_url),
         video_url = COALESCE(?, video_url)
       WHERE id = ? AND (user_id = ? OR ? = 1)`,
-      [title, description, category, thumbnail_url, targetMediaUrl, id, req.user.id, req.user.role === 'admin' ? 1 : 0]
+      [targetTitle, targetDesc, targetCat, targetThumb, targetMediaUrl, id, req.user.id, isAdmin]
     );
+
+    // If 0 rows updated by req.user.id, check by legacyId
+    if (result.affectedRows === 0 && req.user.legacyId) {
+      await pool.query(
+        `UPDATE videos SET 
+          title = COALESCE(?, title),
+          description = COALESCE(?, description),
+          category = COALESCE(?, category),
+          thumbnail_url = COALESCE(?, thumbnail_url),
+          video_url = COALESCE(?, video_url)
+        WHERE id = ? AND user_id = ?`,
+        [targetTitle, targetDesc, targetCat, targetThumb, targetMediaUrl, id, req.user.legacyId]
+      );
+    }
+
     return res.json({ success: true, message: 'Video updated successfully' });
   } catch (err) {
     console.error('Update video error:', err);

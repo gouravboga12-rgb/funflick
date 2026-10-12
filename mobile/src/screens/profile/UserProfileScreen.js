@@ -102,7 +102,7 @@ function AvatarWithFallback({ avatar, name, username, size = 80 }) {
 }
 
 export const UserProfileScreen = ({ navigation, route }) => {
-  const { currentUser, setCurrentUser, logout, posts, fetchFeed, deleteUserPost, stories, fetchLiveStories, savedPostIds, toggleSavePost } = useApp();
+  const { currentUser, setCurrentUser, logout, posts, fetchFeed, updateUserPost, deleteUserPost, stories, fetchLiveStories, savedPostIds, toggleSavePost } = useApp();
   const [activeMode, setActiveMode] = useState('viewer'); // 'viewer' | 'influencer'
 
   // Dynamic live followers / following count
@@ -539,10 +539,26 @@ export const UserProfileScreen = ({ navigation, route }) => {
           payload.thumbnail_url = finalMediaUrl;
           payload.poster_url = finalMediaUrl;
         }
-        await apiRequest(`/videos/${editingContentItem.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
+
+        if (updateUserPost) {
+          await updateUserPost(editingContentItem.id, {
+            title: editContentTitle.trim(),
+            caption: editContentCaption.trim(),
+            description: editContentCaption.trim(),
+            category: editContentCategory,
+            ...(finalMediaUrl ? {
+              mediaUrl: finalMediaUrl,
+              video_url: finalMediaUrl,
+              posterUrl: finalMediaUrl,
+              thumbnailUrl: finalMediaUrl,
+            } : {}),
+          });
+        } else {
+          await apiRequest(`/videos/${editingContentItem.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          });
+        }
 
         // Update in-memory myMediaList state so UI reflects immediately
         setMyMediaList(prev => prev.map(m =>
@@ -553,7 +569,13 @@ export const UserProfileScreen = ({ navigation, route }) => {
                 description: editContentCaption.trim(),
                 caption: editContentCaption.trim(),
                 category: editContentCategory,
-                ...(finalMediaUrl ? { mediaUrl: finalMediaUrl, media_url: finalMediaUrl } : {}),
+                ...(finalMediaUrl ? {
+                  mediaUrl: finalMediaUrl,
+                  media_url: finalMediaUrl,
+                  posterUrl: finalMediaUrl,
+                  thumbnail: finalMediaUrl,
+                  thumbnail_url: finalMediaUrl,
+                } : {}),
               }
             : m
         ));
