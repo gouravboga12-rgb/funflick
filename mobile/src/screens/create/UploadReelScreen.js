@@ -37,6 +37,7 @@ import { ensureMediaLibraryPermission } from '../../services/permissionsService'
 import { uploadMediaToS3 } from '../../services/s3Upload';
 import { apiRequest } from '../../services/api';
 import { useApp } from '../../context/AppContext';
+import { UploadSuccessModal } from '../../components/common/UploadSuccessModal';
 
 const CATEGORIES = [
   'Comedy',
@@ -136,6 +137,8 @@ export const UploadReelScreen = ({ navigation }) => {
   // Upload progress
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadSuccessModalVisible, setUploadSuccessModalVisible] = useState(false);
+  const [publishedTitle, setPublishedTitle] = useState('');
 
   // Location search effect (Debounced reverse geocoding via Nominatim)
   useEffect(() => {
@@ -308,15 +311,10 @@ export const UploadReelScreen = ({ navigation }) => {
         }),
       });
 
-      // 3. Refresh live feed and navigate back to feed
+      // 3. Refresh live feed and show creator monetization celebration modal
       await fetchFeed();
-      showAppAlert(
-        'Reel Published! 🎉',
-        'Your reel is now live on FunFlick! It has also been submitted to the Admin Moderation Queue.',
-        [
-          { text: 'OK', onPress: () => navigation.navigate('MainTabs', { screen: 'Feed' }) },
-        ]
-      );
+      setPublishedTitle(finalTitle);
+      setUploadSuccessModalVisible(true);
     } catch (err) {
       showAppAlert('Upload Failed', err.message || 'Could not upload reel');
     } finally {
@@ -798,6 +796,21 @@ export const UploadReelScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Post-Upload Monetization & Creator Fund Celebration Modal */}
+      <UploadSuccessModal
+        visible={uploadSuccessModalVisible}
+        type="Reel"
+        title={publishedTitle}
+        onClose={() => {
+          setUploadSuccessModalVisible(false);
+          navigation.navigate('MainTabs', { screen: 'Feed' });
+        }}
+        onUnlockMonetization={() => {
+          setUploadSuccessModalVisible(false);
+          navigation.navigate('Subscription');
+        }}
+      />
     </SafeAreaView>
   );
 };

@@ -32,6 +32,7 @@ import { uploadMediaToS3 } from '../../services/s3Upload';
 import { apiRequest, getToken } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
+import { UploadSuccessModal } from '../../components/common/UploadSuccessModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -110,6 +111,7 @@ export const CreateStoryScreen = ({ navigation }) => {
 
   const [isUploading, setIsUploading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [uploadSuccessModalVisible, setUploadSuccessModalVisible] = useState(false);
   const isSubmittingRef = useRef(false);
   const [progress, setProgress] = useState(0);
 
@@ -265,25 +267,7 @@ export const CreateStoryScreen = ({ navigation }) => {
 
       // Show immediate visual confirmation
       setIsSuccess(true);
-
-      // Show alert and redirect
-      showAppAlert(
-        'Story Published! 🌟',
-        'Your story is now live for everyone and will automatically expire in 24 hours.',
-        [
-          {
-            text: 'OK',
-            onPress: handleExitScreen,
-          },
-        ]
-      );
-
-      // Web automatic fallback redirection in case browser alert is dismissed or suppressed
-      if (Platform.OS === 'web') {
-        setTimeout(() => {
-          handleExitScreen();
-        }, 1500);
-      }
+      setUploadSuccessModalVisible(true);
     } catch (err) {
       console.error('Story upload failed:', err);
       showAppAlert('Upload Failed', err.message || 'Could not upload story. Please try again.');
@@ -533,6 +517,21 @@ export const CreateStoryScreen = ({ navigation }) => {
           </TouchableOpacity>
         ) : null}
       </View>
+
+      {/* Post-Upload Monetization & Creator Fund Celebration Modal */}
+      <UploadSuccessModal
+        visible={uploadSuccessModalVisible}
+        type="Story"
+        title={caption ? caption.slice(0, 40) : '24h Story'}
+        onClose={() => {
+          setUploadSuccessModalVisible(false);
+          handleExitScreen();
+        }}
+        onUnlockMonetization={() => {
+          setUploadSuccessModalVisible(false);
+          navigation.navigate('Subscription');
+        }}
+      />
     </SafeAreaView>
   );
 };

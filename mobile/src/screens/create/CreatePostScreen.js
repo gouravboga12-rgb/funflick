@@ -31,6 +31,7 @@ import { uploadMediaToS3 } from '../../services/s3Upload';
 import { apiRequest, getToken } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
+import { UploadSuccessModal } from '../../components/common/UploadSuccessModal';
 
 const CATEGORIES = [
   'Comedy',
@@ -96,6 +97,8 @@ export const CreatePostScreen = ({ navigation }) => {
   const [isUploading, setIsUploading] = useState(false);
   const isSubmittingRef = useRef(false);
   const [progress, setProgress] = useState(0);
+  const [uploadSuccessModalVisible, setUploadSuccessModalVisible] = useState(false);
+  const [publishedPostTitle, setPublishedPostTitle] = useState('');
 
   // Location search effect (Debounced reverse geocoding via Nominatim)
   useEffect(() => {
@@ -239,9 +242,8 @@ export const CreatePostScreen = ({ navigation }) => {
       });
 
       await fetchFeed();
-      showAppAlert('Published! 📸', 'Your photo post is live on FunFlick!', [
-        { text: 'OK', onPress: handleExitScreen },
-      ]);
+      setPublishedPostTitle(caption.trim().slice(0, 50) || 'Photo Post');
+      setUploadSuccessModalVisible(true);
     } catch (err) {
       showAppAlert('Publish Failed', err.message || 'Could not upload photo post');
     } finally {
@@ -560,6 +562,21 @@ export const CreatePostScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Post-Upload Monetization & Creator Fund Celebration Modal */}
+      <UploadSuccessModal
+        visible={uploadSuccessModalVisible}
+        type="Post"
+        title={publishedPostTitle}
+        onClose={() => {
+          setUploadSuccessModalVisible(false);
+          handleExitScreen();
+        }}
+        onUnlockMonetization={() => {
+          setUploadSuccessModalVisible(false);
+          navigation.navigate('Subscription');
+        }}
+      />
     </SafeAreaView>
   );
 };
