@@ -504,6 +504,7 @@ export const UserProfileScreen = ({ navigation, route }) => {
       // Upload new media to S3 if user picked a replacement
       if (editContentNewMediaUrl) {
         setIsUploadingEditMedia(true);
+        try {
           const isVideo = editingContentItem._type === 'video' ||
                           editingContentItem?.media_type === 'video' ||
                           editingContentItem?.mediaType === 'video' ||
