@@ -407,7 +407,8 @@ export async function recordView(req, res) {
 export async function updateVideo(req, res) {
   try {
     const { id } = req.params;
-    const { title, description, category, thumbnail_url, video_url } = req.body;
+    const { title, description, category, thumbnail_url, video_url, media_url } = req.body;
+    const targetMediaUrl = video_url || media_url || null;
     await pool.query(
       `UPDATE videos SET 
         title = COALESCE(?, title),
@@ -416,7 +417,7 @@ export async function updateVideo(req, res) {
         thumbnail_url = COALESCE(?, thumbnail_url),
         video_url = COALESCE(?, video_url)
       WHERE id = ? AND (user_id = ? OR ? = 1)`,
-      [title, description, category, thumbnail_url, video_url, id, req.user.id, req.user.role === 'admin' ? 1 : 0]
+      [title, description, category, thumbnail_url, targetMediaUrl, id, req.user.id, req.user.role === 'admin' ? 1 : 0]
     );
     return res.json({ success: true, message: 'Video updated successfully' });
   } catch (err) {

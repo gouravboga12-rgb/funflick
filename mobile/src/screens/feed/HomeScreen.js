@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, FlatList, StyleSheet, RefreshControl, Modal, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Bell, X, Sparkles, CheckCircle2 } from 'lucide-react-native';
 import { Header } from '../../components/common/Header';
 import { StoryBar } from '../../components/feed/StoryBar';
@@ -15,6 +16,7 @@ export const HomeScreen = ({ navigation }) => {
     posts,
     isLoadingFeed,
     fetchFeed,
+    fetchLiveStories,
     adsList,
     isPaidInfluencer,
     notifications,
@@ -27,6 +29,19 @@ export const HomeScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('For You');
   const [activeVideoId, setActiveVideoId] = useState(null);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchLiveStories?.();
+    }, [fetchLiveStories])
+  );
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      fetchFeed?.(),
+      fetchLiveStories?.(),
+    ]);
+  };
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems && viewableItems.length > 0) {
@@ -112,7 +127,7 @@ export const HomeScreen = ({ navigation }) => {
         refreshControl={
           <RefreshControl
             refreshing={isLoadingFeed}
-            onRefresh={fetchFeed}
+            onRefresh={handleRefresh}
             tintColor={colors.primary}
             colors={[colors.primary]}
           />

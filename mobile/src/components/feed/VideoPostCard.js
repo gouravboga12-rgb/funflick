@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Share, Dimensions, Animated, Platform } from 'react-native';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, Play, Music, Plus, Eye, Check } from 'lucide-react-native';
@@ -236,43 +235,49 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     <View style={styles.card}>
       {/* Media Player Container */}
       <View style={styles.playerContainer}>
-        {isVideo ? (
-          Platform.OS === 'web' ? (
-            <video
-              ref={webVideoRef}
-              src={post.mediaUrl}
-              autoPlay
-              playsInline
-              loop
-              muted={isReelsMuted}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                backgroundColor: '#000000',
-              }}
-            />
-          ) : player ? (
-            <VideoView
-              player={player}
+        {/* Background Media — wrapped in pointerEvents="none" so native VideoView never intercepts touch events */}
+        <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+          {isVideo ? (
+            Platform.OS === 'web' ? (
+              <video
+                ref={webVideoRef}
+                src={post.mediaUrl}
+                autoPlay
+                playsInline
+                loop
+                muted={isReelsMuted}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  backgroundColor: '#000000',
+                }}
+              />
+            ) : player ? (
+              <VideoView
+                player={player}
+                style={styles.videoPlayer}
+                contentFit="cover"
+                surfaceType="textureView"
+                useExoShutter={false}
+                nativeControls={false}
+              />
+            ) : null
+          ) : (
+            <Image
+              source={{ uri: post.mediaUrl || post.posterUrl }}
               style={styles.videoPlayer}
-              contentFit="cover"
-              surfaceType="textureView"
-              useExoShutter={false}
-              nativeControls={false}
-              pointerEvents="none"
+              resizeMode="cover"
             />
-          ) : null
-        ) : (
-          <Image
-            source={{ uri: post.mediaUrl || post.posterUrl }}
-            style={styles.videoPlayer}
-            resizeMode="cover"
-          />
-        )}
+          )}
+        </View>
 
-        {/* Full-surface tap overlay covering center & entire video */}
-        <TouchableOpacity activeOpacity={1} onPress={handleMediaPress} style={styles.fullTapLayer} />
+        {/* Dedicated Tap Detector Layer covering entire video surface */}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={handleMediaPress}
+          style={styles.fullTapLayer}
+        />
 
         {/* Top Vignette Overlay */}
         <LinearGradient
@@ -288,7 +293,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
           pointerEvents="none"
         />
 
-        {/* Center Pause Indicator & Tap-to-play button: shown whenever video is paused */}
+        {/* Center Pause Indicator — shown when user manually pauses */}
         {isUserPaused && isVideo && (
           <View style={styles.playOverlay} pointerEvents="box-none">
             <TouchableOpacity

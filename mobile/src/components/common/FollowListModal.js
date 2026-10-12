@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Search, UserCheck, UserPlus, UserX } from 'lucide-react-native';
 import { apiRequest } from '../../services/api';
+import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
 export const FollowListModal = ({
@@ -24,6 +25,7 @@ export const FollowListModal = ({
   onRelationshipChanged,
   navigation,
 }) => {
+  const { toggleFollowCreator, fetchLiveStories } = useApp();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
@@ -62,10 +64,14 @@ export const FollowListModal = ({
     if (!user?.username) return;
     setActionLoadingId(user.id);
     const willFollow = !user.iFollowThem;
-    const endpoint = willFollow ? `/follows/${user.username}/follow` : `/follows/${user.username}/unfollow`;
 
     try {
-      await apiRequest(endpoint, { method: 'POST' });
+      if (toggleFollowCreator) {
+        await toggleFollowCreator(user.username);
+      } else {
+        const endpoint = willFollow ? `/follows/${user.username}/follow` : `/follows/${user.username}/unfollow`;
+        await apiRequest(endpoint, { method: 'POST' });
+      }
       const updateItem = item => item.id === user.id ? { ...item, iFollowThem: willFollow } : item;
       setFollowers(prev => prev.map(updateItem));
       setFollowing(prev => {
@@ -74,6 +80,7 @@ export const FollowListModal = ({
         }
         return prev.map(updateItem);
       });
+      fetchLiveStories?.();
       onRelationshipChanged?.();
     } catch (e) {
     } finally {
@@ -85,8 +92,9 @@ export const FollowListModal = ({
     if (!user?.username) return;
     setActionLoadingId(user.id);
     try {
-      await apiRequest(`/follows/${user.username}/remove-follower`, { method: 'POST' });
+      await apiRequest(`/follows/${user.username}/remove-follower`, { method: 'DELETE' });
       setFollowers(prev => prev.filter(f => f.id !== user.id));
+      fetchLiveStories?.();
       onRelationshipChanged?.();
     } catch (e) {
     } finally {

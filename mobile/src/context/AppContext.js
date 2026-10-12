@@ -14,7 +14,7 @@ export const AppProvider = ({ children }) => {
   const [stories, setStories] = useState([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   // Mute audio by default on app launch (matching web & standard social feeds)
-  const [isReelsMuted, setIsReelsMuted] = useState(true);
+  const [isReelsMuted, setIsReelsMuted] = useState(false);
   const [activePlayingVideoId, setActivePlayingVideoId] = useState(null);
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -378,6 +378,11 @@ export const AppProvider = ({ children }) => {
       })
     );
 
+    // Optimistically remove stories from tray immediately on unfollow
+    if (!willFollow) {
+      setStories(prev => prev.filter(s => s.isUser || s.username?.toLowerCase() !== cleanUser));
+    }
+
       try {
         const endpoint = willFollow ? `/follows/${username}/follow` : `/follows/${username}/unfollow`;
         const res = await apiRequest(endpoint, { method: 'POST' });
@@ -393,6 +398,8 @@ export const AppProvider = ({ children }) => {
           });
         }
         fetchMyFollowing();
+        // Refresh story tray so unfollowed user's stories disappear immediately
+        fetchLiveStories();
       } catch (e) {
         // Fallback: try /toggle if available
         try {
@@ -409,12 +416,14 @@ export const AppProvider = ({ children }) => {
             });
           }
           fetchMyFollowing();
+          // Refresh story tray so unfollowed user's stories disappear immediately
+          fetchLiveStories();
         } catch (err2) {
           console.warn('Toggle follow error:', err2);
         }
       }
     },
-    [fetchMyFollowing]
+    [fetchMyFollowing, fetchLiveStories]
   );
 
   // Follow requests state (matching website)

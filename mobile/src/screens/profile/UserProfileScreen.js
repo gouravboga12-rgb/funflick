@@ -134,6 +134,8 @@ export const UserProfileScreen = ({ navigation, route }) => {
   const [editContentTitle, setEditContentTitle] = useState('');
   const [editContentCaption, setEditContentCaption] = useState('');
   const [editContentCategory, setEditContentCategory] = useState('Comedy');
+  const [editContentNewMediaUrl, setEditContentNewMediaUrl] = useState(null);
+  const [isUploadingEditMedia, setIsUploadingEditMedia] = useState(false);
   const [isSavingContentEdit, setIsSavingContentEdit] = useState(false);
 
   useEffect(() => {
@@ -460,7 +462,29 @@ export const UserProfileScreen = ({ navigation, route }) => {
     setEditContentTitle(item.title || '');
     setEditContentCaption(item.description || item.caption || '');
     setEditContentCategory(item.category || 'Comedy');
+    setEditContentNewMediaUrl(null);
     setIsEditContentModalOpen(true);
+  };
+
+  const handlePickNewMedia = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showAppAlert('Permission Required', 'Please allow access to your media library.');
+        return;
+      }
+      const isVideo = editingContentItem?._type === 'video';
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: isVideo ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images,
+        quality: 0.85,
+        allowsEditing: false,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setEditContentNewMediaUrl(result.assets[0].uri);
+      }
+    } catch (e) {
+      showAppAlert('Error', 'Could not open media picker.');
+    }
   };
 
   const handleSaveContentEdit = async () => {
@@ -472,15 +496,36 @@ export const UserProfileScreen = ({ navigation, route }) => {
 
     setIsSavingContentEdit(true);
     try {
+      let finalMediaUrl = null;
+
+      // Upload new media to S3 if user picked a replacement
+      if (editContentNewMediaUrl) {
+        setIsUploadingEditMedia(true);
+        try {
+          const isVideo = editingContentItem._type === 'video';
+          const uploadedUrl = await uploadMediaToS3(editContentNewMediaUrl, isVideo ? 'video' : 'image');
+          finalMediaUrl = uploadedUrl;
+        } catch (uploadErr) {
+          showAppAlert('Upload Failed', 'Could not upload new media. Saving other changes only.');
+        } finally {
+          setIsUploadingEditMedia(false);
+        }
+      }
+
       const isVidOrPost = editingContentItem._type === 'video' || editingContentItem._type === 'post' || !editingContentItem._type;
       if (isVidOrPost) {
+        const payload = {
+          title: editContentTitle.trim(),
+          description: editContentCaption.trim(),
+          category: editContentCategory,
+        };
+        if (finalMediaUrl) {
+          payload.media_url = finalMediaUrl;
+          payload.video_url = finalMediaUrl;
+        }
         await apiRequest(`/videos/${editingContentItem.id}`, {
           method: 'PUT',
-          body: JSON.stringify({
-            title: editContentTitle.trim(),
-            description: editContentCaption.trim(),
-            category: editContentCategory,
-          }),
+          body: JSON.stringify(payload),
         });
 
         // Update in-memory myMediaList state so UI reflects immediately
@@ -492,6 +537,7 @@ export const UserProfileScreen = ({ navigation, route }) => {
                 description: editContentCaption.trim(),
                 caption: editContentCaption.trim(),
                 category: editContentCategory,
+                ...(finalMediaUrl ? { mediaUrl: finalMediaUrl, media_url: finalMediaUrl } : {}),
               }
             : m
         ));
@@ -502,6 +548,7 @@ export const UserProfileScreen = ({ navigation, route }) => {
 
       setIsEditContentModalOpen(false);
       setEditingContentItem(null);
+      setEditContentNewMediaUrl(null);
       showAppAlert('Success ✅', 'Your content has been updated successfully!');
     } catch (err) {
       console.warn('Update content error:', err);
@@ -2090,22 +2137,41 @@ export const UserProfileScreen = ({ navigation, route }) => {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 14, gap: 14 }}>
-              {/* Media Preview Card */}
+              {/* Media Preview Card + Change Media button for videos */}
               {editingContentItem && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
-                  <Image
-                    source={{ uri: editingContentItem.thumbnail_url || editingContentItem.thumbnailUrl || editingContentItem.media_url || editingContentItem.mediaUrl }}
-                    style={{ width: 54, height: 54, borderRadius: 8, backgroundColor: '#18122c' }}
-                    resizeMode="cover"
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#ffffff', fontSize: 12.5, fontWeight: '700' }} numberOfLines={1}>
-                      {editingContentItem.title || 'Untitled Post'}
-                    </Text>
-                    <Text style={{ color: '#94a3b8', fontSize: 10.5, marginTop: 2 }}>
-                      Views: {editingContentItem.views_count || editingContentItem.viewsCount || 0}
-                    </Text>
+                <View style={{ gap: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <Image
+                      source={{ uri: editContentNewMediaUrl || editingContentItem.thumbnail_url || editingContentItem.thumbnailUrl || editingContentItem.media_url || editingContentItem.mediaUrl }}
+                      style={{ width: 54, height: 54, borderRadius: 8, backgroundColor: '#18122c' }}
+                      resizeMode="cover"
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#ffffff', fontSize: 12.5, fontWeight: '700' }} numberOfLines={1}>
+                        {editingContentItem.title || 'Untitled Post'}
+                      </Text>
+                      <Text style={{ color: '#94a3b8', fontSize: 10.5, marginTop: 2 }}>
+                        Views: {editingContentItem.views_count || editingContentItem.viewsCount || 0}
+                      </Text>
+                      {editContentNewMediaUrl && (
+                        <Text style={{ color: '#22c55e', fontSize: 10, marginTop: 2, fontWeight: '700' }}>✓ New media selected</Text>
+                      )}
+                    </View>
                   </View>
+
+                  {/* Change Media button — only for video/reel posts */}
+                  {(editingContentItem._type === 'video' || !editingContentItem._type) && (
+                    <TouchableOpacity
+                      onPress={handlePickNewMedia}
+                      disabled={isUploadingEditMedia}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(56,189,248,0.12)', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(56,189,248,0.3)' }}
+                    >
+                      <Camera size={15} color="#38bdf8" />
+                      <Text style={{ color: '#38bdf8', fontSize: 12, fontWeight: '700' }}>
+                        {editContentNewMediaUrl ? 'Change Media Again' : 'Change Video / Media'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
 
@@ -3337,6 +3403,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     paddingHorizontal: 14,
     paddingVertical: 10,
+  },
+  modalInputGroup: {
+    marginBottom: 12,
+  },
+  modalInputLabel: {
+    color: '#cbd5e1',
+    fontSize: 11.5,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  modalInputBox: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  modalTextInput: {
+    color: '#ffffff',
+    fontSize: 13,
+    padding: 0,
+    width: '100%',
   },
   modalSaveBtn: {
     borderRadius: 14,

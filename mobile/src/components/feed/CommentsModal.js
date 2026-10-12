@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Send, MessageCircle, Trash2 } from 'lucide-react-native';
@@ -31,6 +32,31 @@ export const CommentsModal = ({
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const onShow = (e) => {
+      const height = e?.endCoordinates?.height || 0;
+      setKeyboardHeight(height);
+    };
+    const onHide = () => {
+      setKeyboardHeight(0);
+    };
+
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      onShow
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      onHide
+    );
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!visible || !videoId) return;
@@ -200,7 +226,17 @@ export const CommentsModal = ({
           )}
 
           {/* Bottom Input Bar */}
-          <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
+          <View
+            style={[
+              styles.inputBar,
+              {
+                paddingBottom: Platform.OS === 'android'
+                  ? (keyboardHeight > 0 ? 8 : Math.max(insets.bottom, 12) + 8)
+                  : (Math.max(insets.bottom, 12) + 8),
+                marginBottom: Platform.OS === 'android' ? keyboardHeight : 0,
+              },
+            ]}
+          >
             <TextInput
               style={styles.textInput}
               placeholder="Add a comment..."
