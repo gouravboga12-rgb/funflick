@@ -51,8 +51,16 @@ export const HomeScreen = ({ navigation }) => {
   }).current;
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 35,
+    itemVisiblePercentThreshold: 45,
+    waitForInteraction: false,
   }).current;
+
+  // Auto-activate the first item immediately on load
+  useEffect(() => {
+    if (filteredPosts.length > 0 && !activeVideoId) {
+      setActiveVideoId(filteredPosts[0].id);
+    }
+  }, [filteredPosts, activeVideoId]);
 
   const filteredPosts = useMemo(() => {
     const list = [...(posts || [])];
@@ -122,7 +130,7 @@ export const HomeScreen = ({ navigation }) => {
               {isVideo ? (
                 <VideoPostCard
                   post={item}
-                  isActive={activeVideoId ? item.id === activeVideoId : index === 0}
+                  isActive={activeVideoId ? String(item.id) === String(activeVideoId) : index === 0}
                   navigation={navigation}
                 />
               ) : (

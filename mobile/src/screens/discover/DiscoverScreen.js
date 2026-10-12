@@ -25,6 +25,7 @@ import {
   Eye,
   Heart,
   Play,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { apiRequest } from '../../services/api';
@@ -546,6 +547,12 @@ export const DiscoverScreen = ({ navigation }) => {
               {displayedTrendingVideos.map((video, idx) => {
                 const dynamicCardWidth = Math.min(240, Math.max(150, Math.floor((windowWidth - 42) / 2)));
                 const dynamicCardHeight = Math.floor(dynamicCardWidth * 1.45);
+                const mediaUrl = video.mediaUrl || video.video_url || video.videoUrl || '';
+                const isVideoItem = (video.mediaType === 'video' || video.media_type === 'video') &&
+                  !mediaUrl.match(/\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i) &&
+                  video.category !== 'Photo' &&
+                  video.category !== 'Post';
+
                 return (
                   <TouchableOpacity
                     key={video.id}
@@ -579,9 +586,15 @@ export const DiscoverScreen = ({ navigation }) => {
                       <Text style={styles.viewsBadgeText}>{video.viewsCount || '0'}</Text>
                     </View>
                     <View style={styles.singlePlayOverlay} pointerEvents="none">
-                      <View style={styles.singlePlayCircle}>
-                        <Play size={16} color="#ffffff" fill="#ffffff" />
-                      </View>
+                      {isVideoItem ? (
+                        <View style={styles.singlePlayCircle}>
+                          <Play size={16} color="#ffffff" fill="#ffffff" />
+                        </View>
+                      ) : (
+                        <View style={[styles.singlePlayCircle, { backgroundColor: 'rgba(56, 189, 248, 0.45)', borderColor: 'rgba(56, 189, 248, 0.6)' }]}>
+                          <ImageIcon size={15} color="#ffffff" />
+                        </View>
+                      )}
                     </View>
                     <View style={styles.gridVideoMeta}>
                       <Text style={styles.gridVideoTitle} numberOfLines={1}>

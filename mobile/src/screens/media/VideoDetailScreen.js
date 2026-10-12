@@ -9,11 +9,13 @@ import {
   ActivityIndicator,
   Share,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { ArrowLeft, Share2, AlertCircle, Home, Flame } from 'lucide-react-native';
 import { ReelItem } from '../feed/ReelsScreen';
+import { StandardPostCard } from '../../components/feed/StandardPostCard';
 import { apiRequest } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
@@ -208,21 +210,41 @@ export const VideoDetailScreen = ({ route, navigation }) => {
             flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
           }, 150);
         }}
-        renderItem={({ item, index }) => (
-          <ReelItem
-            item={item}
-            isActive={currentIndex === index}
-            isScreenFocused={isFocused}
-            reelHeight={containerHeight}
-            isReelsMuted={isReelsMuted}
-            toggleMute={toggleMute}
-            toggleLikePost={toggleLikePost}
-            toggleFollowCreator={toggleFollowCreator}
-            recordPostView={recordPostView}
-            handleShare={handleShare}
-            navigation={navigation}
-          />
-        )}
+        renderItem={({ item, index }) => {
+          const mediaUrl = item?.mediaUrl || item?.video_url || item?.videoUrl || '';
+          const isItemVideo = (item?.mediaType === 'video' || item?.media_type === 'video') &&
+            !mediaUrl.match(/\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i) &&
+            item?.category !== 'Photo' &&
+            item?.category !== 'Post';
+
+          if (!isItemVideo) {
+            return (
+              <ScrollView
+                style={{ width: WINDOW_WIDTH, height: containerHeight }}
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', backgroundColor: '#090514', paddingVertical: 20 }}
+                showsVerticalScrollIndicator={false}
+              >
+                <StandardPostCard post={item} navigation={navigation} />
+              </ScrollView>
+            );
+          }
+
+          return (
+            <ReelItem
+              item={item}
+              isActive={currentIndex === index}
+              isScreenFocused={isFocused}
+              reelHeight={containerHeight}
+              isReelsMuted={isReelsMuted}
+              toggleMute={toggleMute}
+              toggleLikePost={toggleLikePost}
+              toggleFollowCreator={toggleFollowCreator}
+              recordPostView={recordPostView}
+              handleShare={handleShare}
+              navigation={navigation}
+            />
+          );
+        }}
       />
     </View>
   );

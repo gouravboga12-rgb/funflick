@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Share, Dimensions, Animated, Platform } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, Play, Music, Plus, Eye, Check } from 'lucide-react-native';
+import { Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, Play, Music, Plus, Eye, Check, Film } from 'lucide-react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { CommentsModal } from './CommentsModal';
 import { useApp } from '../../context/AppContext';
@@ -46,15 +46,28 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   }, [post.id, post.isLiked, post.user_liked, post.likesCount, post.likes_count, post.commentsCount, post.comments_count, post.isSaved]);
 
   const isOwner = post.creator?.username === currentUser?.username;
-  const isVideo = (post.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(post.mediaUrl || '')) &&
-                  !/\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(post.mediaUrl || '');
+  const mediaUrl = post?.mediaUrl || post?.video_url || post?.videoUrl || '';
+  const isVideoExt = (url) => typeof url === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(url);
+  const isVideo = (post.mediaType === 'video' || isVideoExt(mediaUrl)) &&
+                  !/\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i.test(mediaUrl || '');
 
-  const shouldMountPlayer = isVideo && isActive && isFocused;
-  const player = useVideoPlayer(shouldMountPlayer ? post.mediaUrl : null, p => {
+  const shouldMountPlayer = Boolean(isVideo && isActive && isFocused && mediaUrl);
+
+  const cleanPosterUrl = (!isVideoExt(post?.posterUrl) && post?.posterUrl)
+    ? post.posterUrl
+    : (!isVideoExt(post?.thumbnailUrl) && post?.thumbnailUrl)
+      ? post.thumbnailUrl
+      : (!isVideoExt(post?.thumbnail) && post?.thumbnail)
+        ? post.thumbnail
+        : (!isVideoExt(mediaUrl) && mediaUrl)
+          ? mediaUrl
+          : undefined;
+
+  const player = useVideoPlayer(mediaUrl, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
-    if (isActive && isFocused && !isUserPaused) {
+    if (shouldMountPlayer && !isUserPaused) {
       p.play();
       setIsPlaying(true);
     }
@@ -76,11 +89,11 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     if (!player) return;
     let viewTimer = null;
     try {
-      if (isActive && isFocused && !isUserPaused) {
+      if (shouldMountPlayer && !isUserPaused) {
         player.play();
         setIsPlaying(true);
         // Only count view after 5 seconds of continuous playback
-        if (!hasRecordedViewRef.current && recordPostView) {
+        if (!hasRecordedViewRef.current && recordPostView && post?.id) {
           viewTimer = setTimeout(() => {
             if (!hasRecordedViewRef.current) {
               hasRecordedViewRef.current = true;
@@ -97,7 +110,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     return () => {
       if (viewTimer) clearTimeout(viewTimer);
     };
-  }, [isActive, isFocused, isUserPaused, player, post.id, recordPostView]);
+  }, [shouldMountPlayer, isUserPaused, player, post?.id, recordPostView]);
 
   // Sync mute state
   useEffect(() => {
@@ -248,13 +261,13 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     <View style={styles.card}>
       {/* Media Player Container */}
       <View style={styles.playerContainer}>
-        {/* Background Media */}
-        <View style={StyleSheet.absoluteFillObject}>
+        {/* Background Media — pointerEvents none prevents native view from blocking gesture layers */}
+        <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
           {isVideo ? (
             Platform.OS === 'web' ? (
               <video
                 ref={webVideoRef}
-                src={post.mediaUrl}
+                src={mediaUrl}
                 autoPlay
                 playsInline
                 loop
@@ -271,21 +284,31 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
                 player={player}
                 style={styles.videoPlayer}
                 contentFit="cover"
+                surfaceType="textureView"
+                useExoShutter={false}
                 nativeControls={false}
               />
-            ) : (
+            ) : cleanPosterUrl ? (
               <Image
-                source={{ uri: post.posterUrl || post.thumbnailUrl || post.mediaUrl }}
+                source={{ uri: cleanPosterUrl }}
                 style={styles.videoPlayer}
                 resizeMode="cover"
               />
+            ) : (
+              <View style={[styles.videoPlayer, { backgroundColor: '#130924', justifyContent: 'center', alignItems: 'center' }]}>
+                <Film size={40} color="rgba(255,255,255,0.25)" />
+              </View>
             )
-          ) : (
+          ) : cleanPosterUrl ? (
             <Image
-              source={{ uri: post.mediaUrl || post.posterUrl || post.thumbnailUrl }}
+              source={{ uri: cleanPosterUrl }}
               style={styles.videoPlayer}
               resizeMode="cover"
             />
+          ) : (
+            <View style={[styles.videoPlayer, { backgroundColor: '#130924', justifyContent: 'center', alignItems: 'center' }]}>
+              <Film size={40} color="rgba(255,255,255,0.25)" />
+            </View>
           )}
         </View>
 
