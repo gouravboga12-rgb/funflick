@@ -11,7 +11,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as ImagePicker from 'expo-image-picker';
@@ -107,6 +107,7 @@ function ReelPreview({ videoUri, isMuted }) {
 }
 
 export const UploadReelScreen = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { fetchFeed, currentUser } = useApp();
 
   // Media state

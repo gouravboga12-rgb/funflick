@@ -640,8 +640,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 150,
-    elevation: 150,
+    zIndex: 999,
+    elevation: 999,
   },
   rightNavArrow: {
     position: 'absolute',
@@ -656,8 +656,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 150,
-    elevation: 150,
+    zIndex: 999,
+    elevation: 999,
   },
   touchArea: {
     position: 'absolute',

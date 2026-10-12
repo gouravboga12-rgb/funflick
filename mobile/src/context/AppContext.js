@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { apiRequest, getToken, setToken, getStoredUser, setStoredUser } from '../services/api';
+import { apiRequest, getToken, setToken, getStoredUser, setStoredUser, getStoredSavedPosts, setStoredSavedPosts } from '../services/api';
 import { registerForPushNotificationsAsync, scheduleLocalNotification } from '../services/pushService';
 import * as Notifications from 'expo-notifications';
 import { navigate } from '../navigation/navigationService';
@@ -28,6 +28,15 @@ export const AppProvider = ({ children }) => {
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const locallySeenStoryIdsRef = useRef(new Set());
+  const [savedPostIds, setSavedPostIds] = useState(new Set());
+  const savedPostIdsRef = useRef(new Set());
+
+  const [adContactSettings, setAdContactSettings] = useState({
+    adContactPhone: '+91 98765 43210',
+    adContactWhatsapp: '+91 98765 43210',
+    adContactEmail: 'ads@funflick.in',
+    adContactTimings: 'Mon - Sat, 9:00 AM - 7:00 PM IST',
+  });
 
   // In-app floating toast banner state
   const [inAppBanner, setInAppBanner] = useState({
@@ -126,6 +135,24 @@ export const AppProvider = ({ children }) => {
           // Register device push token in background
           registerForPushNotificationsAsync();
         }
+
+        // Restore persistent saved post IDs
+        try {
+          const savedIds = await getStoredSavedPosts();
+          if (Array.isArray(savedIds)) {
+            const set = new Set(savedIds.map(String));
+            setSavedPostIds(set);
+            savedPostIdsRef.current = set;
+          }
+        } catch (e) {}
+
+        // Fetch central platform & ad contact settings
+        try {
+          const sData = await apiRequest('/settings');
+          if (sData && sData.settings) {
+            setAdContactSettings(sData.settings);
+          }
+        } catch (e) {}
       } catch (err) {
         console.warn('Auth restore error:', err);
       } finally {
@@ -160,6 +187,7 @@ export const AppProvider = ({ children }) => {
             commentsCount: Number(v.comments_count) || 0,
             timeAgo: v.created_at ? new Date(v.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Recently',
             isLiked: Boolean(v.user_liked),
+            isSaved: Boolean(savedPostIdsRef.current.has(String(v.id))),
             isFollowing: Boolean(v.user_following),
             creator: {
               id: v.creator_id,
@@ -342,6 +370,45 @@ export const AppProvider = ({ children }) => {
     if (!videoId) return;
     try {
       await apiRequest(`/videos/${videoId}/view`, { method: 'POST' });
+    } catch (e) {}
+  }, []);
+
+  // Persistent toggle save / bookmark post
+  const toggleSavePost = useCallback(async (postId) => {
+    if (!postId) return;
+    const strId = String(postId);
+    let willSave = false;
+    setSavedPostIds(prev => {
+      const next = new Set(prev);
+      if (next.has(strId)) {
+        next.delete(strId);
+        willSave = false;
+      } else {
+        next.add(strId);
+        willSave = true;
+      }
+      savedPostIdsRef.current = next;
+      setStoredSavedPosts(Array.from(next));
+      return next;
+    });
+
+    setPosts(prev =>
+      prev.map(p => {
+        if (String(p.id) === strId) {
+          return { ...p, isSaved: willSave };
+        }
+        return p;
+      })
+    );
+  }, []);
+
+  // Fetch live platform & ad contact settings
+  const fetchSettings = useCallback(async () => {
+    try {
+      const data = await apiRequest('/settings');
+      if (data && data.settings) {
+        setAdContactSettings(data.settings);
+      }
     } catch (e) {}
   }, []);
 
@@ -1110,6 +1177,10 @@ export const AppProvider = ({ children }) => {
         setActivePlayingVideoId,
         toggleLikePost,
         recordPostView,
+        toggleSavePost,
+        savedPostIds,
+        adContactSettings,
+        fetchSettings,
         toggleFollowCreator,
         followingUsernames,
         fetchMyFollowing,

@@ -34,12 +34,17 @@ export function ReelItem({
   handleShare,
   navigation,
 }) {
+  const { toggleSavePost } = useApp();
   const [isPaused, setIsPaused] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [isSaved, setIsSaved] = useState(Boolean(item?.isSaved));
   const [lastTap, setLastTap] = useState(0);
   const heartScale = useRef(new Animated.Value(0)).current;
   const hasRecordedViewRef = useRef(false);
+
+  useEffect(() => {
+    setIsSaved(Boolean(item?.isSaved));
+  }, [item?.isSaved]);
 
   // Optimistic like state so likes work instantly in Reels feed and in Discovery/Trending modal
   const [localLiked, setLocalLiked] = useState(Boolean(item?.isLiked || item?.user_liked));
@@ -349,7 +354,12 @@ export function ReelItem({
         <TouchableOpacity
           style={styles.sideBtn}
           activeOpacity={0.7}
-          onPress={() => setIsSaved(prev => !prev)}
+          onPress={() => {
+            setIsSaved(prev => !prev);
+            if (toggleSavePost && item?.id) {
+              toggleSavePost(item.id);
+            }
+          }}
         >
           <Bookmark
             size={25}

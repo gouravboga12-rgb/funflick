@@ -37,7 +37,7 @@ import { uploadMediaToS3 } from '../../services/s3Upload';
 import { colors } from '../../theme/colors';
 
 export const SubmitAdRequestModal = ({ isOpen, onClose }) => {
-  const { currentUser } = useApp();
+  const { currentUser, adContactSettings: contextAdSettings, fetchSettings } = useApp();
 
   const [activeTab, setActiveTab] = useState('new'); // 'new' | 'my_requests'
   const [brandName, setBrandName] = useState('');
@@ -61,11 +61,17 @@ export const SubmitAdRequestModal = ({ isOpen, onClose }) => {
   // My requests & contact settings
   const [myAdRequests, setMyAdRequests] = useState([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
-  const [adContactSettings, setAdContactSettings] = useState({
+  const [adContactSettings, setAdContactSettings] = useState(contextAdSettings || {
     adContactPhone: '+91 98765 43210',
     adContactWhatsapp: '+91 98765 43210',
     adContactEmail: 'ads@funflick.in',
   });
+
+  useEffect(() => {
+    if (contextAdSettings) {
+      setAdContactSettings(contextAdSettings);
+    }
+  }, [contextAdSettings]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -75,7 +81,8 @@ export const SubmitAdRequestModal = ({ isOpen, onClose }) => {
 
   const fetchContactSettings = async () => {
     try {
-      const data = await apiRequest('/ads/contact-settings');
+      if (fetchSettings) fetchSettings();
+      const data = await apiRequest('/settings');
       if (data && data.settings) {
         setAdContactSettings(data.settings);
       }

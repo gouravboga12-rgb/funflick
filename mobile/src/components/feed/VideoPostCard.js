@@ -24,7 +24,7 @@ function formatCount(num) {
 
 export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const isFocused = useIsFocused();
-  const { toggleLikePost, recordPostView, toggleFollowCreator, isReelsMuted, toggleMute, currentUser } = useApp();
+  const { toggleLikePost, toggleSavePost, recordPostView, toggleFollowCreator, isReelsMuted, toggleMute, currentUser } = useApp();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isUserPaused, setIsUserPaused] = useState(false);
   const [isLiked, setIsLiked] = useState(Boolean(post.isLiked || post.user_liked));
@@ -33,7 +33,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const [commentsCount, setCommentsCount] = useState(Number(post.commentsCount ?? post.comments_count ?? 0));
   const [lastTap, setLastTap] = useState(0);
   const [captionExpanded, setCaptionExpanded] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [isSaved, setIsSaved] = useState(Boolean(post.isSaved));
   const [avatarErr, setAvatarErr] = useState(false);
   const heartScale = useRef(new Animated.Value(0)).current;
   const hasRecordedViewRef = useRef(false);
@@ -42,7 +42,8 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
     setIsLiked(Boolean(post.isLiked || post.user_liked));
     setLikesCount(Number(post.likesCount ?? post.likes_count ?? 0));
     setCommentsCount(Number(post.commentsCount ?? post.comments_count ?? 0));
-  }, [post.id, post.isLiked, post.user_liked, post.likesCount, post.likes_count, post.commentsCount, post.comments_count]);
+    setIsSaved(Boolean(post.isSaved));
+  }, [post.id, post.isLiked, post.user_liked, post.likesCount, post.likes_count, post.commentsCount, post.comments_count, post.isSaved]);
 
   const isOwner = post.creator?.username === currentUser?.username;
   const isVideo = (post.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(post.mediaUrl || '')) &&
@@ -466,7 +467,10 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
           <TouchableOpacity
             style={styles.actionBtn}
             activeOpacity={0.7}
-            onPress={() => setIsSaved(prev => !prev)}
+            onPress={() => {
+              setIsSaved(prev => !prev);
+              toggleSavePost?.(post.id);
+            }}
           >
             <Bookmark
               size={24}

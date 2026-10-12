@@ -102,7 +102,7 @@ function AvatarWithFallback({ avatar, name, username, size = 80 }) {
 }
 
 export const UserProfileScreen = ({ navigation, route }) => {
-  const { currentUser, setCurrentUser, logout, posts, fetchFeed, deleteUserPost, stories, fetchLiveStories } = useApp();
+  const { currentUser, setCurrentUser, logout, posts, fetchFeed, deleteUserPost, stories, fetchLiveStories, savedPostIds, toggleSavePost } = useApp();
   const [activeMode, setActiveMode] = useState('viewer'); // 'viewer' | 'influencer'
 
   // Dynamic live followers / following count
@@ -349,9 +349,13 @@ export const UserProfileScreen = ({ navigation, route }) => {
         }),
       });
       if (updated && updated.user) {
-        setCurrentUser(updated.user);
-        await setStoredUser(updated.user);
-        if (updated.token) {
+        if (typeof setCurrentUser === 'function') {
+          setCurrentUser(updated.user);
+        }
+        if (typeof setStoredUser === 'function') {
+          await setStoredUser(updated.user);
+        }
+        if (updated.token && typeof setToken === 'function') {
           await setToken(updated.token);
         }
       }
@@ -473,9 +477,8 @@ export const UserProfileScreen = ({ navigation, route }) => {
         showAppAlert('Permission Required', 'Please allow access to your media library.');
         return;
       }
-      const isVideo = editingContentItem?._type === 'video' || editingContentItem?.media_type === 'video' || editingContentItem?.mediaType === 'video';
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: isVideo ? ['videos'] : ['images'],
+        mediaTypes: ['images', 'videos'],
         quality: 0.85,
         allowsEditing: false,
       });
@@ -501,8 +504,10 @@ export const UserProfileScreen = ({ navigation, route }) => {
       // Upload new media to S3 if user picked a replacement
       if (editContentNewMediaUrl) {
         setIsUploadingEditMedia(true);
-        try {
-          const isVideo = editingContentItem._type === 'video' || editingContentItem?.media_type === 'video' || editingContentItem?.mediaType === 'video';
+          const isVideo = editingContentItem._type === 'video' ||
+                          editingContentItem?.media_type === 'video' ||
+                          editingContentItem?.mediaType === 'video' ||
+                          /\.(mp4|mov|webm|m4v)($|\?)/i.test(editContentNewMediaUrl);
           const defaultExt = isVideo ? 'mp4' : 'jpg';
           const defaultMime = isVideo ? 'video/mp4' : 'image/jpeg';
           const fileName = `edit_${Date.now()}.${defaultExt}`;
@@ -530,6 +535,8 @@ export const UserProfileScreen = ({ navigation, route }) => {
         if (finalMediaUrl) {
           payload.media_url = finalMediaUrl;
           payload.video_url = finalMediaUrl;
+          payload.thumbnail_url = finalMediaUrl;
+          payload.poster_url = finalMediaUrl;
         }
         await apiRequest(`/videos/${editingContentItem.id}`, {
           method: 'PUT',
@@ -664,8 +671,12 @@ export const UserProfileScreen = ({ navigation, route }) => {
       }
 
       if (res && res.user) {
-        setCurrentUser(res.user);
-        await setStoredUser(res.user);
+        if (typeof setCurrentUser === 'function') {
+          setCurrentUser(res.user);
+        }
+        if (typeof setStoredUser === 'function') {
+          await setStoredUser(res.user);
+        }
       }
       setIsSettingsModalOpen(false);
       Alert.alert('Settings Saved', '⚙️ Account settings and preferences saved successfully!');
@@ -695,7 +706,7 @@ export const UserProfileScreen = ({ navigation, route }) => {
   // User posts / submissions
   const myPosts = (posts || []).filter(p => p.creator?.username === currentUser?.username);
   const myLikedPosts = (posts || []).filter(p => p.isLiked);
-  const mySavedPosts = (posts || []).filter(p => p.isSaved);
+  const mySavedPosts = (posts || []).filter(p => p.isSaved || (savedPostIds && savedPostIds.has && savedPostIds.has(String(p.id))));
 
   const realPostCount = myPosts.length;
   const isInfluencer = Boolean(currentUser?.isInfluencer);
@@ -2167,19 +2178,17 @@ export const UserProfileScreen = ({ navigation, route }) => {
                     </View>
                   </View>
 
-                  {/* Change Media button — only for video/reel posts */}
-                  {(editingContentItem._type === 'video' || !editingContentItem._type) && (
-                    <TouchableOpacity
-                      onPress={handlePickNewMedia}
-                      disabled={isUploadingEditMedia}
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(56,189,248,0.12)', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(56,189,248,0.3)' }}
-                    >
-                      <Camera size={15} color="#38bdf8" />
-                      <Text style={{ color: '#38bdf8', fontSize: 12, fontWeight: '700' }}>
-                        {editContentNewMediaUrl ? 'Change Media Again' : 'Change Video / Media'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+                  {/* Change Media button — available for all posts & reels */}
+                  <TouchableOpacity
+                    onPress={handlePickNewMedia}
+                    disabled={isUploadingEditMedia}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(56,189,248,0.12)', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(56,189,248,0.3)' }}
+                  >
+                    <Camera size={15} color="#38bdf8" />
+                    <Text style={{ color: '#38bdf8', fontSize: 12, fontWeight: '700' }}>
+                      {editContentNewMediaUrl ? 'Change Media Again' : 'Change Photo / Video Media'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
 

@@ -25,7 +25,12 @@ export const CreateChooserModal = ({ visible, onClose, onSelect }) => {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleModalClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={handleModalClose}>
+      <View style={styles.overlay}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={handleModalClose}
+        />
         <View style={[styles.sheet, { paddingBottom: bottomPadding }]}>
           {!showMonetizationExplainer ? (
             <>
@@ -222,7 +227,7 @@ export const CreateChooserModal = ({ visible, onClose, onSelect }) => {
             </View>
           )}
         </View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 };

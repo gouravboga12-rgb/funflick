@@ -6,6 +6,7 @@ import { Bell, X, Sparkles, CheckCircle2 } from 'lucide-react-native';
 import { Header } from '../../components/common/Header';
 import { StoryBar } from '../../components/feed/StoryBar';
 import { VideoPostCard } from '../../components/feed/VideoPostCard';
+import { StandardPostCard } from '../../components/feed/StandardPostCard';
 import { SponsoredAdCard } from '../../components/feed/SponsoredAdCard';
 import { MobileAdPopup } from '../../components/common/MobileAdPopup';
 import { useApp } from '../../context/AppContext';
@@ -109,13 +110,27 @@ export const HomeScreen = ({ navigation }) => {
           const adIndex = Math.floor(index / 5) % Math.max(1, inFeedAds.length);
           const feedAd = showFeedAd ? inFeedAds[adIndex] : null;
 
+          const mediaUrl = item.mediaUrl || item.video_url || '';
+          const isVideo =
+            (item.mediaType === 'video' || item.media_type === 'video') &&
+            !mediaUrl.match(/\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i) &&
+            item.category !== 'Photo' &&
+            item.category !== 'Post';
+
           return (
             <View style={styles.cardWrapper}>
-              <VideoPostCard
-                post={item}
-                isActive={activeVideoId ? item.id === activeVideoId : index === 0}
-                navigation={navigation}
-              />
+              {isVideo ? (
+                <VideoPostCard
+                  post={item}
+                  isActive={activeVideoId ? item.id === activeVideoId : index === 0}
+                  navigation={navigation}
+                />
+              ) : (
+                <StandardPostCard
+                  post={item}
+                  navigation={navigation}
+                />
+              )}
               {feedAd && (
                 <View style={{ marginTop: 8 }}>
                   <SponsoredAdCard ad={feedAd} isActive={false} />

@@ -120,3 +120,40 @@ export async function apiRequest(endpoint, options = {}) {
 
   return data;
 }
+
+const SAVED_POSTS_KEY = 'funflick_saved_posts';
+let memorySavedPosts = [];
+
+export async function getStoredSavedPosts() {
+  if (Platform.OS === 'web') {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const val = window.localStorage.getItem(SAVED_POSTS_KEY);
+        return val ? JSON.parse(val) : [];
+      }
+    } catch { return []; }
+    return memorySavedPosts;
+  }
+  try {
+    const val = await SecureStore.getItemAsync(SAVED_POSTS_KEY);
+    return val ? JSON.parse(val) : memorySavedPosts;
+  } catch {
+    return memorySavedPosts;
+  }
+}
+
+export async function setStoredSavedPosts(ids) {
+  memorySavedPosts = ids;
+  const json = JSON.stringify(ids);
+  if (Platform.OS === 'web') {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(SAVED_POSTS_KEY, json);
+      }
+    } catch {}
+    return;
+  }
+  try {
+    await SecureStore.setItemAsync(SAVED_POSTS_KEY, json);
+  } catch {}
+}
