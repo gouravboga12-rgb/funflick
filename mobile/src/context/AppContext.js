@@ -6,6 +6,15 @@ import { navigate } from '../navigation/navigationService';
 
 const AppContext = createContext();
 
+const cleanAvatar = (url, fallback = 'https://funflick.in/brand/funflick-logo.png') => {
+  if (!url || typeof url !== 'string') return fallback;
+  let clean = url.replace(/https?:\/\/funflick-theta\.vercel\.app/g, 'https://funflick.in');
+  clean = clean.replace(/https?:\/\/98\.130\.142\.69/g, 'https://funflick.in');
+  if (clean.startsWith('/')) clean = `https://funflick.in${clean}`;
+  if (clean.includes('default-avatar')) return fallback;
+  return clean;
+};
+
 export const AppProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -59,7 +68,7 @@ export const AppProvider = ({ children }) => {
           userId: currentUser?.id || userGroup?.userId,
           username: currentUser?.username || 'Your Story',
           name: 'Your Story',
-          avatar: currentUser?.avatar_url || currentUser?.avatar || userGroup?.avatar || '/brand/default-avatar.svg',
+          avatar: cleanAvatar(currentUser?.avatar_url || currentUser?.avatar || userGroup?.avatar),
           hasUnseen: false,
           stories: userGroup?.stories || [],
         };
@@ -83,7 +92,7 @@ export const AppProvider = ({ children }) => {
               isUser: false,
               username: s.username,
               name: s.name || s.username,
-              avatar: s.avatar || '/brand/default-avatar.svg',
+              avatar: cleanAvatar(s.avatar),
               hasUnseen,
               stories: updatedStories,
             };
@@ -156,9 +165,12 @@ export const AppProvider = ({ children }) => {
               id: v.creator_id,
               name: v.creator_name || 'Creator',
               username: v.creator_username || 'creator',
-              avatar: (v.creator_username === 'super_admin')
-                ? (v.creator_avatar && !v.creator_avatar.includes('default-avatar') ? v.creator_avatar : 'https://funflick.in/brand/funflick-logo.png')
-                : (v.creator_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'),
+              avatar: cleanAvatar(
+                v.creator_avatar,
+                v.creator_username === 'super_admin'
+                  ? 'https://funflick.in/brand/funflick-logo.png'
+                  : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
+              ),
             }
           };
         });

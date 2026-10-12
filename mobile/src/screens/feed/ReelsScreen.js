@@ -41,7 +41,12 @@ export function ReelItem({
   const heartScale = useRef(new Animated.Value(0)).current;
   const hasRecordedViewRef = useRef(false);
 
-  const player = useVideoPlayer(item.mediaUrl, p => {
+  const mediaUrl = item?.mediaUrl || item?.video_url || item?.videoUrl || '';
+  const isVideo = item?.mediaType === 'video' ||
+    /\.(mp4|webm|mov|m4v)($|\?)/i.test(mediaUrl) ||
+    (!item?.mediaType && !/\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(mediaUrl));
+
+  const player = useVideoPlayer(mediaUrl, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;

@@ -55,9 +55,12 @@ function CreatorAvatarCircle({ avatar, name, username, size = 64 }) {
       : 'https://funflick.in/brand/funflick-logo.png';
   }
 
-  // Ensure relative URLs are converted to absolute public URLs
-  if (imageUri && typeof imageUri === 'string' && imageUri.startsWith('/')) {
-    imageUri = `https://funflick.in${imageUri}`;
+  // Ensure relative URLs and legacy domains are converted to absolute public URLs
+  if (imageUri && typeof imageUri === 'string') {
+    imageUri = imageUri.replace(/https?:\/\/funflick-theta\.vercel\.app/g, 'https://funflick.in');
+    if (imageUri.startsWith('/')) {
+      imageUri = `https://funflick.in${imageUri}`;
+    }
   }
 
   const isDefaultOrMissing = !imageUri || String(imageUri).includes('default-avatar') || hasError;

@@ -47,8 +47,11 @@ export async function searchUsers(req, res) {
       } else {
         userAvatar = userAvatar || 'https://funflick.in/brand/default-avatar.svg';
       }
-      if (userAvatar && userAvatar.startsWith('/')) {
-        userAvatar = `https://funflick.in${userAvatar}`;
+      if (userAvatar && typeof userAvatar === 'string') {
+        userAvatar = userAvatar.replace(/https?:\/\/funflick-theta\.vercel\.app/g, 'https://funflick.in');
+        if (userAvatar.startsWith('/')) {
+          userAvatar = `https://funflick.in${userAvatar}`;
+        }
       }
 
       return {
