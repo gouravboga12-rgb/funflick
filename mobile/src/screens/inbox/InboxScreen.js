@@ -719,6 +719,15 @@ export const InboxScreen = ({ navigation, route }) => {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top Header */}
       <View style={styles.header}>
+        {navigation.canGoBack() && (
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <ChevronLeft size={24} color="#ffffff" />
+          </TouchableOpacity>
+        )}
         <Text style={styles.headerTitle}>Direct Messages</Text>
         <View style={styles.chatBadge}>
           <Text style={styles.chatBadgeText}>{conversations.length}</Text>

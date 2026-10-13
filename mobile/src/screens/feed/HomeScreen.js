@@ -26,10 +26,15 @@ export const HomeScreen = ({ navigation }) => {
     showMobileAd,
     isAuthenticated,
     currentUser,
+    conversations,
   } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
   const [activeVideoId, setActiveVideoId] = useState(null);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
+
+  const unreadMessagesCount = useMemo(() => {
+    return (conversations || []).reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+  }, [conversations]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -87,6 +92,7 @@ export const HomeScreen = ({ navigation }) => {
       <Header
         activeTab={activeTab}
         unreadCount={unreadNotificationCount}
+        unreadMessagesCount={unreadMessagesCount}
         onTabChange={setActiveTab}
         onSearchPress={() => navigation.navigate('Discover')}
         onNotificationsPress={() => navigation.navigate('Notifications')}

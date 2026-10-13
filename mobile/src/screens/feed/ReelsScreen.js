@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated, Platform } from 'react-native';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated, Platform, RefreshControl } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,6 +7,7 @@ import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Pause, Music, Boo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
+import { apiRequest } from '../../services/api';
 import { CommentsModal } from '../../components/feed/CommentsModal';
 import { colors } from '../../theme/colors';
 
@@ -484,11 +485,68 @@ export const ReelsScreen = ({ navigation }) => {
   } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
+  const [reelsData, setReelsData] = useState([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const reelsScrolledCountRef = useRef(0);
 
-  const videoPosts = posts.filter(
+  // Fetch category-personalized and dynamically seeded video-only feed
+  const fetchDedicatedReels = useCallback(async (newSeed) => {
+    try {
+      const seedParam = newSeed || Date.now();
+      const res = await apiRequest(`/videos/reels?limit=25&seed=${seedParam}`);
+      if (res && res.videos && Array.isArray(res.videos) && res.videos.length > 0) {
+        const mapped = res.videos.map(v => {
+          const safePoster = v.thumbnail_url && !/\.(mp4|webm|mov|m4v)($|\?)/i.test(v.thumbnail_url) ? v.thumbnail_url : null;
+          return {
+            id: v.id,
+            title: v.title || 'FunFlick Video',
+            caption: v.description || v.title || '',
+            category: v.category || 'Comedy',
+            mediaType: 'video',
+            mediaUrl: v.video_url,
+            posterUrl: safePoster,
+            thumbnailUrl: safePoster,
+            likesCount: Number(v.likes_count) || 0,
+            viewsCount: String(v.views_count || '0'),
+            commentsCount: Number(v.comments_count) || 0,
+            isLiked: Boolean(v.user_liked),
+            isFollowing: Boolean(v.user_following),
+            isSaved: false,
+            creator: {
+              id: v.creator_id,
+              name: v.creator_name || 'Creator',
+              username: v.creator_username || 'creator',
+              avatar: v.creator_avatar || 'https://funflick.in/brand/funflick-logo.png',
+            },
+          };
+        });
+        setReelsData(mapped);
+      }
+    } catch (err) {
+      console.warn('Could not fetch dedicated reels feed:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDedicatedReels();
+  }, [fetchDedicatedReels]);
+
+  const handlePullRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Regenerate seed to reshuffle and prioritize fresh/different videos
+      await fetchDedicatedReels(Date.now());
+      setCurrentIndex(0);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const fallbackVideoPosts = (posts || []).filter(
     p => p.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(p.mediaUrl || '')
   );
+
+  const displayVideos = reelsData.length > 0 ? reelsData : fallbackVideoPosts;
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0) {
@@ -520,7 +578,7 @@ export const ReelsScreen = ({ navigation }) => {
       const shareUrl = `https://funflick.in/video/${post?.id}`;
       await Share.share({
         title: post?.title || 'Watch on FunFlick',
-        message: `Watch "${post?.title || 'this reel'}" on FunFlick!\n${shareUrl}`,
+        message: `Watch "${post?.title || 'this video'}" on FunFlick!\n${shareUrl}`,
         url: shareUrl,
       });
     } catch (e) {}
@@ -536,16 +594,16 @@ export const ReelsScreen = ({ navigation }) => {
         }
       }}
     >
-      {/* Top Floating Header (Matching Web Reels) */}
+      {/* Top Floating Header (Matching Web Videos) */}
       <View style={[styles.topHeader, { top: Math.max(insets.top, 14) }]}>
-        <Text style={styles.headerTitle}>Reels</Text>
+        <Text style={styles.headerTitle}>Videos</Text>
         <View style={styles.liveBadge}>
           <Text style={styles.liveText}>LIVE</Text>
         </View>
       </View>
 
       <FlatList
-        data={videoPosts}
+        data={displayVideos}
         keyExtractor={item => String(item.id)}
         renderItem={({ item, index }) => (
           <ReelItem
@@ -562,6 +620,14 @@ export const ReelsScreen = ({ navigation }) => {
             navigation={navigation}
           />
         )}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handlePullRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         pagingEnabled
         showsVerticalScrollIndicator={false}
         snapToInterval={containerHeight}

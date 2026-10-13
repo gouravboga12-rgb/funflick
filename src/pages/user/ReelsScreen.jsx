@@ -5,7 +5,7 @@ import { VideoPostCard } from '../../components/feed/VideoPostCard';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
 import { SubscriptionGateModal } from '../../components/common/SubscriptionGateModal';
 import { CreateChooserModal } from '../../components/user/create/CreateChooserModal';
-import { ChevronUp, ChevronDown, Sparkles, Film, Plus } from 'lucide-react';
+import { ChevronUp, ChevronDown, Sparkles, Film, Plus, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const ReelsScreen = () => {
@@ -14,7 +14,76 @@ export const ReelsScreen = () => {
   const targetId = searchParams.get('id');
   const { posts, blockedUsers, showMobileAd, adsList, setActivePlayingVideoId, isAuthenticated } = useApp();
 
-  const visiblePosts = posts.filter(p => !blockedUsers?.includes(p.creator?.username));
+  const [dedicatedReels, setDedicatedReels] = useState([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchReels = async (seed) => {
+    try {
+      const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+      const seedParam = seed || Date.now();
+      const res = await fetch(`/api/videos/reels?limit=30&seed=${seedParam}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.videos && Array.isArray(data.videos)) {
+          const mapped = data.videos.map(v => {
+            const isVideoUrl = (u) => typeof u === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(u);
+            const safePoster = (!isVideoUrl(v.thumbnail_url) && v.thumbnail_url) ? v.thumbnail_url : null;
+            return {
+              id: v.id,
+              title: v.title || 'FunFlick Video',
+              caption: v.description || v.title || '',
+              category: v.category || 'Comedy',
+              mediaType: 'video',
+              mediaUrl: v.video_url,
+              posterUrl: safePoster,
+              thumbnailUrl: safePoster,
+              thumbnail: safePoster,
+              hashtags: v.hashtags || '',
+              likesCount: Number(v.likes_count) || 0,
+              viewsCount: String(v.views_count || '0'),
+              commentsCount: Number(v.comments_count) || 0,
+              sharesCount: 0,
+              savesCount: 0,
+              creator: {
+                id: v.creator_id,
+                name: v.creator_name || 'Creator',
+                username: v.creator_username || 'creator',
+                avatar: v.creator_avatar || '/brand/default-avatar.svg',
+                isVerified: true
+              },
+              timeAgo: 'Just now',
+              isLiked: Boolean(v.user_liked),
+              isFollowing: Boolean(v.user_following),
+              isSaved: false,
+              comments: []
+            };
+          });
+          setDedicatedReels(mapped);
+        }
+      }
+    } catch (e) {
+      console.warn('Reels fetch error:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchReels();
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchReels(Date.now());
+      setCurrentIdx(0);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const rawPosts = dedicatedReels.length > 0 ? dedicatedReels : posts;
+  const visiblePosts = rawPosts.filter(p => !blockedUsers?.includes(p.creator?.username));
 
   const [currentIdx, setCurrentIdx] = useState(() => {
     if (targetId) {
@@ -137,13 +206,20 @@ export const ReelsScreen = () => {
       className="relative w-full flex-1 flex flex-col bg-black min-h-screen sm:min-h-full overflow-hidden select-none"
     >
       {/* Top Header Floating Title */}
-      <div className="absolute top-3 left-4 z-30 flex items-center gap-2 pointer-events-none">
+      <div className="absolute top-3 left-4 z-30 flex items-center gap-2">
         <span className="font-extrabold text-base text-white drop-shadow font-heading">
-          Reels
+          Videos
         </span>
         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#ff007a] text-white">
           LIVE
         </span>
+        <button
+          onClick={handleRefresh}
+          className="p-1 rounded-full bg-black/40 hover:bg-black/70 text-gray-300 hover:text-white transition active:scale-95"
+          title="Refresh Videos with New Recommendations"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {/* Vertical Navigation Arrow Controls (for convenient 1-tap navigation on both mobile and desktop) */}

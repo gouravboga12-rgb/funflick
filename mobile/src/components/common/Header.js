@@ -7,6 +7,7 @@ export const Header = ({
   tabs = ['For You', 'Trending', 'Latest'],
   activeTab = 'For You',
   unreadCount = 0,
+  unreadMessagesCount = 0,
   onTabChange,
   onSearchPress,
   onNotificationsPress,
@@ -67,6 +68,13 @@ export const Header = ({
 
         <TouchableOpacity onPress={onMessagesPress} style={styles.iconBtn}>
           <MessageSquare size={19} color="#ffffff" strokeWidth={2.2} />
+          {unreadMessagesCount > 0 && (
+            <View style={styles.msgBadgeWrap}>
+              <Text style={styles.msgBadgeText}>
+                {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -161,5 +169,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#ff007a',
     borderWidth: 1.5,
     borderColor: '#090514',
+  },
+  msgBadgeWrap: {
+    position: 'absolute',
+    top: -3,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#ff007a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#090514',
+  },
+  msgBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
+    lineHeight: 11,
   },
 });

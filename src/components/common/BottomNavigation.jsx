@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Home, Compass, Plus, MessageSquare, User } from 'lucide-react';
+import { Home, Compass, Plus, MessageSquare, User, Film } from 'lucide-react';
 
 export const BottomNavigation = () => {
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ export const BottomNavigation = () => {
     { label: 'Home', icon: Home, path: '/feed' },
     { label: 'Discover', icon: Compass, path: '/discover' },
     { label: 'Create', isCreate: true },
-    { label: 'Inbox', icon: MessageSquare, path: '/messages', badge: unreadMessages },
+    { label: 'Videos', icon: Film, path: '/videos' },
     { label: 'Profile', icon: User, path: '/profile', isAvatar: true }
   ];
 
@@ -59,6 +59,7 @@ export const BottomNavigation = () => {
 
           const isActive = currentPath === item.path || 
             (item.path === '/feed' && currentPath === '/') ||
+            (item.path === '/videos' && currentPath === '/reels') ||
             (item.label === 'Profile' && (currentPath === '/profile' || (currentUser?.username && currentPath.toLowerCase() === `/creator/${currentUser.username.toLowerCase()}`)));
           const Icon = item.icon;
 

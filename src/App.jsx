@@ -110,6 +110,7 @@ function AppRoutes() {
           {/* User Mobile App Routes */}
           <Route path="/feed" element={<MobileAppWrapper><HomeScreen /></MobileAppWrapper>} />
           <Route path="/reels" element={<MobileAppWrapper><ReelsScreen /></MobileAppWrapper>} />
+          <Route path="/videos" element={<MobileAppWrapper><ReelsScreen /></MobileAppWrapper>} />
           <Route path="/discover" element={<MobileAppWrapper><DiscoverScreen /></MobileAppWrapper>} />
           <Route path="/video/:id" element={<MobileAppWrapper><VideoDetailScreen /></MobileAppWrapper>} />
           <Route path="/creator/:username" element={<MobileAppWrapper><CreatorProfileScreen /></MobileAppWrapper>} />

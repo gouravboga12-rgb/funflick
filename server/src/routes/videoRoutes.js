@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { 
   listVideos, 
+  getReelsFeed,
   getMyMedia,
   getLikedVideos,
   createVideo, 
@@ -19,6 +20,9 @@ const router = Router();
 
 // Public / Authenticated: Browse feed videos with personalized like state
 router.get('/', optionalAuth, listVideos);
+
+// Public / Authenticated: Dedicated full-screen vertical video feed with category personalization & seeded refresh
+router.get('/reels', optionalAuth, getReelsFeed);
 
 // Protected: Get authenticated user's own media library (independent per account)
 router.get('/my-media', authenticateToken, getMyMedia);

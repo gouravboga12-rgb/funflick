@@ -18,6 +18,7 @@ import StoryViewerScreen from '../screens/feed/StoryViewerScreen';
 import { SubscriptionScreen } from '../screens/subscription/SubscriptionScreen';
 import { WalletScreen } from '../screens/wallet/WalletScreen';
 import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
+import { InboxScreen } from '../screens/inbox/InboxScreen';
 import { colors } from '../theme/colors';
 
 import * as Linking from 'expo-linking';
@@ -53,10 +54,11 @@ const linking = {
         screens: {
           Feed: 'feed',
           Discover: 'discover',
-          Inbox: 'inbox',
+          Videos: 'videos',
           Profile: 'profile',
         },
       },
+      Inbox: 'messages',
       VideoDetail: {
         path: 'video/:videoId',
         parse: {
@@ -137,6 +139,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Notifications"
           component={NotificationsScreen}
+          options={{ presentation: 'card', animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Inbox"
+          component={InboxScreen}
           options={{ presentation: 'card', animation: 'slide_from_right' }}
         />
         <Stack.Screen

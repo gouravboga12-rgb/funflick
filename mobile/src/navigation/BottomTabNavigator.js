@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, Compass, Plus, MessageSquare } from 'lucide-react-native';
+import { Home, Compass, Plus, MessageSquare, Film } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { HomeScreen } from '../screens/feed/HomeScreen';
 import { DiscoverScreen } from '../screens/discover/DiscoverScreen';
+import { ReelsScreen } from '../screens/feed/ReelsScreen';
 import { InboxScreen } from '../screens/inbox/InboxScreen';
 import { UserProfileScreen } from '../screens/profile/UserProfileScreen';
 import { CreateChooserModal } from '../screens/create/CreateChooserModal';
@@ -114,23 +115,14 @@ export default function BottomTabNavigator({ navigation }) {
           }}
         />
 
-        {/* 4. Inbox (Matching Website 4th Tab) */}
+        {/* 4. Videos (Dedicated Vertical Reels Feed) */}
         <Tab.Screen
-          name="Inbox"
-          component={InboxScreen}
+          name="Videos"
+          component={ReelsScreen}
           options={{
-            tabBarLabel: 'Inbox',
+            tabBarLabel: 'Videos',
             tabBarIcon: ({ color, focused }) => (
-              <View style={{ position: 'relative' }}>
-                <MessageSquare size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
-                {unreadMessagesCount > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadBadgeText}>
-                      {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              <Film size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
             ),
           }}
         />

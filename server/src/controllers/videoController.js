@@ -55,6 +55,89 @@ export async function listVideos(req, res) {
   }
 }
 
+// Dedicated full-screen vertical video feed with dynamic category personalization and seeded refresh
+export async function getReelsFeed(req, res) {
+  try {
+    const { limit = 15, offset = 0, seed } = req.query;
+    const currentUserId = req.user?.id || 0;
+    const seedNum = parseInt(seed, 10) || Math.floor(Date.now() / 60000);
+
+    // 1. Fetch user's top 3 preferred categories based on like history
+    let topCategories = [];
+    if (currentUserId > 0) {
+      try {
+        const [catRows] = await pool.query(
+          `SELECT v.category, COUNT(*) as cnt
+           FROM likes l
+           JOIN videos v ON l.video_id = v.id
+           WHERE l.user_id = ? AND v.category IS NOT NULL AND v.category != ''
+           GROUP BY v.category
+           ORDER BY cnt DESC
+           LIMIT 3`,
+          [currentUserId]
+        );
+        topCategories = catRows.map(r => r.category).filter(Boolean);
+      } catch (catErr) {
+        console.warn('Could not fetch user preferred categories:', catErr);
+      }
+    }
+
+    // 2. Select strictly videos with video_url and approved status
+    let query = `
+      SELECT 
+        v.id, v.title, v.description, v.category, v.video_url, v.thumbnail_url,
+        v.media_type, v.hashtags, v.location, v.audio_title,
+        v.duration, v.views_count, v.likes_count, v.created_at, v.status,
+        (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id) AS comments_count,
+        (SELECT COUNT(*) FROM likes l WHERE l.video_id = v.id AND l.user_id = ?) AS user_liked,
+        (SELECT COUNT(*) FROM follows f WHERE f.follower_id = ? AND f.following_id = u.id) AS user_following,
+        u.id AS creator_id, u.name AS creator_name, u.username AS creator_username, u.avatar_url AS creator_avatar
+      FROM videos v
+      JOIN users u ON v.user_id = u.id
+      WHERE v.status = 'Approved'
+        AND (v.media_type = 'video' OR v.video_url LIKE '%.mp4%' OR v.video_url LIKE '%.mov%' OR v.video_url LIKE '%.webm%')
+        AND (v.moderation_status IS NULL OR v.moderation_status != 'Rejected')
+        AND (u.status IS NULL OR u.status != 'Suspended')
+        AND (
+          COALESCE(u.is_private, 0) = 0
+          OR u.id = ?
+          OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ? AND f.following_id = u.id)
+        )
+    `;
+    const params = [currentUserId, currentUserId, currentUserId, currentUserId];
+
+    // 3. Dynamic Ordering: Category affinity + Popularity + Seeded Randomness
+    if (topCategories.length > 0) {
+      const placeholders = topCategories.map(() => '?').join(',');
+      query += `
+        ORDER BY (
+          (CASE WHEN v.category IN (${placeholders}) THEN 1.8 ELSE 1.0 END) *
+          (1.0 + (LOG(1 + GREATEST(v.likes_count, 0)) * 0.15)) +
+          (RAND(?) * 0.8)
+        ) DESC
+      `;
+      params.push(...topCategories, seedNum);
+    } else {
+      query += `
+        ORDER BY (
+          (1.0 + (LOG(1 + GREATEST(v.likes_count, 0)) * 0.15) + (LOG(1 + GREATEST(v.views_count, 0)) * 0.05)) +
+          (RAND(?) * 0.9)
+        ) DESC
+      `;
+      params.push(seedNum);
+    }
+
+    query += ' LIMIT ? OFFSET ?';
+    params.push(Number(limit), Number(offset));
+
+    const [rows] = await pool.query(query, params);
+    return res.json({ videos: rows, seed: seedNum });
+  } catch (err) {
+    console.error('Get reels feed error:', err);
+    return res.status(500).json({ error: 'Failed to fetch reels feed' });
+  }
+}
+
 // Authenticated user's private liked videos (only visible to the user who liked them)
 export async function getLikedVideos(req, res) {
   try {
