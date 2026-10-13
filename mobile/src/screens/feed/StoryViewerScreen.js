@@ -413,26 +413,8 @@ export default function StoryViewerScreen({ route, navigation }) {
       ]}
       pointerEvents="box-none"
     >
-      {/* Visible Chevron Navigation Arrows on the sides */}
-      <TouchableOpacity
-        style={styles.leftNavArrow}
-        onPress={goToPrevStory}
-        activeOpacity={0.7}
-        hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-      >
-        <ChevronLeft size={26} color="#ffffff" />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.rightNavArrow}
-        onPress={goToNextStory}
-        activeOpacity={0.7}
-        hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-      >
-        <ChevronRight size={26} color="#ffffff" />
-      </TouchableOpacity>
-          {/* Top Controls Section */}
-          <View style={styles.topSection} pointerEvents="box-none">
+      {/* Top Controls Section */}
+      <View style={styles.topSection} pointerEvents="box-none">
             {/* Instagram-style Segmented Progress Bar */}
             <View style={styles.progressBarContainer} pointerEvents="none">
               {storiesList.map((_, idx) => (
@@ -600,6 +582,25 @@ export default function StoryViewerScreen({ route, navigation }) {
         </View>
       </View>
     </Modal>
+
+    {/* Explicit Floating Navigation Arrows with top zIndex */}
+    <TouchableOpacity
+      style={styles.leftNavArrow}
+      onPress={goToPrevStory}
+      activeOpacity={0.7}
+      hitSlop={{ top: 25, bottom: 25, left: 25, right: 25 }}
+    >
+      <ChevronLeft size={28} color="#ffffff" />
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={styles.rightNavArrow}
+      onPress={goToNextStory}
+      activeOpacity={0.7}
+      hitSlop={{ top: 25, bottom: 25, left: 25, right: 25 }}
+    >
+      <ChevronRight size={28} color="#ffffff" />
+    </TouchableOpacity>
   </View>
 );
 }
@@ -679,38 +680,6 @@ const styles = StyleSheet.create({
     zIndex: 100,
     elevation: 100,
     justifyContent: 'space-between',
-  },
-  leftNavArrow: {
-    position: 'absolute',
-    left: 10,
-    top: '50%',
-    marginTop: -22,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 150,
-    elevation: 150,
-  },
-  rightNavArrow: {
-    position: 'absolute',
-    right: 10,
-    top: '50%',
-    marginTop: -22,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 150,
-    elevation: 150,
   },
   topSection: {
     width: '100%',

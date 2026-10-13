@@ -675,7 +675,7 @@ const styles = StyleSheet.create({
   popularBadge: {
     position: 'absolute',
     top: -10,
-    right: 20,
+    left: 16,
     backgroundColor: '#ff007a',
     paddingHorizontal: 12,
     paddingVertical: 3,
@@ -684,6 +684,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 6,
     elevation: 5,
+    zIndex: 10,
   },
   popularBadgeText: {
     color: '#ffffff',
@@ -694,11 +695,12 @@ const styles = StyleSheet.create({
   savingsBadge: {
     position: 'absolute',
     top: -10,
-    right: 20,
+    left: 16,
     backgroundColor: '#9333ea',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 12,
+    zIndex: 10,
   },
   savingsBadgeText: {
     color: '#ffffff',

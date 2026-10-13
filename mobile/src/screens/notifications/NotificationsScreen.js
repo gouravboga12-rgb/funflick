@@ -39,15 +39,26 @@ function NotificationAvatar({ avatarUri, initialChar, isSystem, style, fallbackS
     setImgErr(false);
   }, [avatarUri, isSystem]);
 
+  if (isSystem) {
+    return (
+      <View style={[style || styles.avatarImg, { backgroundColor: '#1e1136', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }]}>
+        <Image
+          source={require('../../../assets/icon.png')}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
+      </View>
+    );
+  }
+
   const finalUri = useMemo(() => {
-    if (isSystem) return 'https://funflick.in/brand/funflick-logo.png';
     if (!avatarUri || imgErr) return null;
     let uri = String(avatarUri).trim();
     if (uri.startsWith('/')) {
       return `https://funflick.in${uri}`;
     }
     return uri;
-  }, [avatarUri, imgErr, isSystem]);
+  }, [avatarUri, imgErr]);
 
   if (finalUri && !imgErr) {
     return (

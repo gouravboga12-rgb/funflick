@@ -5,14 +5,30 @@ import * as Notifications from 'expo-notifications';
 import { navigate } from '../navigation/navigationService';
 
 const AppContext = createContext();
-
-const cleanAvatar = (url, fallback = 'https://funflick.in/brand/funflick-logo.png') => {
+export const cleanAvatar = (url, fallback = 'https://funflick.in/brand/funflick-logo.png') => {
   if (!url || typeof url !== 'string') return fallback;
-  let clean = url.replace(/https?:\/\/funflick-theta\.vercel\.app/g, 'https://funflick.in');
+  let clean = url.trim();
+  clean = clean.replace(/https?:\/\/funflick-theta\.vercel\.app/g, 'https://funflick.in');
   clean = clean.replace(/https?:\/\/98\.130\.142\.69/g, 'https://funflick.in');
   if (clean.startsWith('/')) clean = `https://funflick.in${clean}`;
-  if (clean.includes('default-avatar')) return fallback;
+  if (
+    clean.includes('default-avatar') ||
+    clean.endsWith('.svg') ||
+    !clean.startsWith('http')
+  ) {
+    return fallback;
+  }
   return clean;
+};
+
+export const sanitizeUser = (u) => {
+  if (!u || typeof u !== 'object') return u;
+  const avatar = cleanAvatar(u.avatar || u.avatar_url);
+  return {
+    ...u,
+    avatar,
+    avatar_url: avatar,
+  };
 };
 
 export const AppProvider = ({ children }) => {
@@ -132,7 +148,8 @@ export const AppProvider = ({ children }) => {
           } catch (e) {}
         }
         if (token && user) {
-          setCurrentUser(user);
+          const safeUser = sanitizeUser(user);
+          setCurrentUser(safeUser);
           setIsAuthenticated(true);
           // Register device push token in background
           registerForPushNotificationsAsync();
@@ -226,18 +243,15 @@ export const AppProvider = ({ children }) => {
     });
 
     if (data.token && data.user) {
+      const safeUser = sanitizeUser(data.user);
       await setToken(data.token);
-      await setStoredUser(data.user);
-      setCurrentUser(data.user);
+      await setStoredUser(safeUser);
+      setCurrentUser(safeUser);
       setIsAuthenticated(true);
       registerForPushNotificationsAsync();
       fetchFeed();
-      // Trigger login pop-up ad for normal users
       hasTriggeredAdOnLaunchRef.current = false;
-      setTimeout(() => {
-        showMobileAd();
-      }, 1200);
-      return data.user;
+      return safeUser;
     }
     throw new Error('Invalid login response');
   };
@@ -250,17 +264,15 @@ export const AppProvider = ({ children }) => {
     });
 
     if (data.token && data.user) {
+      const safeUser = sanitizeUser(data.user);
       await setToken(data.token);
-      await setStoredUser(data.user);
-      setCurrentUser(data.user);
+      await setStoredUser(safeUser);
+      setCurrentUser(safeUser);
       setIsAuthenticated(true);
       registerForPushNotificationsAsync();
       fetchFeed();
       hasTriggeredAdOnLaunchRef.current = false;
-      setTimeout(() => {
-        showMobileAd();
-      }, 1200);
-      return data.user;
+      return safeUser;
     }
     return data;
   };
@@ -277,17 +289,15 @@ export const AppProvider = ({ children }) => {
     }
 
     if (data.token && data.user) {
+      const safeUser = sanitizeUser(data.user);
       await setToken(data.token);
-      await setStoredUser(data.user);
-      setCurrentUser(data.user);
+      await setStoredUser(safeUser);
+      setCurrentUser(safeUser);
       setIsAuthenticated(true);
       registerForPushNotificationsAsync();
       fetchFeed();
       hasTriggeredAdOnLaunchRef.current = false;
-      setTimeout(() => {
-        showMobileAd();
-      }, 1200);
-      return data;
+      return safeUser;
     }
 
     throw new Error(data.error || 'Google login failed');
@@ -301,17 +311,15 @@ export const AppProvider = ({ children }) => {
     });
 
     if (data.token && data.user) {
+      const safeUser = sanitizeUser(data.user);
       await setToken(data.token);
-      await setStoredUser(data.user);
-      setCurrentUser(data.user);
+      await setStoredUser(safeUser);
+      setCurrentUser(safeUser);
       setIsAuthenticated(true);
       registerForPushNotificationsAsync();
       fetchFeed();
       hasTriggeredAdOnLaunchRef.current = false;
-      setTimeout(() => {
-        showMobileAd();
-      }, 1200);
-      return data;
+      return safeUser;
     }
 
     throw new Error(data.error || 'Failed to select account');
@@ -320,13 +328,14 @@ export const AppProvider = ({ children }) => {
   // Hydrate user session from OAuth token and user object
   const hydrateOAuthSession = async (token, user) => {
     if (token && user) {
+      const safeUser = sanitizeUser(user);
       await setToken(token);
-      await setStoredUser(user);
-      setCurrentUser(user);
+      await setStoredUser(safeUser);
+      setCurrentUser(safeUser);
       setIsAuthenticated(true);
       registerForPushNotificationsAsync();
       fetchFeed();
-      return user;
+      return safeUser;
     }
   };
 
@@ -1195,7 +1204,9 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider
       value={{
         currentUser,
-        setCurrentUser,
+        setCurrentUser: (u) => setCurrentUser(u ? sanitizeUser(u) : null),
+        cleanAvatar,
+        sanitizeUser,
         isAuthenticated,
         isPaidInfluencer,
         isLoadingAuth,

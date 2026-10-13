@@ -477,8 +477,15 @@ export const UserProfileScreen = ({ navigation, route }) => {
         showAppAlert('Permission Required', 'Please allow access to your media library.');
         return;
       }
+      const isVideo = editingContentItem?._type === 'video' ||
+                      Boolean(editingContentItem?.video_url || editingContentItem?.videoUrl) ||
+                      editingContentItem?.category === 'Reels';
+      const mediaTypesConfig = ImagePicker.MediaTypeOptions?.All 
+        ? (isVideo ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.All)
+        : (isVideo ? ['videos'] : ['images', 'videos']);
+
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images', 'videos'],
+        mediaTypes: mediaTypesConfig,
         quality: 0.85,
         allowsEditing: false,
       });
@@ -486,6 +493,7 @@ export const UserProfileScreen = ({ navigation, route }) => {
         setEditContentNewMediaUrl(result.assets[0].uri);
       }
     } catch (e) {
+      console.warn('handlePickNewMedia error:', e);
       showAppAlert('Error', 'Could not open media picker.');
     }
   };
