@@ -7,6 +7,7 @@ import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Music, Bookmark, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
+import { CommentsModal } from '../../components/feed/CommentsModal';
 import { colors } from '../../theme/colors';
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
@@ -45,6 +46,13 @@ export function ReelItem({
   useEffect(() => {
     setIsSaved(Boolean(item?.isSaved));
   }, [item?.isSaved]);
+
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [localCommentsCount, setLocalCommentsCount] = useState(Number(item?.commentsCount ?? item?.comments_count ?? 0));
+
+  useEffect(() => {
+    setLocalCommentsCount(Number(item?.commentsCount ?? item?.comments_count ?? 0));
+  }, [item?.commentsCount, item?.comments_count]);
 
   // Optimistic like state so likes work instantly in Reels feed and in Discovery/Trending modal
   const [localLiked, setLocalLiked] = useState(Boolean(item?.isLiked || item?.user_liked));
@@ -323,10 +331,10 @@ export function ReelItem({
         <TouchableOpacity
           style={styles.sideBtn}
           activeOpacity={0.7}
-          onPress={() => navigation.navigate('VideoDetail', { videoId: item.id })}
+          onPress={() => setIsCommentsOpen(true)}
         >
           <MessageCircle size={27} color="#fff" strokeWidth={2} />
-          <Text style={styles.sideCount}>{formatCount(item.commentsCount)}</Text>
+          <Text style={styles.sideCount}>{formatCount(localCommentsCount)}</Text>
         </TouchableOpacity>
 
         {/* Share */}
@@ -430,6 +438,14 @@ export function ReelItem({
           </Text>
         </View>
       </View>
+
+      {/* Comments Drawer Modal */}
+      <CommentsModal
+        visible={isCommentsOpen}
+        onClose={() => setIsCommentsOpen(false)}
+        videoId={item?.id}
+        onCommentAdded={() => setLocalCommentsCount(c => c + 1)}
+      />
     </View>
   );
 }
