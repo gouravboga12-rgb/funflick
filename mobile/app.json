@@ -125,11 +125,11 @@
         }
       ]
     ],
+    "owner": "gourav5",
     "extra": {
       "eas": {
-        "projectId": "8f75f80d-ad46-4c21-8c97-06da2837b8b1"
+        "projectId": "2560da78-f4c1-40f6-8cff-bb14685b81b7"
       }
-    },
-    "owner": "namza63"
+    }
   }
 }
