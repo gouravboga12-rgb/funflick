@@ -100,7 +100,8 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
   };
 
   const handleMarkAsPaid = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    if (processing) return;
     if (!isSubscribed) {
       showToast('⚠️ Payouts are strictly reserved for subscribed VIP creators. This creator is on a Free account.', 'error');
       return;
@@ -181,11 +182,15 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto no-scrollbar">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto no-scrollbar"
+      onClick={(e) => e.stopPropagation()}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
+        onClick={(e) => e.stopPropagation()}
         className="w-full max-w-lg bg-[#110b24] border border-pink-500/30 rounded-3xl p-6 shadow-2xl space-y-4 my-6"
       >
         {/* Header */}
@@ -320,6 +325,9 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
                     max={currentViews}
                     value={settleUpTo}
                     onChange={e => setSettleUpTo(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') e.preventDefault();
+                    }}
                     className={`w-full bg-[#0f0921] text-white text-xs px-3 py-2 rounded-xl border focus:outline-none font-mono ${milestoneInvalid ? 'border-red-500/60' : 'border-white/10 focus:border-cyan-500'}`}
                   />
                   {milestoneInvalid && (
@@ -400,7 +408,17 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
             </div>
 
             {/* Form */}
-            <form onSubmit={handleMarkAsPaid} className="space-y-3.5">
+            <form 
+              onSubmit={e => {
+                e.preventDefault();
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                }
+              }}
+              className="space-y-3.5"
+            >
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-bold text-gray-200">Amount transferred (₹)</label>
@@ -425,6 +443,9 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
                     required
                     value={payAmount}
                     onChange={e => setPayAmount(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') e.preventDefault();
+                    }}
                     className="w-full bg-[#181033] text-white text-base font-extrabold pl-8 pr-4 py-2.5 rounded-2xl border border-white/15 focus:outline-none focus:border-pink-500 shadow-inner"
                   />
                 </div>
@@ -449,6 +470,9 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
                     type="text"
                     value={adminReference}
                     onChange={e => setAdminReference(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') e.preventDefault();
+                    }}
                     placeholder="Auto-generated if empty"
                     className="w-full bg-[#181033] text-white text-xs px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500 font-mono"
                   />
@@ -461,6 +485,9 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
                   type="text"
                   value={adminNote}
                   onChange={e => setAdminNote(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') e.preventDefault();
+                  }}
                   placeholder="e.g. Reward for reaching 10,000 views"
                   className="w-full bg-[#181033] text-white text-xs px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500"
                 />
@@ -475,7 +502,8 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleMarkAsPaid}
                   disabled={processing || milestoneInvalid || !isSubscribed}
                   className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-indigo-600 text-white font-bold text-xs hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/20 transition flex items-center justify-center gap-2"
                 >

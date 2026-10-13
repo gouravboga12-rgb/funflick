@@ -280,7 +280,6 @@ export const AdminCreatorsScreen = () => {
           onClose={() => setSelectedCreatorForPayout(null)}
           onPaidSuccess={() => {
             fetchCreators();
-            setSelectedCreatorForPayout(null);
           }}
         />
       )}
