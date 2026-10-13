@@ -11,6 +11,7 @@ import {
   Modal,
   Alert,
   Platform,
+  ScrollView,
 } from 'react-native';
 import {
   Heart,
@@ -26,6 +27,8 @@ import {
   AlertTriangle,
   Send,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../context/AppContext';
@@ -60,6 +63,29 @@ export const StandardPostCard = ({ post, navigation }) => {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [quickCommentText, setQuickCommentText] = useState('');
   const [isSubmittingQuickComment, setIsSubmittingQuickComment] = useState(false);
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  const [cardWidth, setCardWidth] = useState(SCREEN_WIDTH);
+  const carouselScrollRef = useRef(null);
+
+  // Parse media list supporting single URL, JSON array, or comma-separated URLs
+  const mediaList = React.useMemo(() => {
+    const raw = post?.media_urls || post?.mediaUrl || post?.video_url || post?.videoUrl || post?.posterUrl || post?.thumbnailUrl || '';
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed.filter(Boolean);
+        } catch (e) {}
+      }
+      if (trimmed.includes(',') && !trimmed.startsWith('data:')) {
+        return trimmed.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      return [trimmed].filter(Boolean);
+    }
+    return [];
+  }, [post]);
 
   // Sync props changes
   React.useEffect(() => {
@@ -283,17 +309,111 @@ export const StandardPostCard = ({ post, navigation }) => {
         </View>
       </View>
 
-      {/* 2. Photo Area (Square Aspect Ratio with Double Tap) */}
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={handlePhotoPress}
+      {/* 2. Photo Area (Multi-Photo Carousel or Single Photo) */}
+      <View
         style={styles.imageContainer}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          if (w > 0 && Math.abs(w - cardWidth) > 2) {
+            setCardWidth(w);
+          }
+        }}
       >
-        <Image
-          source={{ uri: photoUri }}
-          style={styles.postImage}
-          resizeMode="cover"
-        />
+        {mediaList.length > 1 ? (
+          <View style={styles.carouselWrap}>
+            <ScrollView
+              ref={carouselScrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                const offsetX = e.nativeEvent.contentOffset.x;
+                const index = Math.round(offsetX / (cardWidth || SCREEN_WIDTH));
+                setActiveMediaIndex(index);
+              }}
+              style={{ width: cardWidth, height: cardWidth }}
+            >
+              {mediaList.map((uri, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  activeOpacity={1}
+                  onPress={handlePhotoPress}
+                  style={{ width: cardWidth, height: cardWidth }}
+                >
+                  <Image
+                    source={{ uri }}
+                    style={styles.postImage}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Subtle Frosted Left Chevron Arrow */}
+            {activeMediaIndex > 0 && (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  const nextIdx = Math.max(0, activeMediaIndex - 1);
+                  carouselScrollRef.current?.scrollTo({ x: nextIdx * cardWidth, animated: true });
+                  setActiveMediaIndex(nextIdx);
+                }}
+                style={styles.carouselChevronLeft}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <ChevronLeft size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
+
+            {/* Subtle Frosted Right Chevron Arrow */}
+            {activeMediaIndex < mediaList.length - 1 && (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  const nextIdx = Math.min(mediaList.length - 1, activeMediaIndex + 1);
+                  carouselScrollRef.current?.scrollTo({ x: nextIdx * cardWidth, animated: true });
+                  setActiveMediaIndex(nextIdx);
+                }}
+                style={styles.carouselChevronRight}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <ChevronRight size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
+
+            {/* Counter Pill (1/3) */}
+            <View style={styles.carouselCounterPill}>
+              <Text style={styles.carouselCounterText}>
+                {activeMediaIndex + 1}/{mediaList.length}
+              </Text>
+            </View>
+
+            {/* Pagination Dots */}
+            <View style={styles.carouselDotsContainer} pointerEvents="none">
+              {mediaList.map((_, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.carouselDot,
+                    idx === activeMediaIndex ? styles.carouselDotActive : styles.carouselDotInactive,
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={handlePhotoPress}
+            style={StyleSheet.absoluteFillObject}
+          >
+            <Image
+              source={{ uri: mediaList[0] || photoUri }}
+              style={styles.postImage}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
+        )}
 
         {/* Category Pill */}
         {post.category ? (
@@ -308,7 +428,7 @@ export const StandardPostCard = ({ post, navigation }) => {
             <Heart size={84} color="#ff007a" fill="#ff007a" />
           </View>
         )}
-      </TouchableOpacity>
+      </View>
 
       {/* 3. Action Row (Instagram Style: Left [Like, Comment, Share], Right [Save]) */}
       <View style={styles.actionRow}>
@@ -660,6 +780,84 @@ const styles = StyleSheet.create({
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  carouselWrap: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  carouselChevronLeft: {
+    position: 'absolute',
+    left: 10,
+    top: '50%',
+    marginTop: -18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 15,
+    elevation: 5,
+  },
+  carouselChevronRight: {
+    position: 'absolute',
+    right: 10,
+    top: '50%',
+    marginTop: -18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 15,
+    elevation: 5,
+  },
+  carouselCounterPill: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    zIndex: 15,
+  },
+  carouselCounterText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  carouselDotsContainer: {
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 5,
+    zIndex: 15,
+  },
+  carouselDot: {
+    height: 6,
+    borderRadius: 3,
+  },
+  carouselDotActive: {
+    width: 16,
+    backgroundColor: '#ff007a',
+  },
+  carouselDotInactive: {
+    width: 6,
+    backgroundColor: 'rgba(255,255,255,0.45)',
   },
   postImage: {
     width: '100%',

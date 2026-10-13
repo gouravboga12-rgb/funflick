@@ -21,9 +21,12 @@ import {
   Check,
   MapPin,
   Hash,
-  Sparkles,
   Search,
   X,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  Plus,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ensureMediaLibraryPermission } from '../../services/permissionsService';
@@ -84,8 +87,8 @@ export const CreatePostScreen = ({ navigation }) => {
     }
   };
 
-  const [imageUri, setImageUri] = useState(null);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [photos, setPhotos] = useState([]); // [{ uri, file, size }]
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [caption, setCaption] = useState('');
   const [category, setCategory] = useState('Comedy');
   const [selectedTags, setSelectedTags] = useState(['#funflick', '#post']);
@@ -154,15 +157,27 @@ export const CreatePostScreen = ({ navigation }) => {
     return () => clearTimeout(timer);
   }, [locationSearchQuery]);
 
-  const handleProcessPhoto = (fileOrAsset) => {
-    const size = fileOrAsset.size || fileOrAsset.fileSize || 0;
-    if (size > 5 * 1024 * 1024) {
-      showAppAlert('File Too Large', `The selected photo is ${(size / (1024 * 1024)).toFixed(1)}MB. Photos must be 5MB or less. Please select a smaller photo.`);
-      return;
+  const handleProcessPhotos = (assetsOrFiles) => {
+    const list = Array.isArray(assetsOrFiles) ? assetsOrFiles : [assetsOrFiles];
+    const newPhotos = [];
+    for (const item of list) {
+      const size = item.size || item.fileSize || 0;
+      if (size > 5 * 1024 * 1024) {
+        showAppAlert('File Too Large', `One of the selected photos is ${(size / (1024 * 1024)).toFixed(1)}MB. Photos must be 5MB or less.`);
+        continue;
+      }
+      const uri = item.uri || (typeof window !== 'undefined' && window.URL ? window.URL.createObjectURL(item) : null);
+      if (uri) {
+        newPhotos.push({
+          uri,
+          file: item.file || item,
+          size,
+        });
+      }
     }
-    const uri = fileOrAsset.uri || (typeof window !== 'undefined' && window.URL ? window.URL.createObjectURL(fileOrAsset) : null);
-    setImageUri(uri);
-    setSelectedFile(fileOrAsset.file || fileOrAsset);
+    if (newPhotos.length > 0) {
+      setPhotos(prev => [...prev, ...newPhotos].slice(0, 10));
+    }
   };
 
   const handlePickPhoto = async () => {
@@ -173,17 +188,25 @@ export const CreatePostScreen = ({ navigation }) => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
         quality: 0.9,
       });
 
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const asset = result.assets[0];
-        handleProcessPhoto(asset.file || asset);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        handleProcessPhotos(result.assets);
       }
     } catch (err) {
-      showAppAlert('Error', 'Failed to pick photo from device');
+      showAppAlert('Error', 'Failed to pick photos from device');
     }
+  };
+
+  const handleRemovePhoto = (idx) => {
+    setPhotos(prev => {
+      const updated = prev.filter((_, i) => i !== idx);
+      setPreviewIndex(curr => Math.max(0, Math.min(curr, updated.length - 1)));
+      return updated;
+    });
   };
 
   const toggleTag = (tag) => {
@@ -197,8 +220,8 @@ export const CreatePostScreen = ({ navigation }) => {
   const handlePublish = async () => {
     if (isSubmittingRef.current || isUploading) return;
 
-    if (!imageUri && !selectedFile) {
-      showAppAlert('Photo Required', 'Please select a photo first.');
+    if (photos.length === 0) {
+      showAppAlert('Photo Required', 'Please select at least one photo first.');
       return;
     }
 
@@ -216,14 +239,31 @@ export const CreatePostScreen = ({ navigation }) => {
     setProgress(0);
 
     try {
-      // 1. Upload to S3
-      const s3ImageUrl = await uploadMediaToS3(
-        selectedFile || imageUri,
-        `post_${Date.now()}.jpg`,
-        'image/jpeg',
-        'images',
-        (pct) => setProgress(pct)
-      );
+      // 1. Upload all selected photos to AWS S3
+      const uploadedUrls = [];
+      const totalPhotos = photos.length;
+
+      for (let i = 0; i < totalPhotos; i++) {
+        const p = photos[i];
+        const s3Url = await uploadMediaToS3(
+          p.file || p.uri,
+          `post_${Date.now()}_${i}.jpg`,
+          'image/jpeg',
+          'images',
+          (pct) => {
+            const base = (i / totalPhotos) * 90;
+            const share = ((pct / 100) / totalPhotos) * 90;
+            setProgress(Math.round(base + share));
+          }
+        );
+        if (!s3Url || s3Url.startsWith('blob:')) {
+          throw new Error('Failed to upload all photos to AWS S3 storage.');
+        }
+        uploadedUrls.push(s3Url);
+      }
+
+      const finalVideoUrl = uploadedUrls.length === 1 ? uploadedUrls[0] : JSON.stringify(uploadedUrls);
+      const finalThumbnailUrl = uploadedUrls[0];
 
       // 2. Persist to database on AWS EC2
       await apiRequest('/videos', {
@@ -232,8 +272,8 @@ export const CreatePostScreen = ({ navigation }) => {
           title: caption.trim().slice(0, 50) || 'New Photo Post',
           description: caption.trim(),
           category,
-          video_url: s3ImageUrl,
-          thumbnail_url: s3ImageUrl,
+          video_url: finalVideoUrl,
+          thumbnail_url: finalThumbnailUrl,
           duration: 0,
           media_type: 'image',
           hashtags: selectedTags.join(' '),
@@ -290,10 +330,11 @@ export const CreatePostScreen = ({ navigation }) => {
           {Platform.OS === 'web' && (
             <input
               type="file"
+              multiple
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleProcessPhoto(file);
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) handleProcessPhotos(files);
               }}
               style={{
                 position: 'absolute',
@@ -309,12 +350,56 @@ export const CreatePostScreen = ({ navigation }) => {
               }}
             />
           )}
-          {imageUri ? (
+          {photos.length > 0 ? (
             <View style={styles.previewContainer}>
-              <Image source={{ uri: imageUri }} style={styles.previewImage} resizeMode="cover" />
-              <View style={styles.changeOverlay}>
-                <Text style={styles.changeOverlayText}>Tap to change</Text>
+              <Image source={{ uri: photos[previewIndex]?.uri || photos[0]?.uri }} style={styles.previewImage} resizeMode="cover" />
+
+              {/* Frosted Left Chevron */}
+              {previewIndex > 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    setPreviewIndex(prev => Math.max(0, prev - 1));
+                  }}
+                  style={styles.previewChevronLeft}
+                >
+                  <ChevronLeft size={20} color="#fff" />
+                </TouchableOpacity>
+              )}
+
+              {/* Frosted Right Chevron */}
+              {previewIndex < photos.length - 1 && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    setPreviewIndex(prev => Math.min(photos.length - 1, prev + 1));
+                  }}
+                  style={styles.previewChevronRight}
+                >
+                  <ChevronRight size={20} color="#fff" />
+                </TouchableOpacity>
+              )}
+
+              {/* Counter Badge */}
+              <View style={styles.previewCounterPill}>
+                <Text style={styles.previewCounterText}>
+                  {previewIndex + 1}/{photos.length}
+                </Text>
               </View>
+
+              {/* Remove Photo */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  handleRemovePhoto(previewIndex);
+                }}
+                style={styles.previewTrashBtn}
+              >
+                <Trash2 size={16} color="#fff" />
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.emptyPicker}>
@@ -324,11 +409,35 @@ export const CreatePostScreen = ({ navigation }) => {
               >
                 <ImageIcon size={28} color="#fff" />
               </LinearGradient>
-              <Text style={styles.pickerPrompt}>Tap to Select Photo</Text>
-              <Text style={styles.pickerSub}>JPG, PNG, WebP up to 5MB • 100% Free</Text>
+              <Text style={styles.pickerPrompt}>Tap to Select Photos</Text>
+              <Text style={styles.pickerSub}>Select up to 10 photos • JPG, PNG, WebP up to 5MB</Text>
             </View>
           )}
         </TouchableOpacity>
+
+        {/* Thumbnail Preview Strip when photos selected */}
+        {photos.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbsScroll}>
+            {photos.map((p, idx) => (
+              <TouchableOpacity
+                key={idx}
+                onPress={() => setPreviewIndex(idx)}
+                style={[styles.thumbItem, idx === previewIndex && styles.thumbItemActive]}
+              >
+                <Image source={{ uri: p.uri }} style={styles.thumbImage} />
+              </TouchableOpacity>
+            ))}
+            {photos.length < 10 && (
+              <TouchableOpacity
+                onPress={handlePickPhoto}
+                style={styles.thumbAddBtn}
+              >
+                <Plus size={20} color="#f472b6" />
+                <Text style={styles.thumbAddText}>Add</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        )}
 
         {/* Caption */}
         <View style={styles.inputGroup}>
@@ -653,6 +762,103 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+  },
+  previewChevronLeft: {
+    position: 'absolute',
+    left: 10,
+    top: '50%',
+    marginTop: -16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  previewChevronRight: {
+    position: 'absolute',
+    right: 10,
+    top: '50%',
+    marginTop: -16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  previewCounterPill: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    zIndex: 10,
+  },
+  previewCounterText: {
+    color: '#ffffff',
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  previewTrashBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(239,68,68,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    zIndex: 10,
+  },
+  thumbsScroll: {
+    gap: 8,
+    paddingBottom: 12,
+  },
+  thumbItem: {
+    width: 54,
+    height: 54,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  thumbItemActive: {
+    borderColor: '#ff007a',
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbAddBtn: {
+    width: 54,
+    height: 54,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,0,122,0.4)',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(255,0,122,0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbAddText: {
+    color: '#f472b6',
+    fontSize: 9.5,
+    fontWeight: '700',
+    marginTop: 2,
   },
   changeOverlayText: {
     color: '#ffffff',

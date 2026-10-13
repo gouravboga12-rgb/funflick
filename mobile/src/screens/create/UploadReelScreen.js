@@ -198,10 +198,10 @@ export const UploadReelScreen = ({ navigation }) => {
 
   const handleProcessVideo = (fileOrAsset) => {
     const size = fileOrAsset.size || fileOrAsset.fileSize || 0;
-    if (size > 10 * 1024 * 1024) {
+    if (size > 20 * 1024 * 1024) {
       showAppAlert(
         'Video Exceeds Limit',
-        `The selected video is ${(size / (1024 * 1024)).toFixed(1)}MB. Videos must be 10MB or less. Please select a smaller video.`
+        `The selected video is ${(size / (1024 * 1024)).toFixed(1)}MB. Videos must be 20MB or less. Please select a smaller video.`
       );
       return;
     }
@@ -386,7 +386,7 @@ export const UploadReelScreen = ({ navigation }) => {
                 <UploadCloud size={30} color="#f472b6" />
               </LinearGradient>
               <Text style={styles.pickerPrompt}>Choose Video from Device / Gallery</Text>
-              <Text style={styles.pickerSub}>MP4, WebM, MOV up to 10MB • Max 30s • 100% Free</Text>
+              <Text style={styles.pickerSub}>MP4, WebM, MOV up to 20MB • Max 30s • 100% Free</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.previewContainer}>
@@ -448,7 +448,7 @@ export const UploadReelScreen = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
           <Text style={styles.limitNotice}>
-            • Video limit: <Text style={{ color: '#f472b6', fontWeight: '700' }}>Maximum 10MB</Text> (MP4, MOV, WebM)
+            • Video limit: <Text style={{ color: '#f472b6', fontWeight: '700' }}>Maximum 20MB</Text> (MP4, MOV, WebM)
           </Text>
         </View>
 

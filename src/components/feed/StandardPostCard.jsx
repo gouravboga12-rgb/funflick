@@ -17,7 +17,9 @@ import {
   Check,
   Send,
   Lock,
-  Sparkles
+  Sparkles,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CommentSheet } from './CommentSheet';
@@ -52,6 +54,27 @@ export const StandardPostCard = ({ post }) => {
   const [showInsights, setShowInsights] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [quickCommentText, setQuickCommentText] = useState('');
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+
+  // Parse media list supporting single URL, JSON array, or comma-separated URLs
+  const mediaList = React.useMemo(() => {
+    const raw = post?.media_urls || post?.mediaUrl || post?.video_url || post?.videoUrl || post?.posterUrl || '';
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed.filter(Boolean);
+        } catch (e) {}
+      }
+      if (trimmed.includes(',') && !trimmed.startsWith('data:')) {
+        return trimmed.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      return [trimmed].filter(Boolean);
+    }
+    return [];
+  }, [post]);
 
   const lastTapRef = useRef(0);
   const hasRecordedViewRef = useRef(false);
@@ -233,9 +256,70 @@ export const StandardPostCard = ({ post }) => {
               Follow to View
             </button>
           </div>
+        ) : mediaList.length > 1 ? (
+          <div className="relative w-full h-full">
+            <img
+              src={mediaList[currentMediaIndex]}
+              alt={post.title || post.caption}
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80';
+              }}
+              className="w-full h-full object-cover transition-all duration-300"
+            />
+
+            {/* Subtle frosted glass left navigation chevron */}
+            {currentMediaIndex > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentMediaIndex(prev => Math.max(0, prev - 1));
+                }}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/45 hover:bg-black/75 backdrop-blur-md text-white flex items-center justify-center border border-white/20 transition-all z-10 shadow-lg active:scale-90"
+                aria-label="Previous photo"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Subtle frosted glass right navigation chevron */}
+            {currentMediaIndex < mediaList.length - 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentMediaIndex(prev => Math.min(mediaList.length - 1, prev + 1));
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/45 hover:bg-black/75 backdrop-blur-md text-white flex items-center justify-center border border-white/20 transition-all z-10 shadow-lg active:scale-90"
+                aria-label="Next photo"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Counter pill: 1/3 */}
+            <span className="absolute top-3 left-3 px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/60 backdrop-blur-md text-white/90 border border-white/10 shadow-md">
+              {currentMediaIndex + 1}/{mediaList.length}
+            </span>
+
+            {/* Pagination indicator dots */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10 pointer-events-none">
+              {mediaList.map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`rounded-full transition-all duration-200 ${
+                    idx === currentMediaIndex 
+                      ? 'w-4 h-1.5 bg-pink-500 shadow-md shadow-pink-500/50' 
+                      : 'w-1.5 h-1.5 bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
         ) : (
           <img
-            src={post.posterUrl || post.mediaUrl}
+            src={mediaList[0] || post.posterUrl || post.mediaUrl}
             alt={post.title || post.caption}
             onError={(e) => {
               e.currentTarget.onerror = null;

@@ -163,10 +163,10 @@ export const UploadVideoScreen = () => {
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Enforce 10MB limit
-      const MAX_BYTES = 10 * 1024 * 1024;
+      // Enforce 20MB limit
+      const MAX_BYTES = 20 * 1024 * 1024;
       if (file.size > MAX_BYTES) {
-        showToast(`⚠️ Video size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Videos must be 10MB or less!`, 'error');
+        showToast(`⚠️ Video size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Videos must be 20MB or less!`, 'error');
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
@@ -434,7 +434,7 @@ export const UploadVideoScreen = () => {
                 Choose Video from Device / Gallery
               </span>
               <span className="text-xs text-gray-400 max-w-[240px]">
-                MP4, WebM, MOV up to 10MB • Max 30s • 100% Free
+                MP4, WebM, MOV up to 20MB • Max 30s • 100% Free
               </span>
             </div>
           ) : (
@@ -529,7 +529,7 @@ export const UploadVideoScreen = () => {
             </button>
             <p className="text-[11px] text-gray-400 text-center mt-1.5 flex items-center justify-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-pink-400"></span>
-              <span>Video limit: <strong className="text-pink-300">Maximum 10MB</strong> (MP4, MOV, WebM)</span>
+              <span>Video limit: <strong className="text-pink-300">Maximum 20MB</strong> (MP4, MOV, WebM)</span>
             </p>
           </div>
         </div>

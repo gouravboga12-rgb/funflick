@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, 
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Music, Bookmark, Plus, Eye, Check } from 'lucide-react-native';
+import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Pause, Music, Bookmark, Plus, Eye, Check } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
@@ -35,6 +35,7 @@ export function ReelItem({
   handleShare,
   navigation,
 }) {
+  const insets = useSafeAreaInsets();
   const { toggleSavePost } = useApp();
   const [isPaused, setIsPaused] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
@@ -283,11 +284,19 @@ export function ReelItem({
         <Heart size={84} color="#ff007a" fill="#ff007a" />
       </Animated.View>
 
-      {/* Center Pause/Play Indicator: only on active reel when paused */}
+      {/* Top Right Floating Controls: Mute Pill safely placed away from bottom phone navigation gestures */}
+      <View style={[styles.topRightControls, { top: Math.max(insets.top, 16) + 12 }]} pointerEvents="box-none">
+        <TouchableOpacity style={styles.topMutePill} activeOpacity={0.8} onPress={toggleMute}>
+          {isReelsMuted ? <VolumeX size={18} color="#fff" strokeWidth={2.2} /> : <Volume2 size={18} color="#ff007a" strokeWidth={2.2} />}
+        </TouchableOpacity>
+      </View>
+
+      {/* Center Pause/Play Indicator: prominent frosted circle with PAUSED badge when paused */}
       {isPaused && (
         <View style={styles.pausedOverlay} pointerEvents="box-none">
-          <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.85}>
             <Play size={36} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
+            <Text style={styles.pausedBadgeText}>PAUSED</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -383,9 +392,16 @@ export function ReelItem({
           <Text style={styles.viewsCount}>{formatCount(item.viewsCount || 0)}</Text>
         </View>
 
-        {/* Mute Pill */}
-        <TouchableOpacity style={styles.mutePill} activeOpacity={0.8} onPress={toggleMute}>
-          {isReelsMuted ? <VolumeX size={18} color="#fff" strokeWidth={2.2} /> : <Volume2 size={18} color="#ff007a" strokeWidth={2.2} />}
+        {/* Dedicated Pause / Play Toggle Action */}
+        <TouchableOpacity style={styles.sideBtn} activeOpacity={0.7} onPress={togglePlayPause}>
+          <View style={styles.playPausePill}>
+            {isPaused ? (
+              <Play size={20} color="#ff007a" fill="#ff007a" style={{ marginLeft: 2 }} />
+            ) : (
+              <Pause size={20} color="#fff" strokeWidth={2.2} />
+            )}
+          </View>
+          <Text style={styles.sideCount}>{isPaused ? 'Play' : 'Pause'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -635,16 +651,53 @@ const styles = StyleSheet.create({
     elevation: 25,
   },
   pausedCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: 'rgba(0,0,0,0.72)',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 30,
     elevation: 30,
+  },
+  pausedBadgeText: {
+    color: '#ffffff',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginTop: 3,
+  },
+  topRightControls: {
+    position: 'absolute',
+    right: 14,
+    zIndex: 40,
+    elevation: 40,
+  },
+  topMutePill: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+  },
+  playPausePill: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   burstHeartWrap: {
     position: 'absolute',

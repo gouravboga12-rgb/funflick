@@ -17,9 +17,11 @@ import {
   Crown,
   Hash,
   Smile,
-  ShieldCheck,
   Tag,
-  Search
+  Search,
+  ChevronRight,
+  Trash2,
+  Plus
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UploadSuccessMonetizationModal } from '../../../components/common/UploadSuccessMonetizationModal';
@@ -78,8 +80,9 @@ export const CreatePostScreen = () => {
     return () => clearTimeout(timer);
   }, [tagSearchQuery, currentUser]);
 
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [mediaUrl, setMediaUrl] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [mediaUrls, setMediaUrls] = useState([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [caption, setCaption] = useState('');
   const [selectedTags, setSelectedTags] = useState(['funflick', 'post']);
   const [tagSearchInput, setTagSearchInput] = useState('');
@@ -122,17 +125,32 @@ export const CreatePostScreen = () => {
   const [submittedItem, setSubmittedItem] = useState(null);
 
   const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const validFiles = [];
+    const validUrls = [];
+    for (const file of files) {
       if (file.size > 5 * 1024 * 1024) {
-        showToast(`⚠️ Photo size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Photos must be under 5MB!`, 'error');
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        return;
+        showToast(`⚠️ "${file.name}" is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Photos must be under 5MB!`, 'error');
+        continue;
       }
-      setSelectedFile(file);
-      setMediaUrl(URL.createObjectURL(file));
-      showToast('Photo selected from device! 📸', 'info');
+      validFiles.push(file);
+      validUrls.push(URL.createObjectURL(file));
     }
+
+    if (validFiles.length > 0) {
+      setSelectedFiles(prev => [...prev, ...validFiles].slice(0, 10));
+      setMediaUrls(prev => [...prev, ...validUrls].slice(0, 10));
+      showToast(`${validFiles.length} photo${validFiles.length > 1 ? 's' : ''} added! 📸`, 'info');
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemovePhoto = (idx) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== idx));
+    setMediaUrls(prev => prev.filter((_, i) => i !== idx));
+    setPreviewIndex(prev => Math.max(0, Math.min(prev, mediaUrls.length - 2)));
   };
 
   const handleAddTagUser = (user) => {
@@ -153,8 +171,8 @@ export const CreatePostScreen = () => {
     if (e && e.preventDefault) e.preventDefault();
     if (isSubmittingRef.current || isUploading) return;
 
-    if (!selectedFile && !mediaUrl) {
-      showToast('Please select a photo from your device first!', 'error');
+    if (selectedFiles.length === 0 && mediaUrls.length === 0) {
+      showToast('Please select at least one photo from your device first!', 'error');
       return;
     }
 
@@ -170,20 +188,29 @@ export const CreatePostScreen = () => {
     setProgress(5);
 
     try {
-      let finalMediaUrl = mediaUrl;
+      // Upload all real device files to AWS S3
+      const uploadedUrls = [];
+      const totalFiles = selectedFiles.length;
 
-      // Upload real device file to AWS S3
-      if (selectedFile) {
-        finalMediaUrl = await uploadFileToS3(selectedFile, 'images', (pct) => {
-          setProgress(Math.min(90, Math.max(5, pct)));
+      for (let i = 0; i < totalFiles; i++) {
+        const file = selectedFiles[i];
+        const uploadedUrl = await uploadFileToS3(file, 'images', (pct) => {
+          const stepBase = (i / totalFiles) * 85;
+          const stepShare = ((pct / 100) / totalFiles) * 85;
+          setProgress(Math.min(90, Math.max(5, Math.round(stepBase + stepShare))));
         });
+        if (!uploadedUrl || uploadedUrl.startsWith('blob:')) {
+          throw new Error('Failed to upload all photos to AWS S3 storage.');
+        }
+        uploadedUrls.push(uploadedUrl);
       }
 
-      // Permanent media safety check: never commit temporary blob URLs
-      if (!finalMediaUrl || finalMediaUrl.startsWith('blob:')) {
-        throw new Error('Please wait for the photo to upload to AWS S3 storage before submitting.');
+      if (uploadedUrls.length === 0) {
+        throw new Error('Please select at least one valid photo to publish.');
       }
 
+      const finalVideoUrl = uploadedUrls.length === 1 ? uploadedUrls[0] : JSON.stringify(uploadedUrls);
+      const finalThumbnailUrl = uploadedUrls[0];
       const finalHashtags = selectedTags.map(t => `#${t}`).join(' ');
 
       // Save into MySQL database
@@ -198,8 +225,8 @@ export const CreatePostScreen = () => {
           title: caption.trim().slice(0, 45) || 'New Photo Post',
           description: caption.trim(),
           category,
-          video_url: finalMediaUrl,
-          thumbnail_url: finalMediaUrl,
+          video_url: finalVideoUrl,
+          thumbnail_url: finalThumbnailUrl,
           duration: 0,
           media_type: 'image',
           hashtags: finalHashtags,
@@ -309,22 +336,81 @@ export const CreatePostScreen = () => {
 
         {/* Media Preview & Device File Picker */}
         <div className="space-y-3">
-          {mediaUrl ? (
-            <div className="relative w-full aspect-[4/3] rounded-3xl overflow-hidden bg-[#150f2c] border border-white/10 shadow-xl group">
-              <img
-                src={mediaUrl}
-                alt="Post preview"
-                className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
-              />
-              
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-3 right-3 px-3.5 py-1.5 rounded-full bg-black/75 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 border border-white/20 hover:bg-black/90 transition shadow-lg"
-              >
-                <UploadCloud className="w-3.5 h-3.5 text-pink-400" />
-                <span>Change Photo</span>
-              </button>
+          {mediaUrls.length > 0 ? (
+            <div className="space-y-2.5">
+              <div className="relative w-full aspect-[4/3] rounded-3xl overflow-hidden bg-[#150f2c] border border-white/10 shadow-xl group">
+                <img
+                  src={mediaUrls[previewIndex] || mediaUrls[0]}
+                  alt="Post preview"
+                  className="w-full h-full object-cover transition-transform duration-300"
+                />
+
+                {/* Left Preview Chevron */}
+                {previewIndex > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewIndex(prev => Math.max(0, prev - 1))}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/80 backdrop-blur-md text-white flex items-center justify-center border border-white/20 transition shadow-lg active:scale-90"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                )}
+
+                {/* Right Preview Chevron */}
+                {previewIndex < mediaUrls.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewIndex(prev => Math.min(mediaUrls.length - 1, prev + 1))}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/80 backdrop-blur-md text-white flex items-center justify-center border border-white/20 transition shadow-lg active:scale-90"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                )}
+
+                {/* Counter Badge */}
+                <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/65 backdrop-blur-md text-white text-[10px] font-bold border border-white/10 shadow-md">
+                  Photo {previewIndex + 1} of {mediaUrls.length}
+                </span>
+
+                {/* Remove Current Photo */}
+                <button
+                  type="button"
+                  onClick={() => handleRemovePhoto(previewIndex)}
+                  className="absolute top-3 right-3 p-1.5 rounded-full bg-red-500/80 hover:bg-red-600 backdrop-blur-md text-white transition shadow-md active:scale-90 border border-white/20"
+                  title="Remove this photo"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Thumbnail Strip */}
+              <div className="flex items-center gap-2 overflow-x-auto py-1 px-0.5">
+                {mediaUrls.map((url, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => setPreviewIndex(idx)}
+                    className={`relative w-14 h-14 rounded-xl overflow-hidden shrink-0 cursor-pointer border-2 transition-all ${
+                      idx === previewIndex ? 'border-pink-500 scale-105 shadow-md shadow-pink-500/30' : 'border-white/10 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+
+                {mediaUrls.length < 10 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-14 h-14 rounded-xl border-2 border-dashed border-white/20 hover:border-pink-500/50 bg-[#150f2c]/50 flex flex-col items-center justify-center shrink-0 text-gray-400 hover:text-white transition"
+                    title="Add more photos"
+                  >
+                    <Plus className="w-5 h-5 text-pink-400" />
+                    <span className="text-[9px] font-bold mt-0.5">Add</span>
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div 
@@ -334,14 +420,15 @@ export const CreatePostScreen = () => {
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-500/20 to-purple-500/20 flex items-center justify-center text-pink-400 mb-3 group-hover:scale-110 transition border border-pink-500/30">
                 <UploadCloud className="w-7 h-7" />
               </div>
-              <span className="text-sm font-bold text-white mb-1">Choose Photo from Device</span>
-              <span className="text-xs text-gray-400">JPG, PNG, WEBP or GIF supported</span>
+              <span className="text-sm font-bold text-white mb-1">Choose Photos from Device</span>
+              <span className="text-xs text-gray-400">Select up to 10 photos • JPG, PNG, WEBP</span>
             </div>
           )}
 
           <input
             type="file"
             ref={fileInputRef}
+            multiple
             accept="image/*"
             className="hidden"
             onChange={handleFileChange}
@@ -353,7 +440,7 @@ export const CreatePostScreen = () => {
             className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-transparent hover:bg-white/10 border border-pink-500/30 text-xs font-bold text-white flex items-center justify-center gap-2 transition active:scale-[0.99] shadow-sm"
           >
             <UploadCloud className="w-4 h-4 text-pink-400" />
-            <span>{selectedFile ? 'Select Different Photo from Device' : 'Select Photo from Gallery / Device'}</span>
+            <span>{mediaUrls.length > 0 ? `Add More Photos (${mediaUrls.length}/10 selected)` : 'Select Photos from Gallery / Device'}</span>
           </button>
 
           {/* Upload Progress Bar */}

@@ -150,8 +150,21 @@ export async function createVideo(req, res) {
     const initialStatus = 'Approved';
     const moderationStatus = req.user.role === 'admin' ? 'Approved' : 'Pending';
 
-    // Safe thumbnail fallback
-    let safeThumbnail = thumbnail_url || video_url;
+    // Safe thumbnail fallback (for multi-image posts, pick first image if thumbnail_url not set)
+    let safeThumbnail = thumbnail_url;
+    if (!safeThumbnail) {
+      if (typeof video_url === 'string' && video_url.startsWith('[') && video_url.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(video_url);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            safeThumbnail = parsed[0];
+          }
+        } catch (e) {}
+      }
+      if (!safeThumbnail) {
+        safeThumbnail = video_url;
+      }
+    }
     if (typeof safeThumbnail === 'string' && safeThumbnail.length > 5000000) {
       safeThumbnail = video_url;
     }
