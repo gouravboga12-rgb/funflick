@@ -55,10 +55,15 @@ export async function registerForPushNotificationsAsync() {
       }
     }
 
+    if (!Device.isDevice) {
+      console.log('Push notifications require a physical device');
+      return null;
+    }
+
     const projectId =
       Constants?.expoConfig?.extra?.eas?.projectId ||
       Constants?.easConfig?.projectId ||
-      'e7907d3d-a083-4787-bc7d-4dd0302f8516';
+      '2560da78-f4c1-40f6-8cff-bb14685b81b7';
 
     const tokenResponse = await Notifications.getExpoPushTokenAsync({
       projectId,

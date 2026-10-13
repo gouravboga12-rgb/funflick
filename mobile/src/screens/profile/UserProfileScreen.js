@@ -3433,7 +3433,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
   },
-  modalInputGroup: {
+  modalInputGroupLegacy: {
     marginBottom: 14,
   },
   inputLabel: {
@@ -3442,7 +3442,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 6,
   },
-  modalTextInput: {
+  modalTextInputLegacy: {
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 14,
     borderWidth: 1,

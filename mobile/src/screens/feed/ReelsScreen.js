@@ -383,13 +383,13 @@ export function ReelItem({
         {/* Dedicated Pause / Play Toggle Action */}
         <TouchableOpacity style={styles.sideBtn} activeOpacity={0.7} onPress={togglePlayPause}>
           <View style={styles.playPausePill}>
-            {isPaused ? (
+            {isReelsPaused ? (
               <Play size={20} color="#ff007a" fill="#ff007a" style={{ marginLeft: 2 }} />
             ) : (
               <Pause size={20} color="#fff" strokeWidth={2.2} />
             )}
           </View>
-          <Text style={styles.sideCount}>{isPaused ? 'Play' : 'Pause'}</Text>
+          <Text style={styles.sideCount}>{isReelsPaused ? 'Play' : 'Pause'}</Text>
         </TouchableOpacity>
       </View>
 

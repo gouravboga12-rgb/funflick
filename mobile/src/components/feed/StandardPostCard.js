@@ -884,10 +884,6 @@ const styles = StyleSheet.create({
     width: 6,
     backgroundColor: 'rgba(255,255,255,0.45)',
   },
-  postImage: {
-    width: '100%',
-    height: '100%',
-  },
   categoryBadge: {
     position: 'absolute',
     top: 10,
