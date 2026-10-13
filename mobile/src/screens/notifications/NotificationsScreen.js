@@ -35,6 +35,10 @@ const CATEGORIES = ['All', 'Requests', 'Likes', 'Comments', 'Follows', 'System']
 function NotificationAvatar({ avatarUri, initialChar, isSystem, style, fallbackStyle }) {
   const [imgErr, setImgErr] = useState(false);
 
+  useEffect(() => {
+    setImgErr(false);
+  }, [avatarUri, isSystem]);
+
   const finalUri = useMemo(() => {
     if (isSystem) return 'https://funflick.in/brand/funflick-logo.png';
     if (!avatarUri || imgErr) return null;

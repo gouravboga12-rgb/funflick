@@ -32,6 +32,8 @@ export const VideoDetailScreen = ({ route, navigation }) => {
     posts,
     isReelsMuted,
     toggleMute,
+    isReelsPaused,
+    togglePlayPause,
     toggleLikePost,
     toggleFollowCreator,
     recordPostView,
@@ -237,6 +239,8 @@ export const VideoDetailScreen = ({ route, navigation }) => {
               reelHeight={containerHeight}
               isReelsMuted={isReelsMuted}
               toggleMute={toggleMute}
+              isReelsPaused={isReelsPaused}
+              togglePlayPause={togglePlayPause}
               toggleLikePost={toggleLikePost}
               toggleFollowCreator={toggleFollowCreator}
               recordPostView={recordPostView}

@@ -678,7 +678,10 @@ export const UploadReelScreen = ({ navigation }) => {
           activeOpacity={1}
           onPress={() => setIsCategoryModalOpen(false)}
         >
-          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 20) + 12 }]}>
+          <View
+            style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}
+            onStartShouldSetResponder={() => true}
+          >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Category</Text>
               <TouchableOpacity onPress={() => setIsCategoryModalOpen(false)}>
@@ -686,7 +689,7 @@ export const UploadReelScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ maxHeight: 340 }} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
               {CATEGORIES.map(item => {
                 const isSelected = category === item;
                 return (

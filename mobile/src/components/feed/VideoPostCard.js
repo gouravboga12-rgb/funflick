@@ -11,6 +11,8 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
   const {
     isReelsMuted,
     toggleMute,
+    isReelsPaused,
+    togglePlayPause,
     toggleLikePost,
     toggleFollowCreator,
     recordPostView,
@@ -43,6 +45,7 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         backgroundColor: '#000000',
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(255,255,255,0.06)',
+        overflow: 'hidden',
       }}
     >
       <ReelItem
@@ -52,6 +55,8 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
         reelHeight={cardHeight}
         isReelsMuted={isReelsMuted}
         toggleMute={toggleMute}
+        isReelsPaused={isReelsPaused}
+        togglePlayPause={togglePlayPause}
         toggleLikePost={toggleLikePost}
         toggleFollowCreator={toggleFollowCreator}
         recordPostView={recordPostView}

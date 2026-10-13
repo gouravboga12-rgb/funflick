@@ -28,8 +28,10 @@ export function ReelItem({
   isActive,
   isScreenFocused,
   reelHeight,
-  isReelsMuted,
-  toggleMute,
+  isReelsMuted: propMuted,
+  toggleMute: propToggleMute,
+  isReelsPaused: propPaused,
+  togglePlayPause: propTogglePlayPause,
   toggleLikePost,
   toggleFollowCreator,
   recordPostView,
@@ -37,8 +39,19 @@ export function ReelItem({
   navigation,
 }) {
   const insets = useSafeAreaInsets();
-  const { toggleSavePost } = useApp();
-  const [isPaused, setIsPaused] = useState(false);
+  const {
+    toggleSavePost,
+    isReelsMuted: appMuted,
+    toggleMute: appToggleMute,
+    isReelsPaused: appPaused,
+    togglePlayPause: appTogglePlayPause,
+  } = useApp();
+
+  const isReelsMuted = propMuted !== undefined ? propMuted : appMuted;
+  const toggleMute = propToggleMute || appToggleMute;
+  const isReelsPaused = propPaused !== undefined ? propPaused : appPaused;
+  const togglePlayPause = propTogglePlayPause || appTogglePlayPause;
+
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(Boolean(item?.isSaved));
   const [lastTap, setLastTap] = useState(0);
@@ -77,17 +90,10 @@ export function ReelItem({
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
-    if (shouldMountPlayer && !isPaused) {
+    if (shouldMountPlayer && !isReelsPaused) {
       p.play();
     }
   });
-
-  // Reset paused state when scrolling away to another reel
-  useEffect(() => {
-    if (!isActive) {
-      setIsPaused(false);
-    }
-  }, [isActive]);
 
   useEffect(() => {
     hasRecordedViewRef.current = false;
@@ -97,7 +103,7 @@ export function ReelItem({
     if (!player) return;
     let viewTimer = null;
     try {
-      if (shouldMountPlayer && !isPaused) {
+      if (shouldMountPlayer && !isReelsPaused) {
         player.play();
         // Record view only after 5 seconds of continuous playback
         if (!hasRecordedViewRef.current && recordPostView && item?.id) {
@@ -116,7 +122,7 @@ export function ReelItem({
     return () => {
       if (viewTimer) clearTimeout(viewTimer);
     };
-  }, [shouldMountPlayer, isPaused, player, item?.id, recordPostView]);
+  }, [shouldMountPlayer, isReelsPaused, player, item?.id, recordPostView]);
 
   useEffect(() => {
     if (player) {
@@ -147,38 +153,16 @@ export function ReelItem({
   useEffect(() => {
     if (Platform.OS === 'web' && webVideoRef.current) {
       webVideoRef.current.muted = isReelsMuted;
-      if (isActive && isScreenFocused && !isPaused) {
+      if (isActive && isScreenFocused && !isReelsPaused) {
         webVideoRef.current.play().catch(() => {});
       } else {
         webVideoRef.current.pause();
       }
     }
-  }, [isActive, isScreenFocused, isPaused, isReelsMuted]);
+  }, [isActive, isScreenFocused, isReelsPaused, isReelsMuted]);
 
-  const togglePlayPause = () => {
-    if (Platform.OS === 'web' && webVideoRef.current) {
-      if (!isPaused && !webVideoRef.current.paused) {
-        webVideoRef.current.pause();
-        setIsPaused(true);
-      } else {
-        webVideoRef.current.play().catch(() => {});
-        setIsPaused(false);
-      }
-      return;
-    }
-
-    if (!player) return;
-    try {
-      if (!isPaused) {
-        player.pause();
-        setIsPaused(true);
-      } else {
-        player.play();
-        setIsPaused(false);
-      }
-    } catch (e) {
-      console.warn('Reel toggle play error:', e?.message || e);
-    }
+  const handleTogglePlayPause = () => {
+    togglePlayPause();
   };
 
   const handleToggleLike = () => {
@@ -285,18 +269,21 @@ export function ReelItem({
         <Heart size={84} color="#ff007a" fill="#ff007a" />
       </Animated.View>
 
-      {/* Top Right Floating Controls: Mute Pill safely placed away from bottom phone navigation gestures */}
+      {/* Top Right Floating Controls: Mute Pill and Play/Pause Pill safely placed away from bottom phone navigation gestures */}
       <View style={[styles.topRightControls, { top: Math.max(insets.top, 16) + 12 }]} pointerEvents="box-none">
         <TouchableOpacity style={styles.topMutePill} activeOpacity={0.8} onPress={toggleMute}>
           {isReelsMuted ? <VolumeX size={18} color="#fff" strokeWidth={2.2} /> : <Volume2 size={18} color="#ff007a" strokeWidth={2.2} />}
         </TouchableOpacity>
+        <TouchableOpacity style={[styles.topMutePill, { marginTop: 10 }]} activeOpacity={0.8} onPress={togglePlayPause}>
+          {isReelsPaused ? <Play size={17} color="#ff007a" fill="#ff007a" style={{ marginLeft: 2 }} /> : <Pause size={17} color="#fff" fill="#fff" />}
+        </TouchableOpacity>
       </View>
 
-      {/* Center Pause/Play Indicator: prominent frosted circle with PAUSED badge when paused */}
-      {isPaused && (
+      {/* Center Pause/Play Indicator: prominent frosted circle with PAUSED badge when paused — strictly only on active & focused reel */}
+      {Boolean(isActive && isScreenFocused && isReelsPaused) && (
         <View style={styles.pausedOverlay} pointerEvents="box-none">
           <TouchableOpacity style={styles.pausedCircle} onPress={togglePlayPause} activeOpacity={0.85}>
-            <Play size={36} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
+            <Play size={34} color="#fff" fill="#fff" style={{ marginLeft: 3 }} />
             <Text style={styles.pausedBadgeText}>PAUSED</Text>
           </TouchableOpacity>
         </View>
@@ -474,6 +461,8 @@ export const ReelsScreen = ({ navigation }) => {
     posts,
     isReelsMuted,
     toggleMute,
+    isReelsPaused,
+    togglePlayPause,
     toggleLikePost,
     toggleFollowCreator,
     recordPostView,
@@ -613,6 +602,8 @@ export const ReelsScreen = ({ navigation }) => {
             reelHeight={containerHeight}
             isReelsMuted={isReelsMuted}
             toggleMute={toggleMute}
+            isReelsPaused={isReelsPaused}
+            togglePlayPause={togglePlayPause}
             toggleLikePost={toggleLikePost}
             toggleFollowCreator={toggleFollowCreator}
             recordPostView={recordPostView}

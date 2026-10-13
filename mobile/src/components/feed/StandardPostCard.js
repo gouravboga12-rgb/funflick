@@ -65,11 +65,23 @@ export const StandardPostCard = ({ post, navigation }) => {
   const [isSubmittingQuickComment, setIsSubmittingQuickComment] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [cardWidth, setCardWidth] = useState(SCREEN_WIDTH);
+  const [imageError, setImageError] = useState(false);
   const carouselScrollRef = useRef(null);
 
   // Parse media list supporting single URL, JSON array, or comma-separated URLs
   const mediaList = React.useMemo(() => {
-    const raw = post?.media_urls || post?.mediaUrl || post?.video_url || post?.videoUrl || post?.posterUrl || post?.thumbnailUrl || '';
+    const raw =
+      post?.media_urls ||
+      post?.media_url ||
+      post?.mediaUrl ||
+      post?.video_url ||
+      post?.videoUrl ||
+      post?.image_url ||
+      post?.imageUrl ||
+      post?.posterUrl ||
+      post?.thumbnailUrl ||
+      post?.thumbnail ||
+      '';
     if (Array.isArray(raw)) return raw.filter(Boolean);
     if (typeof raw === 'string') {
       const trimmed = raw.trim();
@@ -208,9 +220,12 @@ export const StandardPostCard = ({ post, navigation }) => {
   };
 
   const photoUri =
+    (mediaList && mediaList.length > 0 ? mediaList[0] : null) ||
     post.posterUrl ||
     post.mediaUrl ||
     post.thumbnailUrl ||
+    post.thumbnail ||
+    post.video_url ||
     'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80';
 
   const avatarUri =
@@ -341,7 +356,7 @@ export const StandardPostCard = ({ post, navigation }) => {
                   style={{ width: cardWidth, height: cardWidth }}
                 >
                   <Image
-                    source={{ uri }}
+                    source={{ uri: uri || photoUri }}
                     style={styles.postImage}
                     resizeMode="cover"
                   />
@@ -408,9 +423,14 @@ export const StandardPostCard = ({ post, navigation }) => {
             style={StyleSheet.absoluteFillObject}
           >
             <Image
-              source={{ uri: mediaList[0] || photoUri }}
+              source={{
+                uri: imageError
+                  ? 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80'
+                  : (photoUri || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80'),
+              }}
               style={styles.postImage}
               resizeMode="cover"
+              onError={() => setImageError(true)}
             />
           </TouchableOpacity>
         )}
@@ -781,6 +801,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+  },
+  postImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#18122c',
   },
   carouselWrap: {
     width: '100%',

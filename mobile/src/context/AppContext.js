@@ -24,6 +24,8 @@ export const AppProvider = ({ children }) => {
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   // Mute audio by default on app launch (matching web & standard social feeds)
   const [isReelsMuted, setIsReelsMuted] = useState(false);
+  // Global pause state (like volume/mute) so all reels pause/play together
+  const [isReelsPaused, setIsReelsPaused] = useState(false);
   const [activePlayingVideoId, setActivePlayingVideoId] = useState(null);
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -1215,6 +1217,9 @@ export const AppProvider = ({ children }) => {
         isReelsMuted,
         setIsReelsMuted,
         toggleMute: () => setIsReelsMuted(prev => !prev),
+        isReelsPaused,
+        setIsReelsPaused,
+        togglePlayPause: () => setIsReelsPaused(prev => !prev),
         activePlayingVideoId,
         setActivePlayingVideoId,
         toggleLikePost,
