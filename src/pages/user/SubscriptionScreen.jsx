@@ -43,27 +43,54 @@ export const SubscriptionScreen = () => {
   const [processing, setProcessing] = useState(false);
   const [showPayoutModal, setShowPayoutModal] = useState(false);
 
-  const handlePurchase = (planToPurchase) => {
+  const handlePurchase = async (planToPurchase) => {
     const selectedPlan = planToPurchase || activePlans.find(p => p.id === selectedPlanId) || activePlans[0];
     if (!selectedPlan) return;
 
     setSelectedPlanId(selectedPlan.id);
     setProcessing(true);
 
-    // Check if Razorpay Checkout SDK is loaded
-    if (typeof window !== 'undefined' && window.Razorpay) {
-      try {
+    const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
+    if (!token) {
+      setProcessing(false);
+      showToast('Please log in to purchase an influencer subscription.', 'error');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      // 1. Create official Razorpay order on backend
+      const orderRes = await fetch('/api/subscriptions/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          planId: selectedPlan.id,
+          price: selectedPlan.price
+        })
+      });
+
+      const orderData = await orderRes.json();
+      if (!orderRes.ok || !orderData.orderId) {
+        throw new Error(orderData.error || 'Failed to initiate payment order with Razorpay.');
+      }
+
+      // 2. Open Razorpay Checkout SDK with the server orderId
+      if (typeof window !== 'undefined' && window.Razorpay) {
         const options = {
-          key: RAZORPAY_KEY_ID,
-          amount: Math.round(Number(selectedPlan.price) * 100), // amount in paise
-          currency: 'INR',
+          key: orderData.keyId || RAZORPAY_KEY_ID,
+          amount: orderData.amount, // amount in paise
+          currency: orderData.currency || 'INR',
           name: 'FunFlick Entertainment',
           description: `${selectedPlan.name} (${selectedPlan.label || 'Influencer Subscription'})`,
+          order_id: orderData.orderId,
           image: '/brand/funflick-logo.png',
           prefill: {
-            name: currentUser?.name || 'Srilatha Reddy',
-            email: currentUser?.email || 'funflick0308@gmail.com',
-            contact: currentUser?.phone || '+919876543210'
+            name: currentUser?.name || currentUser?.username || '',
+            email: currentUser?.email || '',
+            contact: currentUser?.phone || ''
           },
           notes: {
             plan_id: selectedPlan.id,
@@ -73,22 +100,48 @@ export const SubscriptionScreen = () => {
           theme: {
             color: '#ff007a'
           },
-          handler: function (response) {
-            setProcessing(false);
-            const paymentId = response.razorpay_payment_id || `pay_rzp_${Date.now()}`;
-            recordSubscriptionPayment({
-              plan: selectedPlan,
-              paymentId,
-              paymentMethod: 'Razorpay Test (Captured)'
-            });
-            setShowPayoutModal(true);
+          handler: async function (response) {
             try {
-              confetti({
-                particleCount: 120,
-                spread: 90,
-                origin: { y: 0.5 }
+              // 3. Verify payment signature on backend
+              const verifyRes = await fetch('/api/subscriptions/verify-payment', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  orderId: response.razorpay_order_id,
+                  paymentId: response.razorpay_payment_id,
+                  signature: response.razorpay_signature,
+                  planId: selectedPlan.id
+                })
               });
-            } catch (e) {}
+              const verifyData = await verifyRes.json();
+
+              setProcessing(false);
+              if (verifyRes.ok && verifyData.verified) {
+                if (fetchUserSubscriptionStatus) await fetchUserSubscriptionStatus();
+                recordSubscriptionPayment({
+                  plan: selectedPlan,
+                  paymentId: response.razorpay_payment_id,
+                  paymentMethod: 'Razorpay (Verified)'
+                });
+                setShowPayoutModal(true);
+                showToast(`🎉 ${selectedPlan.name} activated successfully!`, 'success');
+                try {
+                  confetti({
+                    particleCount: 120,
+                    spread: 90,
+                    origin: { y: 0.5 }
+                  });
+                } catch (e) {}
+              } else {
+                throw new Error(verifyData.error || 'Payment verification failed');
+              }
+            } catch (vErr) {
+              setProcessing(false);
+              showToast(`Payment verification error: ${vErr.message}`, 'error');
+            }
           },
           modal: {
             ondismiss: function () {
@@ -104,14 +157,14 @@ export const SubscriptionScreen = () => {
           showToast(`Payment failed: ${response.error?.description || 'Transaction cancelled'}`, 'error');
         });
         rzp.open();
-      } catch (err) {
-        console.error('Razorpay popup error:', err);
-        // Fallback simulation
+      } else {
+        // Fallback simulation if checkout script is unavailable
         triggerSimulatedSuccess(selectedPlan);
       }
-    } else {
-      // Fallback if Razorpay SDK script is blocked or offline
-      triggerSimulatedSuccess(selectedPlan);
+    } catch (err) {
+      console.error('Subscription purchase error:', err);
+      setProcessing(false);
+      showToast(err.message || 'Payment initiation failed. Please try again.', 'error');
     }
   };
 

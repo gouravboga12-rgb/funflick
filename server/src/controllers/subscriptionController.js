@@ -581,17 +581,17 @@ export async function renderCheckoutPage(req, res) {
 
   <script>
     const options = {
-      key: '${RAZORPAY_KEY_ID}',
-      amount: '${amount}',
+      key: ${JSON.stringify(RAZORPAY_KEY_ID)},
+      amount: Number(${JSON.stringify(amount)}),
       currency: 'INR',
       name: 'FunFlick',
-      description: '${planName || 'Influencer Subscription'}',
-      order_id: '${orderId}',
+      description: ${JSON.stringify(planName || 'Influencer Subscription')},
+      order_id: ${JSON.stringify(orderId)},
       image: 'https://funflick.in/brand/funflick-logo.png',
       prefill: {
-        name: '${name}',
-        email: '${email}',
-        contact: '${phone}'
+        name: ${JSON.stringify(name || '')},
+        email: ${JSON.stringify(email || '')},
+        contact: ${JSON.stringify(phone || '')}
       },
       theme: {
         color: '#ff007a'
