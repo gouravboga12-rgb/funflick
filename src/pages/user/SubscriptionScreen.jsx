@@ -19,7 +19,7 @@ import {
 import confetti from 'canvas-confetti';
 
 // Razorpay Client Key ID (Public Key ID for Checkout SDK; Secret Key is kept securely on server only)
-const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TjWqonuTX5VmT8';
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TnKEnfZ6jVCa3k';
 
 export const SubscriptionScreen = () => {
   const navigate = useNavigate();

@@ -3,8 +3,8 @@ import pool from '../config/db.js';
 import { calculateISTDaysRemaining, formatISTDate, formatISTDateTime } from '../utils/istDateUtils.js';
 import { sendPushNotification } from '../services/pushService.js';
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TjWqonuTX5VmT8';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'Bedi1GN34A0HlH6mgiyQbU3e';
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TnKEnfZ6jVCa3k';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'YqAsTAiWM2lcKj05j5VBWjfT';
 
 export async function getActivePlans(req, res) {
   try {
