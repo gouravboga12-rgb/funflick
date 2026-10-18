@@ -41,20 +41,53 @@ export const AdminSubscriptionsScreen = () => {
     currentUser,
     purchasePublishingSubscription,
     subscriptionTransactions,
-    fetchAdminTransactions
+    fetchAdminTransactions,
+    fetchAdminSubscriptionPlans
   } = useApp();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isResettingTest, setIsResettingTest] = useState(false);
 
   useEffect(() => {
     if (fetchAdminTransactions) fetchAdminTransactions();
+    if (fetchAdminSubscriptionPlans) fetchAdminSubscriptionPlans();
   }, []);
 
   const handleRefreshSubscribers = async () => {
     setIsRefreshing(true);
     if (fetchAdminTransactions) await fetchAdminTransactions();
+    if (fetchAdminSubscriptionPlans) await fetchAdminSubscriptionPlans();
     setIsRefreshing(false);
-    showToast('✅ Subscribers refreshed from database!', 'success');
+    showToast('✅ Subscriptions and plans refreshed from database!', 'success');
+  };
+
+  const handleResetTestSubscriptions = async () => {
+    if (!window.confirm('Reset all test subscriptions back to Free status? This will fix user accounts that were subscribed during Razorpay test mode.')) {
+      return;
+    }
+    setIsResettingTest(true);
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      const res = await fetch('/api/subscriptions/admin/reset-test-subscriptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('✅ All test mode subscriptions have been reset to Free status!', 'success');
+        if (fetchAdminTransactions) await fetchAdminTransactions();
+      } else {
+        showToast(data.error || 'Failed to reset test subscriptions', 'error');
+      }
+    } catch (e) {
+      showToast('Error communicating with server', 'error');
+    } finally {
+      setIsResettingTest(false);
+    }
   };
 
   // Active top-level tab: 'plans' (Manage Plans globally) or 'subscribers' (Subscriber directory)
@@ -156,24 +189,57 @@ export const AdminSubscriptionsScreen = () => {
     setModalOpen(true);
   };
 
+  // Handle Billing Period change with auto-sync to duration
+  const handlePeriodChange = (newPeriod) => {
+    let suggestedDuration = editingPlan.duration;
+    if (newPeriod === 'day') suggestedDuration = '1 Day';
+    else if (newPeriod === 'week') suggestedDuration = '7 Days';
+    else if (newPeriod === 'month') suggestedDuration = '30 Days';
+    else if (newPeriod === 'quarter') suggestedDuration = '90 Days';
+    else if (newPeriod === 'year') suggestedDuration = '365 Days';
+
+    setEditingPlan(prev => ({
+      ...prev,
+      period: newPeriod,
+      duration: suggestedDuration
+    }));
+  };
+
   // Save changes from modal
-  const handleSavePlan = (e) => {
+  const handleSavePlan = async (e) => {
     e.preventDefault();
-    if (!editingPlan.name.trim()) {
+    if (!editingPlan.name || !editingPlan.name.trim()) {
       showToast('Plan name is required', 'error');
       return;
     }
-    if (editingPlan.price <= 0) {
+    if (Number(editingPlan.price) <= 0) {
       showToast('Price must be greater than 0', 'error');
       return;
     }
 
+    const payload = {
+      ...editingPlan,
+      name: editingPlan.name.trim(),
+      price: Number(editingPlan.price),
+      period: editingPlan.period || 'month',
+      duration: editingPlan.duration ? editingPlan.duration.trim() : (editingPlan.period === 'week' ? '7 Days' : editingPlan.period === 'year' ? '365 Days' : '30 Days'),
+      label: editingPlan.label ? editingPlan.label.trim() : '',
+      description: editingPlan.description ? editingPlan.description.trim() : '',
+      savings: editingPlan.savings ? editingPlan.savings.trim() : '',
+      popular: Boolean(editingPlan.popular),
+      active: editingPlan.active !== false,
+      features: Array.isArray(editingPlan.features) ? editingPlan.features : []
+    };
+
+    let ok = false;
     if (modalMode === 'edit') {
-      updatePublishingPlan(editingPlan);
+      ok = await updatePublishingPlan(payload);
     } else {
-      addPublishingPlan(editingPlan);
+      ok = await addPublishingPlan(payload);
     }
-    setModalOpen(false);
+    if (ok) {
+      setModalOpen(false);
+    }
   };
 
   // Toggle popular directly on a card
@@ -287,7 +353,17 @@ export const AdminSubscriptionsScreen = () => {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+              <div className="flex flex-wrap items-center gap-2 shrink-0 w-full md:w-auto">
+                <button
+                  onClick={handleResetTestSubscriptions}
+                  disabled={isResettingTest}
+                  title="Reset all test accounts that were given subscription in test mode"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs text-amber-300 transition"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isResettingTest ? 'animate-spin' : ''}`} />
+                  <span>{isResettingTest ? 'Resetting...' : 'Reset Test Subscriptions'}</span>
+                </button>
+
                 <button
                   onClick={resetPublishingPlansToDefault}
                   title="Reset to original default pricing"
@@ -775,7 +851,7 @@ export const AdminSubscriptionsScreen = () => {
                       <label className="text-xs font-bold text-gray-300">Billing Period</label>
                       <select
                         value={editingPlan.period}
-                        onChange={e => setEditingPlan({ ...editingPlan, period: e.target.value })}
+                        onChange={e => handlePeriodChange(e.target.value)}
                         className="w-full bg-[#1b1338] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-pink-500"
                       >
                         <option value="month">Per Month (month)</option>

@@ -137,14 +137,13 @@ export const SubscriptionScreen = ({ navigation }) => {
 
   const isUserSubscribed = Boolean(
     subStatus?.isActive ||
-    currentUser?.isInfluencer ||
-    (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
+    (currentUser?.isInfluencer && currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
   );
 
-  const activePlanName = subStatus?.planName || currentUser?.subscriptionPlan || 'Weekly Influencer';
+  const activePlanName = subStatus?.planName || currentUser?.subscriptionPlan || 'Influencer Pass';
   const activeDaysRemaining = subStatus?.daysRemaining !== undefined
     ? Number(subStatus.daysRemaining)
-    : (isUserSubscribed ? 5 : 0);
+    : 0;
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -158,11 +157,11 @@ export const SubscriptionScreen = ({ navigation }) => {
 
   const activeStartDate = subStatus?.startDate
     ? formatDate(subStatus.startDate)
-    : (isUserSubscribed ? '7 Oct 2026' : '');
+    : (currentUser?.subscriptionStart ? formatDate(currentUser.subscriptionStart) : '');
 
   const activeExpiryDate = subStatus?.expiresAt
     ? formatDate(subStatus.expiresAt)
-    : (isUserSubscribed ? '14 Oct 2026' : '');
+    : (currentUser?.subscriptionExpiresAt ? formatDate(currentUser.subscriptionExpiresAt) : '');
 
   const isPurchasingRef = useRef(false);
 

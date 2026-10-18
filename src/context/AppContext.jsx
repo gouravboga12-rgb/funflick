@@ -1557,6 +1557,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Fetch active plans from database
+  // Fetch active plans from database (public / user side)
   const fetchSubscriptionPlans = async () => {
     try {
       const res = await fetch('/api/subscriptions/plans');
@@ -1575,23 +1576,34 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Admin: Update an existing plan globally & sync with MySQL
-  const updatePublishingPlan = async (updatedPlan) => {
-    setPublishingPlans(prev => prev.map(p => {
-      if (p.id === updatedPlan.id) {
-        return {
-          ...p,
-          ...updatedPlan,
-          price: Number(updatedPlan.price),
-          formattedPrice: `₹${Number(updatedPlan.price).toLocaleString()}`
-        };
-      }
-      return p;
-    }));
-
+  // Fetch all plans including inactive ones (Admin side)
+  const fetchAdminSubscriptionPlans = async () => {
     const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     try {
-      await fetch(`/api/subscriptions/admin/plans/${updatedPlan.id}`, {
+      const res = await fetch('/api/subscriptions/admin/plans', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.plans && Array.isArray(data.plans)) {
+          const mapped = data.plans.map(p => ({
+            ...p,
+            formattedPrice: p.formatted_price || `₹${Number(p.price).toLocaleString()}`
+          }));
+          setPublishingPlans(mapped);
+          return mapped;
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch admin plans:', err);
+    }
+  };
+
+  // Admin: Update an existing plan globally & sync with MySQL
+  const updatePublishingPlan = async (updatedPlan) => {
+    const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
+    try {
+      const res = await fetch(`/api/subscriptions/admin/plans/${updatedPlan.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1599,20 +1611,28 @@ export const AppProvider = ({ children }) => {
         },
         body: JSON.stringify(updatedPlan)
       });
-      await fetchSubscriptionPlans();
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to update plan in database', 'error');
+        return false;
+      }
+      showToast(`✅ Plan "${updatedPlan.name}" updated in database and reflected user-wide!`, 'success');
+      await fetchAdminSubscriptionPlans();
+      return true;
     } catch (err) {
       console.error('Failed to sync plan update with database:', err);
+      showToast('Failed to communicate with database server', 'error');
+      return false;
     }
-
-    showToast(`✅ Plan "${updatedPlan.name}" updated in database and reflected user-wide!`, 'success');
   };
 
   // Admin: Toggle plan active/inactive status
   const togglePlanActiveStatus = async (planId) => {
-    let nextActive = true;
+    const currentPlan = publishingPlans.find(p => p.id === planId);
+    const nextActive = currentPlan ? (currentPlan.active === false ? true : false) : true;
+
     setPublishingPlans(prev => prev.map(p => {
       if (p.id === planId) {
-        nextActive = p.active === false ? true : false;
         return { ...p, active: nextActive };
       }
       return p;
@@ -1620,7 +1640,7 @@ export const AppProvider = ({ children }) => {
 
     const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     try {
-      await fetch(`/api/subscriptions/admin/plans/${planId}`, {
+      const res = await fetch(`/api/subscriptions/admin/plans/${planId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1628,12 +1648,17 @@ export const AppProvider = ({ children }) => {
         },
         body: JSON.stringify({ active: nextActive })
       });
-      await fetchSubscriptionPlans();
+      if (res.ok) {
+        showToast(`Plan is now ${nextActive ? 'ACTIVE' : 'INACTIVE'} in database`, 'info');
+        await fetchAdminSubscriptionPlans();
+      } else {
+        showToast('Failed to toggle plan status in database', 'error');
+        await fetchAdminSubscriptionPlans();
+      }
     } catch (err) {
       console.error('Failed to toggle plan status:', err);
+      showToast('Error syncing status with server', 'error');
     }
-
-    showToast(`Plan is now ${nextActive ? 'ACTIVE' : 'INACTIVE'} in database`, 'info');
   };
 
   // Admin: Add a new custom plan
@@ -1649,11 +1674,10 @@ export const AppProvider = ({ children }) => {
       popular: !!newPlan.popular,
       features: Array.isArray(newPlan.features) ? newPlan.features : ['Influencer badge', 'Advanced analytics & rewards']
     };
-    setPublishingPlans(prev => [...prev, formatted]);
 
     const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     try {
-      await fetch('/api/subscriptions/admin/plans', {
+      const res = await fetch('/api/subscriptions/admin/plans', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1661,28 +1685,39 @@ export const AppProvider = ({ children }) => {
         },
         body: JSON.stringify(formatted)
       });
-      await fetchSubscriptionPlans();
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to create plan in database', 'error');
+        return false;
+      }
+      showToast(`🎉 New plan "${newPlan.name}" saved to database!`, 'success');
+      await fetchAdminSubscriptionPlans();
+      return true;
     } catch (err) {
       console.error('Failed to save new plan to database:', err);
+      showToast('Server error while saving plan', 'error');
+      return false;
     }
-
-    showToast(`🎉 New plan "${newPlan.name}" saved to database!`, 'success');
   };
 
   // Admin: Delete a plan
   const deletePublishingPlan = async (planId) => {
-    setPublishingPlans(prev => prev.filter(p => p.id !== planId));
     const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     try {
-      await fetch(`/api/subscriptions/admin/plans/${planId}`, {
+      const res = await fetch(`/api/subscriptions/admin/plans/${planId}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-      await fetchSubscriptionPlans();
+      if (res.ok) {
+        showToast('Plan removed from database.', 'info');
+        await fetchAdminSubscriptionPlans();
+      } else {
+        showToast('Failed to delete plan from database', 'error');
+      }
     } catch (err) {
       console.error('Failed to delete plan from database:', err);
+      showToast('Server error deleting plan', 'error');
     }
-    showToast('Plan removed from database.', 'info');
   };
 
   // Admin: Reset plans to default
@@ -3172,6 +3207,7 @@ export const AppProvider = ({ children }) => {
         handlePendingApproval,
         publishingPlans,
         fetchSubscriptionPlans,
+        fetchAdminSubscriptionPlans,
         updatePublishingPlan,
         addPublishingPlan,
         deletePublishingPlan,

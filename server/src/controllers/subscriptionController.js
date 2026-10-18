@@ -3,8 +3,12 @@ import pool from '../config/db.js';
 import { calculateISTDaysRemaining, formatISTDate, formatISTDateTime } from '../utils/istDateUtils.js';
 import { sendPushNotification } from '../services/pushService.js';
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TnKEnfZ6jVCa3k';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'YqAsTAiWM2lcKj05j5VBWjfT';
+export const isPaymentGatewayActive = () => {
+  const keyId = process.env.RAZORPAY_KEY_ID || '';
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
+  return process.env.PAYMENT_GATEWAY_ACTIVE === 'true' &&
+    Boolean(keyId && !keyId.startsWith('rzp_test_') && keySecret);
+};
 
 export async function getActivePlans(req, res) {
   try {
@@ -47,8 +51,10 @@ export async function updatePlanAdmin(req, res) {
     const { id } = req.params;
     const { name, price, formatted_price, period, duration, label, description, savings, popular, active, features } = req.body;
 
-    const formattedPriceVal = formatted_price || `₹${Number(price).toLocaleString()}`;
-    const featuresJson = typeof features === 'string' ? features : JSON.stringify(features || []);
+    const formattedPriceVal = formatted_price || (price !== undefined ? `₹${Number(price).toLocaleString()}` : null);
+    const featuresJson = features !== undefined
+      ? (typeof features === 'string' ? features : JSON.stringify(features || []))
+      : null;
 
     await pool.query(
       `UPDATE subscription_plans SET
@@ -59,23 +65,23 @@ export async function updatePlanAdmin(req, res) {
         duration = COALESCE(?, duration),
         label = COALESCE(?, label),
         description = COALESCE(?, description),
-        savings = ?,
+        savings = COALESCE(?, savings),
         popular = COALESCE(?, popular),
         active = COALESCE(?, active),
         features = COALESCE(?, features)
       WHERE id = ?`,
       [
-        name,
-        price,
-        formattedPriceVal,
-        period,
-        duration,
-        label,
-        description,
-        savings,
-        popular !== undefined ? (popular ? 1 : 0) : undefined,
-        active !== undefined ? (active ? 1 : 0) : undefined,
-        featuresJson,
+        name !== undefined ? name : null,
+        price !== undefined ? Number(price) : null,
+        formattedPriceVal !== undefined ? formattedPriceVal : null,
+        period !== undefined ? period : null,
+        duration !== undefined ? duration : null,
+        label !== undefined ? label : null,
+        description !== undefined ? description : null,
+        savings !== undefined ? savings : null,
+        popular !== undefined ? (popular ? 1 : 0) : null,
+        active !== undefined ? (active ? 1 : 0) : null,
+        featuresJson !== undefined ? featuresJson : null,
         id
       ]
     );
@@ -83,7 +89,7 @@ export async function updatePlanAdmin(req, res) {
     return res.json({ success: true, message: 'Subscription plan updated successfully' });
   } catch (err) {
     console.error('Update plan error:', err);
-    return res.status(500).json({ error: 'Failed to update subscription plan' });
+    return res.status(500).json({ error: 'Failed to update subscription plan: ' + err.message });
   }
 }
 
@@ -96,11 +102,23 @@ export async function createPlanAdmin(req, res) {
 
     await pool.query(
       `INSERT INTO subscription_plans (id, name, price, formatted_price, period, duration, label, description, savings, popular, active, features)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        price = VALUES(price),
+        formatted_price = VALUES(formatted_price),
+        period = VALUES(period),
+        duration = VALUES(duration),
+        label = VALUES(label),
+        description = VALUES(description),
+        savings = VALUES(savings),
+        popular = VALUES(popular),
+        active = VALUES(active),
+        features = VALUES(features)`,
       [
         planId,
-        name,
-        price,
+        name || 'Influencer Pass',
+        Number(price) || 99,
         formattedPriceVal,
         period || 'month',
         duration || '30 Days',
@@ -116,7 +134,42 @@ export async function createPlanAdmin(req, res) {
     return res.status(201).json({ success: true, message: 'Plan created successfully', id: planId });
   } catch (err) {
     console.error('Create plan error:', err);
-    return res.status(500).json({ error: 'Failed to create subscription plan' });
+    return res.status(500).json({ error: 'Failed to create subscription plan: ' + err.message });
+  }
+}
+
+// Admin tool: Reset test / fake subscriptions back to free user
+export async function resetTestSubscriptionsAdmin(req, res) {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId } = req.body || {};
+    if (userId) {
+      await pool.query(
+        'UPDATE users SET is_influencer = 0, subscription_plan = NULL, subscription_start = NULL, subscription_expires_at = NULL WHERE id = ?',
+        [userId]
+      );
+      await pool.query(
+        'DELETE FROM user_subscriptions WHERE user_id = ? AND (payment_gateway LIKE "%test%" OR payment_id LIKE "%PAY_%" OR payment_id LIKE "%rcpt_%" OR payment_id LIKE "%modal%")',
+        [userId]
+      );
+      return res.json({ success: true, message: `User #${userId} subscription reset to Free status` });
+    } else {
+      await pool.query(
+        `UPDATE users 
+         SET is_influencer = 0, subscription_plan = NULL, subscription_start = NULL, subscription_expires_at = NULL
+         WHERE id IN (
+           SELECT user_id FROM user_subscriptions 
+           WHERE payment_gateway LIKE "%test%" OR payment_id LIKE "%PAY_%" OR payment_id LIKE "%rcpt_%" OR payment_id LIKE "%modal%"
+         )`
+      );
+      return res.json({ success: true, message: 'All test subscriptions have been reset to Free status' });
+    }
+  } catch (err) {
+    console.error('Reset test subscriptions error:', err);
+    return res.status(500).json({ error: 'Failed to reset test subscriptions: ' + err.message });
   }
 }
 
@@ -275,8 +328,13 @@ async function executeSubscriptionActivation({ userId, planId, planName, price, 
 
 export async function subscribeUser(req, res) {
   try {
-    const userId = req.user.id;
+    const userRole = req.user?.role;
+    if (userRole !== 'admin') {
+      return res.status(403).json({ error: 'Direct manual subscription activation requires administrator privileges' });
+    }
+
     const { 
+      userId: targetUserId,
       planId = 'monthly', 
       planName = 'Monthly Influencer Pro', 
       price = 199,
@@ -286,7 +344,7 @@ export async function subscribeUser(req, res) {
     } = req.body;
 
     const result = await executeSubscriptionActivation({
-      userId,
+      userId: targetUserId || req.user.id,
       planId,
       planName,
       price,
@@ -311,6 +369,15 @@ export async function createRazorpayOrder(req, res) {
     if (!userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
+
+    if (!isPaymentGatewayActive()) {
+      return res.status(400).json({
+        error: 'Online subscriptions are temporarily paused while payment gateway verification is in progress. Please check back shortly!'
+      });
+    }
+
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
     const { planId = 'monthly', price } = req.body;
 
@@ -342,7 +409,7 @@ export async function createRazorpayOrder(req, res) {
     const amountInPaise = Math.round(planPrice * 100);
     const receipt = `rcpt_${userId}_${Date.now()}`.substring(0, 40);
 
-    const auth = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
+    const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
     const rzpResponse = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -375,7 +442,7 @@ export async function createRazorpayOrder(req, res) {
       orderId: orderData.id,
       amount: orderData.amount,
       currency: orderData.currency,
-      keyId: RAZORPAY_KEY_ID,
+      keyId,
       planName,
       planPrice,
       durationDays
@@ -393,6 +460,15 @@ export async function verifyRazorpayPayment(req, res) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
+    if (!isPaymentGatewayActive()) {
+      return res.status(400).json({
+        error: 'Online subscriptions are currently paused for payment gateway verification.'
+      });
+    }
+
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
     const { orderId, paymentId, signature, planId } = req.body;
 
     if (!orderId || !paymentId || !signature) {
@@ -401,7 +477,7 @@ export async function verifyRazorpayPayment(req, res) {
 
     // 1. Cryptographic HMAC-SHA256 signature verification
     const expectedSignature = crypto
-      .createHmac('sha256', RAZORPAY_KEY_SECRET)
+      .createHmac('sha256', keySecret)
       .update(`${orderId}|${paymentId}`)
       .digest('hex');
 
@@ -411,7 +487,7 @@ export async function verifyRazorpayPayment(req, res) {
     }
 
     // 2. Fetch payment details from Razorpay API to confirm capture status
-    const auth = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
+    const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
     const rzpPayRes = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
       headers: { 'Authorization': `Basic ${auth}` }
     });
@@ -474,6 +550,90 @@ export async function verifyRazorpayPayment(req, res) {
 export async function renderCheckoutPage(req, res) {
   const { orderId, amount, planName, planId, token, name = '', email = '', phone = '' } = req.query;
 
+  if (!isPaymentGatewayActive()) {
+    const pausedHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>FunFlick Payments Paused</title>
+  <style>
+    body {
+      margin: 0;
+      background: #090514;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .card {
+      background: #140c26;
+      border: 1px solid rgba(255, 0, 122, 0.3);
+      border-radius: 24px;
+      padding: 36px 24px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .logo {
+      font-size: 28px;
+      font-weight: 900;
+      color: #ff007a;
+      margin-bottom: 16px;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(255, 0, 122, 0.15);
+      color: #ff4da6;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 20px;
+      margin: 0 0 12px;
+      font-weight: 800;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0 0 24px;
+    }
+    .btn {
+      display: block;
+      background: linear-gradient(135deg, #ff007a, #7928ca);
+      color: #fff;
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 30px;
+      font-size: 15px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">FunFlick</div>
+    <div class="badge">🔒 Verification in Progress</div>
+    <h2>Online Payments Paused</h2>
+    <p>Online subscription checkout is temporarily paused while live payment gateway merchant credentials are being finalized. Please check back shortly!</p>
+    <a href="funflick://payment-cancel" class="btn">Return to FunFlick App</a>
+  </div>
+</body>
+</html>`;
+    res.setHeader('Content-Type', 'text/html');
+    return res.send(pausedHtml);
+  }
+
+  const keyId = process.env.RAZORPAY_KEY_ID || '';
   if (!orderId || !amount) {
     return res.status(400).send('<h3>Invalid checkout request. Missing orderId or amount.</h3>');
   }
@@ -581,7 +741,7 @@ export async function renderCheckoutPage(req, res) {
 
   <script>
     const options = {
-      key: ${JSON.stringify(RAZORPAY_KEY_ID)},
+      key: ${JSON.stringify(keyId)},
       amount: Number(${JSON.stringify(amount)}),
       currency: 'INR',
       name: 'FunFlick',

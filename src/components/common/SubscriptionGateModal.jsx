@@ -10,7 +10,8 @@ export const SubscriptionGateModal = () => {
     subscriptionGateModalOpen, 
     setSubscriptionGateModalOpen, 
     purchasePublishingSubscription,
-    publishingPlans = PUBLISHING_PLANS
+    publishingPlans = PUBLISHING_PLANS,
+    showToast
   } = useApp();
 
   const activePlans = (publishingPlans && publishingPlans.length > 0) ? publishingPlans : PUBLISHING_PLANS;
@@ -20,18 +21,8 @@ export const SubscriptionGateModal = () => {
   if (!subscriptionGateModalOpen) return null;
 
   const handleSubscribe = () => {
-    setProcessing(true);
-    setTimeout(() => {
-      purchasePublishingSubscription(selectedPlanId);
-      setProcessing(false);
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-      } catch (e) {}
-    }, 900);
+    showToast('Online subscriptions are temporarily paused while payment gateway verification is in progress. Please check back shortly!', 'info');
+    setSubscriptionGateModalOpen(false);
   };
 
   return (

@@ -19,7 +19,7 @@ import {
 import confetti from 'canvas-confetti';
 
 // Razorpay Client Key ID (Public Key ID for Checkout SDK; Secret Key is kept securely on server only)
-const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TnKEnfZ6jVCa3k';
+const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
 
 export const SubscriptionScreen = () => {
   const navigate = useNavigate();
@@ -471,7 +471,6 @@ export const SubscriptionScreen = () => {
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 font-bold text-[10px]">
               🔒 Secured by Razorpay
             </span>
-            <span className="text-[10px] text-gray-400 font-medium">Test Mode Enabled (Key: rzp_test_...5VmT8)</span>
           </div>
           <p className="text-[10px] text-gray-400">
             Tap <strong>Pay</strong> on any plan above for instant activation via UPI (GPay, PhonePe, Paytm), Cards, or NetBanking.

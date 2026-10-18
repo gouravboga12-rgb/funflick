@@ -9,7 +9,8 @@ import {
   getUserSubscriptionStatus,
   createRazorpayOrder,
   verifyRazorpayPayment,
-  renderCheckoutPage
+  renderCheckoutPage,
+  resetTestSubscriptionsAdmin
 } from '../controllers/subscriptionController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -34,5 +35,6 @@ router.get('/admin/plans', authenticateToken, getAllPlansAdmin);
 router.post('/admin/plans', authenticateToken, createPlanAdmin);
 router.put('/admin/plans/:id', authenticateToken, updatePlanAdmin);
 router.delete('/admin/plans/:id', authenticateToken, deletePlanAdmin);
+router.post('/admin/reset-test-subscriptions', authenticateToken, resetTestSubscriptionsAdmin);
 
 export default router;
