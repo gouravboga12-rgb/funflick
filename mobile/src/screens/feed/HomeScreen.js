@@ -54,13 +54,6 @@ export const HomeScreen = ({ navigation }) => {
     waitForInteraction: false,
   }).current;
 
-  // Auto-activate the first item immediately on load
-  useEffect(() => {
-    if (filteredPosts.length > 0 && !activeVideoId) {
-      setActiveVideoId(filteredPosts[0].id);
-    }
-  }, [filteredPosts, activeVideoId]);
-
   const filteredPosts = useMemo(() => {
     const list = [...(posts || [])];
     if (activeTab === 'Trending') {
@@ -80,6 +73,58 @@ export const HomeScreen = ({ navigation }) => {
     return list; // 'For You' returns list as-is
   }, [posts, activeTab]);
 
+  // Interleave sponsored ads seamlessly into feed:
+  // 1. Paid / Subscribed influencer accounts NEVER see any ads.
+  // 2. Only show ads specifically configured with frequency === 'After 5 Reels'
+  // 3. 1st ad strictly after 5 reels/posts; 2nd ad after next 5 reels/posts; etc.
+  // 4. Each ad strictly ONCE (no repeats).
+  // 5. Subsequent reels/posts continue uninterrupted after ads!
+  const feedItems = useMemo(() => {
+    if (!filteredPosts || filteredPosts.length === 0) return [];
+
+    if (isPaidInfluencer) {
+      return filteredPosts;
+    }
+
+    const inFeedAds = (adsList || []).filter(a =>
+      a && a.active && a.frequency === 'After 5 Reels'
+    );
+
+    if (inFeedAds.length === 0) {
+      return filteredPosts;
+    }
+
+    const result = [];
+    let adIndex = 0;
+    let postCount = 0;
+
+    for (let i = 0; i < filteredPosts.length; i++) {
+      result.push(filteredPosts[i]);
+      postCount++;
+
+      // Every 5 posts, insert the next available ad
+      if (postCount % 5 === 0 && adIndex < inFeedAds.length) {
+        const rawAd = inFeedAds[adIndex];
+        result.push({
+          ...rawAd,
+          id: `ad_${rawAd.id}`,
+          rawAdId: rawAd.id,
+          isSponsoredAd: true,
+        });
+        adIndex++;
+      }
+    }
+
+    return result;
+  }, [filteredPosts, adsList, isPaidInfluencer]);
+
+  // Auto-activate the first item immediately on load
+  useEffect(() => {
+    if (feedItems.length > 0 && !activeVideoId) {
+      setActiveVideoId(feedItems[0].id);
+    }
+  }, [feedItems, activeVideoId]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* 1-Line Top Header matching website (Logo | For You Trending Latest   Search Bell Inbox) */}
@@ -94,7 +139,7 @@ export const HomeScreen = ({ navigation }) => {
       />
 
       <FlatList
-        data={filteredPosts}
+        data={feedItems}
         keyExtractor={item => String(item.id)}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
@@ -105,24 +150,18 @@ export const HomeScreen = ({ navigation }) => {
           />
         }
         renderItem={({ item, index }) => {
-          // In-feed sponsored ads:
-          // 1. Paid / Subscribed influencer accounts NEVER see any ads!
-          // 2. Only show ads specifically configured in admin panel with frequency === 'After 5 Reels'
-          // 3. 1st ad strictly after 5 posts ((index + 1) === 5) -> slot 0
-          // 4. 2nd ad strictly after 10 posts ((index + 1) === 10) -> slot 1
-          // 5. 3rd ad strictly after 15 posts ((index + 1) === 15) -> slot 2
-          // 6. Strictly ONCE per ad: if slot index >= inFeedAds.length, no ad is displayed.
-          //    An ad never repeats.
-          const inFeedAds = (adsList || []).filter(a =>
-            a.active &&
-            a.frequency === 'After 5 Reels'
-          );
-          const isUserLoggedIn = isAuthenticated && Boolean(currentUser);
-          const isFifthPost = (index + 1) % 5 === 0;
-          const adSlotIdx = isFifthPost ? Math.floor((index + 1) / 5) - 1 : -1;
-          const feedAd = (isUserLoggedIn && !isPaidInfluencer && adSlotIdx >= 0 && adSlotIdx < inFeedAds.length)
-            ? inFeedAds[adSlotIdx]
-            : null;
+          if (item.isSponsoredAd) {
+            const isAdActive = activeVideoId === item.id;
+            return (
+              <View style={styles.cardWrapper}>
+                <SponsoredAdCard
+                  ad={item}
+                  isActive={isAdActive}
+                  onPlayPress={() => setActiveVideoId(item.id)}
+                />
+              </View>
+            );
+          }
 
           const mediaUrl = item.mediaUrl || item.video_url || '';
           const isVideo =
@@ -131,8 +170,7 @@ export const HomeScreen = ({ navigation }) => {
             item.category !== 'Photo' &&
             item.category !== 'Post';
 
-          const isAdActive = Boolean(feedAd && activeVideoId === `ad_${feedAd.id}`);
-          const isPostActive = !isAdActive && (activeVideoId ? String(item.id) === String(activeVideoId) : index === 0);
+          const isPostActive = activeVideoId ? String(item.id) === String(activeVideoId) : index === 0;
 
           return (
             <View style={styles.cardWrapper}>
@@ -147,15 +185,6 @@ export const HomeScreen = ({ navigation }) => {
                   post={item}
                   navigation={navigation}
                 />
-              )}
-              {feedAd && (
-                <View style={{ marginTop: 8 }}>
-                  <SponsoredAdCard
-                    ad={feedAd}
-                    isActive={isAdActive}
-                    onPlayPress={() => setActiveVideoId(`ad_${feedAd.id}`)}
-                  />
-                </View>
               )}
             </View>
           );

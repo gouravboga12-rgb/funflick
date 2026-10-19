@@ -18,12 +18,24 @@ import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Match VideoPostCard / Reels dimensions exactly
+const REEL_CARD_HEIGHT = Math.min(
+  Math.floor(SCREEN_HEIGHT - 120),
+  Math.floor(SCREEN_WIDTH * (16 / 9))
+);
+
+const IMAGE_CARD_HEIGHT = Math.min(
+  Math.floor(SCREEN_HEIGHT - 220),
+  Math.floor(SCREEN_WIDTH * 1.25)
+);
+
 const isVideoExt = (url) => typeof url === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(url);
 
 export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
   const isFocused = useIsFocused();
   const { isReelsMuted, toggleMute, recordAdMetric, isPaidInfluencer, activePopupAd } = useApp();
   const [isAdPaused, setIsAdPaused] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const hasRecordedImpression = useRef(false);
   const webVideoRef = useRef(null);
 
@@ -32,15 +44,22 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
   const isVideo = Boolean(
     ad && (
       ad.type === 'video' ||
-      /\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.mediaUrl || '')
+      isVideoExt(ad.mediaUrl || '')
     )
   );
 
   const shouldPlay = Boolean(isVideo && isActive && isFocused && !isAdPaused && !activePopupAd);
 
-  const validPoster = (!isVideoExt(ad?.thumbnailUrl) && ad?.thumbnailUrl)
-    ? ad.thumbnailUrl
-    : (!isVideoExt(ad?.posterUrl) && ad?.posterUrl ? ad.posterUrl : null);
+  // Safe poster image URI that is NOT an mp4 video URL
+  const validPoster = (() => {
+    const candidates = [ad?.thumbnailUrl, ad?.posterUrl, ad?.thumbnail, ad?.poster];
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.trim() && !isVideoExt(c)) {
+        return c.trim();
+      }
+    }
+    return !isVideo && typeof ad?.mediaUrl === 'string' ? ad.mediaUrl : null;
+  })();
 
   const player = useVideoPlayer(isVideo && Platform.OS !== 'web' ? ad?.mediaUrl : null, p => {
     if (!p) return;
@@ -52,6 +71,32 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
       p.pause();
     }
   });
+
+  // Track video readiness to prevent black screen flash
+  useEffect(() => {
+    if (!player) {
+      setIsVideoReady(false);
+      return;
+    }
+    if (player.status === 'readyToPlay') {
+      setIsVideoReady(true);
+    }
+    const statusSub = player.addListener ? player.addListener('statusChange', (payload) => {
+      if (payload?.status === 'readyToPlay') setIsVideoReady(true);
+    }) : null;
+    const playSub = player.addListener ? player.addListener('playingChange', (payload) => {
+      if (payload?.isPlaying) setIsVideoReady(true);
+    }) : null;
+    const timeSub = player.addListener ? player.addListener('timeUpdate', () => {
+      setIsVideoReady(true);
+    }) : null;
+
+    return () => {
+      statusSub?.remove?.();
+      playSub?.remove?.();
+      timeSub?.remove?.();
+    };
+  }, [player]);
 
   useEffect(() => {
     if (Platform.OS === 'web' && webVideoRef.current) {
@@ -101,18 +146,21 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
 
   // Record impression once when in viewport
   useEffect(() => {
-    if (!hasRecordedImpression.current && ad?.id) {
+    const rawId = ad.rawAdId || ad.id;
+    if (!hasRecordedImpression.current && rawId) {
       hasRecordedImpression.current = true;
-      recordAdMetric(ad.id, 'impression');
+      recordAdMetric?.(rawId, 'impression');
     }
-  }, [ad?.id, recordAdMetric]);
+  }, [ad.rawAdId, ad.id, recordAdMetric]);
 
   const handleAction = () => {
-    if (ad?.id) {
-      recordAdMetric(ad.id, 'click');
+    const rawId = ad.rawAdId || ad.id;
+    if (rawId) {
+      recordAdMetric?.(rawId, 'click');
     }
-    if (ad?.actionUrl) {
-      Linking.openURL(ad.actionUrl).catch(() => {});
+    const targetUrl = ad.actionUrl || 'https://funflick.in';
+    if (targetUrl) {
+      Linking.openURL(targetUrl).catch(e => console.warn('Could not open ad URL:', e));
     }
   };
 
@@ -125,120 +173,147 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
     }
   };
 
-  return (
-    <View style={styles.cardContainer}>
-      {/* Header Bar */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.badge}>
-            <Sparkles size={13} color="#fbbf24" style={{ marginRight: 4 }} />
-            <Text style={styles.badgeText}>Sponsored</Text>
-          </View>
-          <Text style={styles.title} numberOfLines={1}>{ad.title || 'Featured Brand'}</Text>
-        </View>
+  // ==========================================
+  // 1. VIDEO AD: Render like Reels / VideoPostCard
+  // ==========================================
+  if (isVideo) {
+    return (
+      <View style={[styles.reelAdContainer, { height: REEL_CARD_HEIGHT }]}>
+        {/* Layer 1: Ambient Blurred Backdrop */}
+        {validPoster ? (
+          <Image
+            source={{ uri: validPoster }}
+            style={StyleSheet.absoluteFillObject}
+            blurRadius={32}
+            opacity={0.32}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#090514' }]} />
+        )}
 
-        <TouchableOpacity onPress={handleAction} style={styles.learnMoreBtn}>
-          <Text style={styles.learnMoreText}>Visit</Text>
-          <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 3 }} />
-        </TouchableOpacity>
-      </View>
+        {/* Layer 2: True Aspect-Ratio VideoView */}
+        {player && (
+          Platform.OS === 'web' ? (
+            <video
+              ref={webVideoRef}
+              src={ad.mediaUrl}
+              autoPlay
+              playsInline
+              loop
+              muted={isReelsMuted}
+              onLoadedData={() => setIsVideoReady(true)}
+              onPlaying={() => setIsVideoReady(true)}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                backgroundColor: 'transparent',
+              }}
+            />
+          ) : (
+            <VideoView
+              player={player}
+              style={styles.fullscreenVideo}
+              contentFit="contain"
+              surfaceType="textureView"
+              useExoShutter={false}
+              nativeControls={false}
+            />
+          )
+        )}
 
-      {/* Media Display */}
-      <View style={styles.mediaWrapper}>
+        {/* Persistent Poster Image until first video frame is decoded & ready to play */}
+        {(!isVideoReady || !player) && validPoster && (
+          <Image
+            source={{ uri: validPoster }}
+            style={[styles.fullscreenVideo, StyleSheet.absoluteFillObject]}
+            resizeMode="contain"
+          />
+        )}
+
+        {/* Dedicated Tap Layer Covering Entire Screen */}
         <TouchableOpacity
           activeOpacity={1}
-          onPress={isVideo ? handleTogglePlayPause : handleAction}
+          onPress={handleTogglePlayPause}
           style={StyleSheet.absoluteFillObject}
-        >
-          {isVideo ? (
-            Platform.OS === 'web' ? (
-              <video
-                ref={webVideoRef}
-                src={ad.mediaUrl}
-                playsInline
-                loop
-                muted={isReelsMuted}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  backgroundColor: '#000000',
-                }}
-              />
-            ) : player ? (
-              <VideoView
-                player={player}
-                style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
-                contentFit="cover"
-                surfaceType="textureView"
-                useExoShutter={false}
-                nativeControls={false}
-              />
-            ) : null
-          ) : (
-            <Image
-              source={{ uri: validPoster || ad.mediaUrl }}
-              style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
-              resizeMode="cover"
-            />
-          )}
+        />
 
-          {/* Centered Play Pill when Video Ad is paused */}
-          {isVideo && (isAdPaused || !shouldPlay) && (
-            <View style={styles.centerPlayOverlay} pointerEvents="none">
-              <View style={styles.centerPlayPill}>
-                <Play size={24} color="#ffffff" />
-              </View>
+        {/* Top Floating Vignette */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.7)', 'transparent']}
+          style={styles.topVignette}
+          pointerEvents="none"
+        />
+
+        {/* Top Header Floating Controls */}
+        <View style={styles.floatingTopBar} pointerEvents="box-none">
+          <View style={styles.floatingHeaderLeft}>
+            <View style={styles.badge}>
+              <Sparkles size={13} color="#fbbf24" style={{ marginRight: 4 }} />
+              <Text style={styles.badgeText}>Sponsored</Text>
             </View>
-          )}
-        </TouchableOpacity>
+            <Text style={styles.title} numberOfLines={1}>{ad.title || 'Featured Brand'}</Text>
+          </View>
 
-        {/* Audio Mute & Play/Pause Controls for Video Ads */}
-        {isVideo && (
-          <View style={styles.topRightControls}>
-            <TouchableOpacity
-              style={styles.iconCtrlBtn}
-              onPress={handleTogglePlayPause}
-              activeOpacity={0.8}
-            >
-              {isAdPaused || !shouldPlay ? (
-                <Play size={14} color="#ffffff" />
-              ) : (
-                <Pause size={14} color="#ffffff" />
-              )}
-            </TouchableOpacity>
+          <TouchableOpacity onPress={handleAction} style={styles.learnMoreBtn} activeOpacity={0.85}>
+            <Text style={styles.learnMoreText}>Visit</Text>
+            <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
+          </TouchableOpacity>
+        </View>
 
-            <TouchableOpacity
-              style={styles.iconCtrlBtn}
-              onPress={toggleMute}
-              activeOpacity={0.8}
-            >
-              {isReelsMuted ? (
-                <VolumeX size={14} color="#ffffff" />
-              ) : (
-                <Volume2 size={14} color="#ffffff" />
-              )}
+        {/* Top Right Controls: Mute & Play/Pause */}
+        <View style={styles.topRightControls} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.iconCtrlBtn}
+            onPress={toggleMute}
+            activeOpacity={0.8}
+          >
+            {isReelsMuted ? (
+              <VolumeX size={16} color="#ffffff" />
+            ) : (
+              <Volume2 size={16} color="#fbbf24" />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.iconCtrlBtn}
+            onPress={handleTogglePlayPause}
+            activeOpacity={0.8}
+          >
+            {isAdPaused || !shouldPlay ? (
+              <Play size={16} color="#ff007a" fill="#ff007a" style={{ marginLeft: 2 }} />
+            ) : (
+              <Pause size={16} color="#ffffff" fill="#ffffff" />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Centered Play Indicator when Video Ad is paused */}
+        {(isAdPaused || !shouldPlay) && (
+          <View style={styles.centerPlayOverlay} pointerEvents="box-none">
+            <TouchableOpacity style={styles.centerPlayPill} onPress={handleTogglePlayPause} activeOpacity={0.85}>
+              <Play size={28} color="#ffffff" fill="#ffffff" style={{ marginLeft: 3 }} />
             </TouchableOpacity>
           </View>
         )}
 
+        {/* Bottom Vignette Gradient */}
         <LinearGradient
-          colors={['transparent', 'rgba(7,4,13,0.8)']}
-          style={styles.bottomGradient}
+          colors={['transparent', 'rgba(7,4,13,0.92)']}
+          style={styles.bottomVignette}
+          pointerEvents="none"
         />
 
         {/* Bottom CTA Bar */}
-        {Boolean(ad.actionText || ad.actionUrl) && (
+        <View style={styles.bottomCtaWrapper} pointerEvents="box-none">
           <TouchableOpacity
             style={styles.bottomCta}
             onPress={handleAction}
             activeOpacity={0.9}
           >
             <View style={styles.ctaTextContainer}>
-              <Text style={styles.ctaPrompt}>Special Offer</Text>
+              <Text style={styles.ctaPrompt}>Sponsored Promotion</Text>
               <Text style={styles.ctaTitle} numberOfLines={1}>
                 {ad.title || 'Tap to learn more'}
               </Text>
@@ -250,85 +325,174 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
               end={{ x: 1, y: 0 }}
               style={styles.ctaButton}
             >
-              <Text style={styles.ctaButtonText}>{ad.actionText || 'Install / View'}</Text>
+              <Text style={styles.ctaButtonText}>{ad.actionText || 'Visit Now'}</Text>
+              <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
             </LinearGradient>
           </TouchableOpacity>
-        )}
+        </View>
+      </View>
+    );
+  }
+
+  // ==========================================
+  // 2. IMAGE AD: Render like StandardPostCard
+  // ==========================================
+  return (
+    <View style={styles.imageCardContainer}>
+      {/* Post Header */}
+      <View style={styles.postHeader}>
+        <View style={styles.headerLeft}>
+          <View style={styles.brandAvatar}>
+            <Sparkles size={16} color="#fbbf24" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.postTitle} numberOfLines={1}>{ad.title || 'Sponsored'}</Text>
+              <View style={styles.badgeSmall}>
+                <Text style={styles.badgeSmallText}>Ad</Text>
+              </View>
+            </View>
+            <Text style={styles.postSub}>Sponsored Brand Promotion</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity onPress={handleAction} style={styles.learnMoreBtn} activeOpacity={0.85}>
+          <Text style={styles.learnMoreText}>Visit</Text>
+          <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Image Media Container */}
+      <TouchableOpacity
+        activeOpacity={0.95}
+        onPress={handleAction}
+        style={[styles.imageMediaWrapper, { height: IMAGE_CARD_HEIGHT }]}
+      >
+        <Image
+          source={{ uri: validPoster || ad.mediaUrl }}
+          style={styles.postImage}
+          resizeMode="cover"
+        />
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.6)']}
+          style={styles.bottomVignette}
+          pointerEvents="none"
+        />
+      </TouchableOpacity>
+
+      {/* Bottom Action Bar */}
+      <View style={styles.postFooter}>
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={styles.footerTitle} numberOfLines={1}>{ad.title || 'Special Offer'}</Text>
+          <Text style={styles.footerPrompt}>Tap below to check out this offer</Text>
+        </View>
+
+        <TouchableOpacity onPress={handleAction} activeOpacity={0.9}>
+          <LinearGradient
+            colors={[colors.primary, colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.ctaButton}
+          >
+            <Text style={styles.ctaButtonText}>{ad.actionText || 'Visit Now'}</Text>
+            <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  cardContainer: {
-    backgroundColor: '#0f0a1f',
-    borderRadius: 20,
-    marginVertical: 10,
+  // Video Reel-style Container
+  reelAdContainer: {
+    width: SCREEN_WIDTH,
+    backgroundColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    position: 'relative',
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
-  header: {
+  fullscreenVideo: {
+    width: '100%',
+    height: '100%',
+  },
+  topVignette: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 90,
+  },
+  floatingTopBar: {
+    position: 'absolute',
+    top: 16,
+    left: 14,
+    right: 70,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: '#130c24',
+    zIndex: 10,
   },
-  headerLeft: {
+  floatingHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
     gap: 8,
+    flex: 1,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(251,191,36,0.15)',
+    backgroundColor: 'rgba(251,191,36,0.18)',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.3)',
+    borderColor: 'rgba(251,191,36,0.4)',
   },
   badgeText: {
     color: '#fbbf24',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   title: {
     color: '#ffffff',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     flex: 1,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   learnMoreBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   learnMoreText: {
     color: '#ffffff',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   topRightControls: {
     position: 'absolute',
     top: 14,
     right: 14,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     gap: 8,
-    zIndex: 10,
+    zIndex: 15,
   },
   iconCtrlBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.65)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
@@ -339,31 +503,33 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
   centerPlayPill: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: 'rgba(0,0,0,0.7)',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingLeft: 3,
   },
-  bottomGradient: {
+  bottomVignette: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 120,
+    height: 140,
+  },
+  bottomCtaWrapper: {
+    position: 'absolute',
+    bottom: 14,
+    left: 14,
+    right: 14,
+    zIndex: 10,
   },
   bottomCta: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    right: 12,
     backgroundColor: 'rgba(15,10,31,0.92)',
     borderRadius: 16,
     paddingHorizontal: 14,
@@ -372,7 +538,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   ctaTextContainer: {
     flex: 1,
@@ -381,14 +547,16 @@ const styles = StyleSheet.create({
   ctaPrompt: {
     color: '#94a3b8',
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   ctaTitle: {
     color: '#ffffff',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
@@ -396,6 +564,88 @@ const styles = StyleSheet.create({
   ctaButtonText: {
     color: '#ffffff',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '800',
+  },
+
+  // Image Post-style Container
+  imageCardContainer: {
+    width: SCREEN_WIDTH,
+    backgroundColor: '#0c0717',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#100a20',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  brandAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(251,191,36,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  postTitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  badgeSmall: {
+    backgroundColor: 'rgba(251,191,36,0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: 'rgba(251,191,36,0.4)',
+  },
+  badgeSmallText: {
+    color: '#fbbf24',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  postSub: {
+    color: '#94a3b8',
+    fontSize: 11,
+  },
+  imageMediaWrapper: {
+    width: SCREEN_WIDTH,
+    backgroundColor: '#000000',
+    position: 'relative',
+  },
+  postImage: {
+    width: '100%',
+    height: '100%',
+  },
+  postFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#100a20',
+  },
+  footerTitle: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  footerPrompt: {
+    color: '#94a3b8',
+    fontSize: 11,
   },
 });

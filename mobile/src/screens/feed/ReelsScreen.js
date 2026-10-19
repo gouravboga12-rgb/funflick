@@ -101,6 +101,29 @@ export function ReelItem({
     /\.(mp4|webm|mov|m4v)($|\?)/i.test(mediaUrl) ||
     (!item?.mediaType && !/\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(mediaUrl));
 
+  // Safe poster URI that is NOT an mp4 video URL
+  const validPoster = (() => {
+    const candidates = [
+      item?.posterUrl,
+      item?.thumbnailUrl,
+      item?.thumbnail,
+      item?.poster,
+      item?.mediaUrl,
+    ];
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.trim() && !/\.(mp4|webm|mov|m4v)($|\?)/i.test(c)) {
+        return c.trim();
+      }
+    }
+    return null;
+  })();
+
+  const [isVideoReady, setIsVideoReady] = useState(false);
+
+  useEffect(() => {
+    setIsVideoReady(false);
+  }, [item?.id, isActive]);
+
   // Hardware decoder safeguard: ONLY mount player on active reel when screen is focused AND no popup ad is active
   const shouldMountPlayer = Boolean(isVideo && isActive && isScreenFocused && !activePopupAd);
 
@@ -112,6 +135,36 @@ export function ReelItem({
       p.play();
     }
   });
+
+  // Track player readiness to eliminate black screen flicker on swipe
+  useEffect(() => {
+    if (!player) {
+      setIsVideoReady(false);
+      return;
+    }
+    if (player.status === 'readyToPlay') {
+      setIsVideoReady(true);
+    }
+    const statusSub = player.addListener ? player.addListener('statusChange', (payload) => {
+      if (payload?.status === 'readyToPlay') {
+        setIsVideoReady(true);
+      }
+    }) : null;
+    const playSub = player.addListener ? player.addListener('playingChange', (payload) => {
+      if (payload?.isPlaying) {
+        setIsVideoReady(true);
+      }
+    }) : null;
+    const timeSub = player.addListener ? player.addListener('timeUpdate', () => {
+      setIsVideoReady(true);
+    }) : null;
+
+    return () => {
+      statusSub?.remove?.();
+      playSub?.remove?.();
+      timeSub?.remove?.();
+    };
+  }, [player]);
 
   useEffect(() => {
     hasRecordedViewRef.current = false;
@@ -267,16 +320,20 @@ export function ReelItem({
       {/* Background Media — 2-Layer Instagram-style display (No Cropping, Ambient Backdrop) */}
       <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
         {/* Layer 1: Ambient Blurred Backdrop matching Instagram */}
-        <Image
-          source={{ uri: item.posterUrl || item.thumbnailUrl || item.thumbnail || item.poster || item.mediaUrl }}
-          style={StyleSheet.absoluteFillObject}
-          blurRadius={32}
-          opacity={0.32}
-          resizeMode="cover"
-        />
+        {validPoster ? (
+          <Image
+            source={{ uri: validPoster }}
+            style={StyleSheet.absoluteFillObject}
+            blurRadius={32}
+            opacity={0.32}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#090514' }]} />
+        )}
 
         {/* Layer 2: True Aspect-Ratio Video (Never Cropped or Zoomed in) */}
-        {shouldMountPlayer && player ? (
+        {shouldMountPlayer && player && (
           Platform.OS === 'web' ? (
             <video
               ref={webVideoRef}
@@ -285,6 +342,8 @@ export function ReelItem({
               playsInline
               loop
               muted={isReelsMuted}
+              onLoadedData={() => setIsVideoReady(true)}
+              onPlaying={() => setIsVideoReady(true)}
               style={{
                 width: '100%',
                 height: '100%',
@@ -302,10 +361,13 @@ export function ReelItem({
               nativeControls={false}
             />
           )
-        ) : (
+        )}
+
+        {/* Persistent Poster Image until first video frame is decoded & ready to play — eliminates black flash on swipe */}
+        {(!isVideoReady || !shouldMountPlayer || !player) && validPoster && (
           <Image
-            source={{ uri: item.posterUrl || item.thumbnailUrl || item.thumbnail || item.poster || item.mediaUrl }}
-            style={styles.fullscreenVideo}
+            source={{ uri: validPoster }}
+            style={[styles.fullscreenVideo, StyleSheet.absoluteFillObject]}
             resizeMode="contain"
           />
         )}
