@@ -45,3 +45,13 @@ client_secret*.json
 Screenshot*
 scratch_*
 *.mp4
+
+# Sensitive KYC and business documents
+*.pdf
+*Undertaking*
+*Registration*
+*signature*
+*company_seal*
+build_letterhead.py
+images/
+

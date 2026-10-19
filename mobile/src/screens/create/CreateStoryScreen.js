@@ -100,7 +100,7 @@ function StoryVideoPreview({ videoUri }) {
 }
 
 export const CreateStoryScreen = ({ navigation }) => {
-  const { currentUser, fetchLiveStories } = useApp();
+  const { currentUser, fetchLiveStories, mediaLimits } = useApp();
 
   const [mediaUri, setMediaUri] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
@@ -115,7 +115,7 @@ export const CreateStoryScreen = ({ navigation }) => {
   const isSubmittingRef = useRef(false);
   const [progress, setProgress] = useState(0);
 
-  const maxStoryDuration = 15; // 15 seconds max
+  const maxStoryDuration = Number(mediaLimits?.maxStoryDuration) || 15;
 
   // Robust cross-platform navigation back/exit to Feed
   const handleExitScreen = () => {
@@ -130,8 +130,8 @@ export const CreateStoryScreen = ({ navigation }) => {
   const handleProcessMedia = (asset) => {
     const isVid = asset.type === 'video' || (asset.mimeType && asset.mimeType.startsWith('video/')) || (asset.uri && /\.(mp4|mov|webm|m4v)($|\?)/i.test(asset.uri));
     const size = asset.fileSize || asset.size || 0;
-    const maxBytes = isVid ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
-    const maxLabel = isVid ? '10MB' : '5MB';
+    const maxBytes = isVid ? 30 * 1024 * 1024 : 10 * 1024 * 1024;
+    const maxLabel = isVid ? '30MB' : '10MB';
 
     if (size > maxBytes) {
       showAppAlert(

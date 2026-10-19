@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, Modal, TouchableOpacity } from 'react-native';
+import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Bell, X, Sparkles, CheckCircle2 } from 'lucide-react-native';
 import { Header } from '../../components/common/Header';
 import { StoryBar } from '../../components/feed/StoryBar';
 import { VideoPostCard } from '../../components/feed/VideoPostCard';
 import { StandardPostCard } from '../../components/feed/StandardPostCard';
 import { SponsoredAdCard } from '../../components/feed/SponsoredAdCard';
-import { MobileAdPopup } from '../../components/common/MobileAdPopup';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
@@ -20,17 +18,13 @@ export const HomeScreen = ({ navigation }) => {
     fetchLiveStories,
     adsList,
     isPaidInfluencer,
-    notifications,
     unreadNotificationCount,
-    markAllNotificationsRead,
-    showMobileAd,
     isAuthenticated,
     currentUser,
     conversations,
   } = useApp();
   const [activeTab, setActiveTab] = useState('For You');
   const [activeVideoId, setActiveVideoId] = useState(null);
-  const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
 
   const unreadMessagesCount = useMemo(() => {
     return (conversations || []).reduce((acc, c) => acc + (c.unreadCount || 0), 0);
@@ -114,15 +108,21 @@ export const HomeScreen = ({ navigation }) => {
           // In-feed sponsored ads:
           // 1. Paid / Subscribed influencer accounts NEVER see any ads!
           // 2. Only show ads specifically configured in admin panel with frequency === 'After 5 Reels'
-          // 3. Only appear every 5 reels ((index + 1) % 5 === 0)
+          // 3. 1st ad strictly after 5 posts ((index + 1) === 5) -> slot 0
+          // 4. 2nd ad strictly after 10 posts ((index + 1) === 10) -> slot 1
+          // 5. 3rd ad strictly after 15 posts ((index + 1) === 15) -> slot 2
+          // 6. Strictly ONCE per ad: if slot index >= inFeedAds.length, no ad is displayed.
+          //    An ad never repeats.
           const inFeedAds = (adsList || []).filter(a =>
             a.active &&
             a.frequency === 'After 5 Reels'
           );
           const isUserLoggedIn = isAuthenticated && Boolean(currentUser);
-          const showFeedAd = isUserLoggedIn && !isPaidInfluencer && inFeedAds.length > 0 && ((index + 1) % 5 === 0);
-          const adIndex = Math.floor(index / 5) % Math.max(1, inFeedAds.length);
-          const feedAd = showFeedAd ? inFeedAds[adIndex] : null;
+          const isFifthPost = (index + 1) % 5 === 0;
+          const adSlotIdx = isFifthPost ? Math.floor((index + 1) / 5) - 1 : -1;
+          const feedAd = (isUserLoggedIn && !isPaidInfluencer && adSlotIdx >= 0 && adSlotIdx < inFeedAds.length)
+            ? inFeedAds[adSlotIdx]
+            : null;
 
           const mediaUrl = item.mediaUrl || item.video_url || '';
           const isVideo =
@@ -131,12 +131,15 @@ export const HomeScreen = ({ navigation }) => {
             item.category !== 'Photo' &&
             item.category !== 'Post';
 
+          const isAdActive = Boolean(feedAd && activeVideoId === `ad_${feedAd.id}`);
+          const isPostActive = !isAdActive && (activeVideoId ? String(item.id) === String(activeVideoId) : index === 0);
+
           return (
             <View style={styles.cardWrapper}>
               {isVideo ? (
                 <VideoPostCard
                   post={item}
-                  isActive={activeVideoId ? String(item.id) === String(activeVideoId) : index === 0}
+                  isActive={isPostActive}
                   navigation={navigation}
                 />
               ) : (
@@ -147,7 +150,11 @@ export const HomeScreen = ({ navigation }) => {
               )}
               {feedAd && (
                 <View style={{ marginTop: 8 }}>
-                  <SponsoredAdCard ad={feedAd} isActive={false} />
+                  <SponsoredAdCard
+                    ad={feedAd}
+                    isActive={isAdActive}
+                    onPlayPress={() => setActiveVideoId(`ad_${feedAd.id}`)}
+                  />
                 </View>
               )}
             </View>

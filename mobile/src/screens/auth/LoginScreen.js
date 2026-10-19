@@ -20,15 +20,17 @@ import { useApp } from '../../context/AppContext';
 import { startGoogleOAuth } from '../../services/googleAuth';
 
 export default function LoginScreen({ navigation }) {
-  const { login, hydrateOAuthSession, selectGoogleAccount } = useApp();
+  const { login, hydrateOAuthSession, selectGoogleAccount, selectAccount } = useApp();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Google OAuth account chooser state
+  // Account chooser state (for both Google and Password multi-account logins)
   const [showAccountChoiceModal, setShowAccountChoiceModal] = useState(false);
+  const [accountChoiceType, setAccountChoiceType] = useState('password'); // 'password' | 'google'
+  const [savedPasswordForChoice, setSavedPasswordForChoice] = useState('');
   const [googleEmail, setGoogleEmail] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
   const [accountChoices, setAccountChoices] = useState(null);
@@ -42,7 +44,17 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
 
     try {
-      await login(identifier.trim(), password);
+      const res = await login(identifier.trim(), password);
+
+      // Handle multi-account resolution where multiple accounts share email/phone
+      if (res?.requiresAccountChoice) {
+        setAccountChoiceType('password');
+        setSavedPasswordForChoice(password);
+        setAccountChoices(res.accounts || []);
+        setShowAccountChoiceModal(true);
+        return;
+      }
+
       Alert.alert('Welcome Back!', 'Logged in successfully.');
       if (navigation.canGoBack()) {
         navigation.goBack();
@@ -80,6 +92,7 @@ export default function LoginScreen({ navigation }) {
       }
 
       if (result.type === 'choose_account') {
+        setAccountChoiceType('google');
         setGoogleEmail(result.email);
         setAccountChoices(result.accounts);
         setShowAccountChoiceModal(true);
@@ -124,9 +137,14 @@ export default function LoginScreen({ navigation }) {
   const handleSelectAccount = async (account) => {
     setGoogleLoading(true);
     try {
-      await selectGoogleAccount(account.id, googleEmail.trim());
+      if (accountChoiceType === 'password') {
+        await selectAccount(account.username, savedPasswordForChoice);
+      } else {
+        await selectGoogleAccount(account.id, googleEmail.trim());
+      }
       setShowAccountChoiceModal(false);
       setAccountChoices(null);
+      setSavedPasswordForChoice('');
       Alert.alert('Welcome!', `Logged in as @${account.username}`);
       if (navigation.canGoBack()) {
         navigation.goBack();
@@ -274,9 +292,15 @@ export default function LoginScreen({ navigation }) {
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={styles.googleIconBadge}>
-                  <Text style={styles.googleG}>G</Text>
-                </View>
+                {accountChoiceType === 'google' ? (
+                  <View style={styles.googleIconBadge}>
+                    <Text style={styles.googleG}>G</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.googleIconBadge, { backgroundColor: colors.primary }]}>
+                    <User color="#fff" size={16} />
+                  </View>
+                )}
                 <Text style={styles.modalTitle}>Choose Account</Text>
               </View>
               <TouchableOpacity onPress={() => setShowAccountChoiceModal(false)}>
@@ -286,7 +310,9 @@ export default function LoginScreen({ navigation }) {
 
             <View style={{ marginTop: 12 }}>
               <Text style={styles.accountChoiceSubtitle}>
-                Multiple accounts are linked to {googleEmail}. Choose which account to sign into:
+                {accountChoiceType === 'password'
+                  ? `Multiple accounts are registered with "${identifier.trim()}". Choose which account to sign into:`
+                  : `Multiple accounts are linked to ${googleEmail}. Choose which account to sign into:`}
               </Text>
               {accountChoices && accountChoices.map((acc) => (
                 <TouchableOpacity

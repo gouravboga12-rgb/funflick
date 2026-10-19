@@ -9,6 +9,7 @@ import {
   Sparkles, 
   Clock, 
   Play, 
+  Pause,
   Loader2 
 } from 'lucide-react';
 
@@ -208,7 +209,14 @@ export const MobileAdPopup = () => {
     (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
   );
 
-  if (!activePopupAd || (!isUserAuth && !isAdminAuth) || (isPaidInfluencer && !isAdminAuth)) return null;
+  const isReelsPage = typeof window !== 'undefined' && (
+    window.location.pathname === '/reels' ||
+    window.location.pathname.startsWith('/reels/') ||
+    window.location.pathname === '/videos' ||
+    window.location.pathname.startsWith('/videos/')
+  );
+
+  if (!activePopupAd || (!isUserAuth && !isAdminAuth) || (isPaidInfluencer && !isAdminAuth) || (isReelsPage && !isAdminAuth)) return null;
 
   const handleClose = () => {
     if (!canClose) {
@@ -333,8 +341,20 @@ export const MobileAdPopup = () => {
                 </div>
               )}
               
-              {/* Video sound toggle overlay */}
+              {/* Video sound & play/pause toggle overlay */}
               <div className="absolute bottom-3 right-3 flex items-center gap-2 z-20">
+                <button
+                  onClick={handleVideoClick}
+                  className="p-2.5 rounded-full bg-black/80 hover:bg-black text-white border border-white/20 backdrop-blur-md shadow-lg transition cursor-pointer hover:scale-110 active:scale-95"
+                  title={isPlaying ? "Pause Ad Video" : "Play Ad Video"}
+                >
+                  {isPlaying ? (
+                    <Pause className="w-4 h-4 text-white" />
+                  ) : (
+                    <Play className="w-4 h-4 text-white fill-current ml-0.5" />
+                  )}
+                </button>
+
                 <button
                   onClick={handleToggleMute}
                   className="p-2.5 rounded-full bg-black/80 hover:bg-black text-white border border-white/20 backdrop-blur-md shadow-lg transition cursor-pointer hover:scale-110 active:scale-95"

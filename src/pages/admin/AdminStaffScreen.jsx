@@ -225,7 +225,7 @@ export const AdminStaffScreen = () => {
             </div>
             <p className="text-xs text-gray-300 mt-1 max-w-xl">
               Create and manage content review staff. Staff with the <strong>moderator</strong> role can only access: 
-              <span className="text-pink-400 font-semibold"> Ads Requests, Active Ads, Content Moderation, Story Moderation, and Reports</span>. All financial and configuration settings are restricted.
+              <span className="text-pink-400 font-semibold"> Content Moderation, Story Moderation, and Reports</span>. Ads, financial, and configuration settings are restricted to Super Administrators.
             </p>
           </div>
 
@@ -437,8 +437,6 @@ export const AdminStaffScreen = () => {
 
               <div className="p-3 rounded-2xl bg-white/5 border border-white/5 text-[11px] text-gray-300 space-y-1">
                 <span className="font-bold text-pink-400 block">Assigned Permissions:</span>
-                <p>• Ads Requests Review</p>
-                <p>• Active Ads List</p>
                 <p>• Video / Reel Content Moderation</p>
                 <p>• Story Moderation</p>
                 <p>• User Reports Desk</p>
@@ -546,8 +544,6 @@ export const AdminStaffScreen = () => {
 
               <div className="p-3 rounded-2xl bg-white/5 border border-white/5 text-[11px] text-gray-300 space-y-1">
                 <span className="font-bold text-purple-400 block">Assigned Permissions:</span>
-                <p>• Ads Requests Review</p>
-                <p>• Active Ads List</p>
                 <p>• Video / Reel Content Moderation</p>
                 <p>• Story Moderation</p>
                 <p>• User Reports Desk</p>

@@ -29,10 +29,14 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Flag,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../context/AppContext';
 import { CommentsModal } from './CommentsModal';
+import { ReportModal } from '../common/ReportModal';
+import { downloadMediaFile } from '../../services/mediaDownloadService';
 import { apiRequest } from '../../services/api';
 import { colors } from '../../theme/colors';
 
@@ -61,6 +65,8 @@ export const StandardPostCard = ({ post, navigation }) => {
   const [showComments, setShowComments] = useState(false);
   const [showHeartBurst, setShowHeartBurst] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [quickCommentText, setQuickCommentText] = useState('');
   const [isSubmittingQuickComment, setIsSubmittingQuickComment] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -612,13 +618,61 @@ export const StandardPostCard = ({ post, navigation }) => {
 
             <TouchableOpacity
               style={styles.menuOption}
-              onPress={handleToggleSave}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                handleToggleSave();
+              }}
             >
               <Bookmark size={18} color={isSaved ? '#fbbf24' : '#ffffff'} />
               <Text style={styles.menuOptionText}>
                 {isSaved ? 'Remove from Saved' : 'Save to Collection'}
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuOption}
+              disabled={isDownloading}
+              onPress={async () => {
+                setShowOptionsMenu(false);
+                const currentUrl = mediaList[activeMediaIndex] || mediaList[0];
+                if (!currentUrl) {
+                  Alert.alert('Download Unavailable', 'No media file found for this post.');
+                  return;
+                }
+                setIsDownloading(true);
+                try {
+                  await downloadMediaFile({
+                    url: currentUrl,
+                    title: post.title || post.caption || `funflick_post_${post.id}`,
+                    fileType: currentUrl.includes('.mp4') || post.video_url || post.videoUrl ? 'video' : 'image',
+                  });
+                } catch (e) {
+                  console.error('[StandardPostCard] Download error:', e);
+                } finally {
+                  setIsDownloading(false);
+                }
+              }}
+            >
+              <Download size={18} color="#38bdf8" />
+              <Text style={styles.menuOptionText}>
+                {isDownloading ? 'Downloading...' : 'Download Media'}
+              </Text>
+            </TouchableOpacity>
+
+            {!isOwner && (
+              <TouchableOpacity
+                style={styles.menuOption}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  setIsReportModalOpen(true);
+                }}
+              >
+                <Flag size={18} color="#f43f5e" />
+                <Text style={[styles.menuOptionText, { color: '#f43f5e' }]}>
+                  Report Post
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {isOwner && (
               <TouchableOpacity
@@ -650,6 +704,15 @@ export const StandardPostCard = ({ post, navigation }) => {
         onCommentAdded={() => {
           fetchFeed?.();
         }}
+      />
+
+      {/* Content Reporting Modal */}
+      <ReportModal
+        visible={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        contentId={post.id}
+        contentType="post"
+        title={post.title || post.caption}
       />
     </View>
   );

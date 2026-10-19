@@ -162,8 +162,8 @@ export const CreatePostScreen = ({ navigation }) => {
     const newPhotos = [];
     for (const item of list) {
       const size = item.size || item.fileSize || 0;
-      if (size > 5 * 1024 * 1024) {
-        showAppAlert('File Too Large', `One of the selected photos is ${(size / (1024 * 1024)).toFixed(1)}MB. Photos must be 5MB or less.`);
+      if (size > 10 * 1024 * 1024) {
+        showAppAlert('File Too Large', `One of the selected photos is ${(size / (1024 * 1024)).toFixed(1)}MB. Photos must be 10MB or less.`);
         continue;
       }
       const uri = item.uri || (typeof window !== 'undefined' && window.URL ? window.URL.createObjectURL(item) : null);

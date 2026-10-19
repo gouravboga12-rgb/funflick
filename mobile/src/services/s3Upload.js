@@ -47,9 +47,9 @@ export async function uploadMediaToS3(fileOrUri, fileName, mimeType, folder = 'v
     throw new Error('Invalid file provided for upload');
   }
 
-  // Enforce size limits: 5MB for images, 20MB for videos
-  const maxBytes = isImage ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
-  const maxLabel = isImage ? '5MB' : '20MB';
+  // Enforce size limits: 10MB for images, 50MB for videos
+  const maxBytes = isImage ? 10 * 1024 * 1024 : 50 * 1024 * 1024;
+  const maxLabel = isImage ? '10MB' : '50MB';
   if (uploadBlob && uploadBlob.size && uploadBlob.size > maxBytes) {
     const sizeMb = (uploadBlob.size / (1024 * 1024)).toFixed(1);
     throw new Error(`${isImage ? 'Image' : 'Video'} file size (${sizeMb}MB) exceeds the ${maxLabel} limit. Please choose a ${isImage ? 'photo' : 'video'} under ${maxLabel}.`);

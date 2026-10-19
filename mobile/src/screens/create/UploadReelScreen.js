@@ -198,10 +198,10 @@ export const UploadReelScreen = ({ navigation }) => {
 
   const handleProcessVideo = (fileOrAsset) => {
     const size = fileOrAsset.size || fileOrAsset.fileSize || 0;
-    if (size > 20 * 1024 * 1024) {
+    if (size > 50 * 1024 * 1024) {
       showAppAlert(
         'Video Exceeds Limit',
-        `The selected video is ${(size / (1024 * 1024)).toFixed(1)}MB. Videos must be 20MB or less. Please select a smaller video.`
+        `The selected video is ${(size / (1024 * 1024)).toFixed(1)}MB. Videos must be 50MB or less. Please select a smaller video.`
       );
       return;
     }

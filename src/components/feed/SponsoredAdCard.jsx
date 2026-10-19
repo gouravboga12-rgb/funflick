@@ -26,7 +26,16 @@ const getDisplayHost = (rawUrl) => {
 };
 
 export const SponsoredAdCard = ({ ad }) => {
-  const { recordAdImpression, recordAdClick, showMobileAd, theme, activePopupAd, currentUser } = useApp();
+  const { 
+    recordAdImpression, 
+    recordAdClick, 
+    showMobileAd, 
+    theme, 
+    activePopupAd, 
+    currentUser, 
+    activePlayingVideoId, 
+    setActivePlayingVideoId 
+  } = useApp();
   const isLight = theme === 'light';
 
   const isPaidInfluencer = Boolean(
@@ -36,7 +45,8 @@ export const SponsoredAdCard = ({ ad }) => {
   );
 
   const videoRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const isAdActive = activePlayingVideoId === `ad_${ad?.id}`;
+  const [isAdPaused, setIsAdPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const hasRecordedImpression = useRef(false);
 
@@ -46,13 +56,28 @@ export const SponsoredAdCard = ({ ad }) => {
     (typeof ad.mediaUrl === 'string' && ad.mediaUrl.startsWith('data:video/'))
   );
 
-  // Pause feed sponsored card video if pop-up ad is active
+  const shouldPlay = Boolean(isVideo && isAdActive && !isAdPaused && !activePopupAd);
+
+  // Play/pause control based on active single-source audio state
   useEffect(() => {
-    if (activePopupAd && videoRef.current) {
+    if (!videoRef.current) return;
+    if (shouldPlay) {
+      videoRef.current.play().catch(() => {});
+    } else {
       videoRef.current.pause();
-      setIsPlaying(false);
     }
-  }, [activePopupAd]);
+  }, [shouldPlay]);
+
+  // Clean pause on unmount
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        try {
+          videoRef.current.pause();
+        } catch (e) {}
+      }
+    };
+  }, []);
 
   // Record impression once when ad card appears in feed
   useEffect(() => {
@@ -66,19 +91,17 @@ export const SponsoredAdCard = ({ ad }) => {
   if (!ad || isPaidInfluencer) return null;
 
   const handleTogglePlay = (e) => {
-    e.stopPropagation();
-    if (!videoRef.current) return;
-    if (videoRef.current.paused) {
-      videoRef.current.play();
-      setIsPlaying(true);
+    e?.stopPropagation?.();
+    if (shouldPlay) {
+      setIsAdPaused(true);
     } else {
-      videoRef.current.pause();
-      setIsPlaying(false);
+      setIsAdPaused(false);
+      setActivePlayingVideoId?.(`ad_${ad.id}`);
     }
   };
 
   const handleToggleMute = (e) => {
-    e.stopPropagation();
+    e?.stopPropagation?.();
     setIsMuted(prev => !prev);
   };
 
@@ -140,7 +163,7 @@ export const SponsoredAdCard = ({ ad }) => {
 
       {/* Media Display Area */}
       <div 
-        onClick={handleOpenAdOverlay}
+        onClick={isVideo ? handleTogglePlay : handleOpenAdOverlay}
         className="relative w-full aspect-[9/16] max-h-[calc(100dvh-180px)] bg-black overflow-hidden flex items-center justify-center cursor-pointer group"
       >
         {isVideo ? (
@@ -149,26 +172,33 @@ export const SponsoredAdCard = ({ ad }) => {
               ref={videoRef}
               src={ad.mediaUrl}
               poster={ad.thumbnailUrl}
-              autoPlay
               playsInline
               loop
               muted={isMuted}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
               className="w-full h-full object-cover"
             />
+
+            {!shouldPlay && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/25 pointer-events-none z-10">
+                <div className="w-12 h-12 rounded-full bg-black/70 border border-white/30 flex items-center justify-center pl-0.5 shadow-lg">
+                  <Play className="w-6 h-6 text-white fill-current" />
+                </div>
+              </div>
+            )}
 
             {/* Video overlay controls */}
             <div className="absolute bottom-3 right-3 flex items-center gap-2 z-20">
               <button
                 onClick={handleTogglePlay}
-                className="p-2 rounded-full bg-black/70 hover:bg-black text-white border border-white/15 backdrop-blur-sm transition"
+                className="p-2 rounded-full bg-black/70 hover:bg-black text-white border border-white/15 backdrop-blur-sm transition hover:scale-105 active:scale-95"
+                title={shouldPlay ? "Pause Ad" : "Play Ad"}
               >
-                {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                {shouldPlay ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current ml-0.5" />}
               </button>
               <button
                 onClick={handleToggleMute}
-                className="p-2 rounded-full bg-black/70 hover:bg-black text-white border border-white/15 backdrop-blur-sm transition"
+                className="p-2 rounded-full bg-black/70 hover:bg-black text-white border border-white/15 backdrop-blur-sm transition hover:scale-105 active:scale-95"
+                title={isMuted ? "Unmute Ad" : "Mute Ad"}
               >
                 {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-pink-400" />}
               </button>

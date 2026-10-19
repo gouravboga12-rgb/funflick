@@ -32,11 +32,13 @@ import {
   ShieldAlert,
   Sparkles,
   X,
+  Flag,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../context/AppContext';
 import { apiRequest, setStoredUser } from '../../services/api';
 import { FollowListModal } from '../../components/common/FollowListModal';
+import { ReportModal } from '../../components/common/ReportModal';
 import { VideoThumbnail } from '../../components/common/VideoThumbnail';
 import { colors } from '../../theme/colors';
 
@@ -73,6 +75,7 @@ export default function CreatorProfileScreen({ route, navigation }) {
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [isFollowModalOpen, setIsFollowModalOpen] = useState(false);
   const [followModalTab, setFollowModalTab] = useState('followers');
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeStoryGroup, setActiveStoryGroup] = useState(null);
   const [hasStories, setHasStories] = useState(false);
@@ -351,9 +354,17 @@ export default function CreatorProfileScreen({ route, navigation }) {
             <Share2 size={19} color="#cbd5e1" />
           </TouchableOpacity>
           {!isOwner && (
-            <TouchableOpacity style={styles.iconBtn} onPress={handleBlockUser}>
-              <ShieldAlert size={19} color="#ef4444" />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => setIsReportModalOpen(true)}
+              >
+                <Flag size={19} color="#f43f5e" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn} onPress={handleBlockUser}>
+                <ShieldAlert size={19} color="#ef4444" />
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
@@ -650,6 +661,15 @@ export default function CreatorProfileScreen({ route, navigation }) {
         currentUsername={currentUser?.username}
         onRelationshipChanged={fetchCreatorData}
         navigation={navigation}
+      />
+
+      {/* Account / Creator Reporting Modal */}
+      <ReportModal
+        visible={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        contentId={creatorProfile?.id || targetUsername}
+        contentType="account"
+        title={`@${targetUsername}`}
       />
     </SafeAreaView>
   );

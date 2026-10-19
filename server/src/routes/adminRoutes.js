@@ -72,12 +72,10 @@ router.delete('/staff/:id', authenticateToken, requireSuperAdmin, deleteAdminSta
 router.put('/staff/:id/toggle', authenticateToken, requireSuperAdmin, toggleAdminStaff);
 
 // -------------------------------------------------------------
-// Staff & Moderator Accessible Routes (5 permitted sections):
-// 1. Reports
-// 2. Content Moderation
+// Staff & Moderator Accessible Routes (3 permitted sections):
+// 1. Reports & User Help Support
+// 2. Permanent Content Moderation
 // 3. Story Moderation
-// 4. Ads List & Creation
-// 5. Ad Requests
 // -------------------------------------------------------------
 
 // 1. Reports & User Help Support
@@ -97,17 +95,17 @@ router.delete('/stories/:id', authenticateToken, requireStaffOrAdmin, deleteAdmi
 router.put('/stories/users/:userId/suspend', authenticateToken, requireStaffOrAdmin, suspendUserWithDuration);
 router.put('/stories/users/:userId/reactivate', authenticateToken, requireStaffOrAdmin, reactivateUser);
 
-// 4. Ads Management
+// 4. Ads Management (Super Admin only)
 router.get('/ads', getAdminAds);
-router.post('/ads', authenticateToken, requireStaffOrAdmin, createAdminAd);
-router.delete('/ads/:id', authenticateToken, requireStaffOrAdmin, deleteAdminAd);
+router.post('/ads', authenticateToken, requireSuperAdmin, createAdminAd);
+router.delete('/ads/:id', authenticateToken, requireSuperAdmin, deleteAdminAd);
 router.post('/ads/:id/metric', recordAdMetric);
 
-// 5. Ad Requests & Ingestion Moderation
-router.get('/ad-requests', authenticateToken, requireStaffOrAdmin, getAdminAdRequests);
-router.put('/ad-requests/:id/approve', authenticateToken, requireStaffOrAdmin, approveAdminAdRequest);
-router.put('/ad-requests/:id/reject', authenticateToken, requireStaffOrAdmin, rejectAdminAdRequest);
-router.delete('/ad-requests/:id', authenticateToken, requireStaffOrAdmin, deleteAdminAdRequest);
+// 5. Ad Requests & Ingestion Moderation (Super Admin only)
+router.get('/ad-requests', authenticateToken, requireSuperAdmin, getAdminAdRequests);
+router.put('/ad-requests/:id/approve', authenticateToken, requireSuperAdmin, approveAdminAdRequest);
+router.put('/ad-requests/:id/reject', authenticateToken, requireSuperAdmin, rejectAdminAdRequest);
+router.delete('/ad-requests/:id', authenticateToken, requireSuperAdmin, deleteAdminAdRequest);
 
 export default router;
 

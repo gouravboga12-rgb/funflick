@@ -118,8 +118,6 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   }, [location.pathname]);
 
   const MODERATOR_ALLOWED_PATHS = [
-    '/admin/ad-requests',
-    '/admin/ads',
     '/admin/content',
     '/admin/stories',
     '/admin/reports'
@@ -132,8 +130,6 @@ export const AdminLayout = ({ children, title = 'Dashboard' }) => {
   }, [isModerator, location.pathname, navigate]);
 
   const navLinks = isModerator ? [
-    { label: 'Ad Requests', icon: Inbox, path: '/admin/ad-requests', badge: pendingAdRequestsCount },
-    { label: 'Ads & Promotions', icon: Megaphone, path: '/admin/ads' },
     { label: 'Content Moderation', icon: Video, path: '/admin/content', badge: pendingApprovals.length },
     { label: 'Story Moderation', icon: Sparkles, path: '/admin/stories' },
     { label: 'Reports', icon: Flag, path: '/admin/reports', badge: pendingReportsCount },

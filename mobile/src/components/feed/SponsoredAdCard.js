@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, ExternalLink, Volume2, VolumeX } from 'lucide-react-native';
+import { Sparkles, ExternalLink, Volume2, VolumeX, Play, Pause } from 'lucide-react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
@@ -20,9 +20,10 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const isVideoExt = (url) => typeof url === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(url);
 
-export const SponsoredAdCard = ({ ad, isActive = false }) => {
+export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
   const isFocused = useIsFocused();
-  const { isReelsMuted, toggleMute, recordAdMetric, isPaidInfluencer } = useApp();
+  const { isReelsMuted, toggleMute, recordAdMetric, isPaidInfluencer, activePopupAd } = useApp();
+  const [isAdPaused, setIsAdPaused] = useState(false);
   const hasRecordedImpression = useRef(false);
   const webVideoRef = useRef(null);
 
@@ -35,6 +36,8 @@ export const SponsoredAdCard = ({ ad, isActive = false }) => {
     )
   );
 
+  const shouldPlay = Boolean(isVideo && isActive && isFocused && !isAdPaused && !activePopupAd);
+
   const validPoster = (!isVideoExt(ad?.thumbnailUrl) && ad?.thumbnailUrl)
     ? ad.thumbnailUrl
     : (!isVideoExt(ad?.posterUrl) && ad?.posterUrl ? ad.posterUrl : null);
@@ -43,32 +46,50 @@ export const SponsoredAdCard = ({ ad, isActive = false }) => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
-    if (isFocused) {
+    if (shouldPlay) {
       p.play();
+    } else {
+      p.pause();
     }
   });
 
   useEffect(() => {
     if (Platform.OS === 'web' && webVideoRef.current) {
       webVideoRef.current.muted = isReelsMuted;
-      if (isFocused) {
+      if (shouldPlay) {
         webVideoRef.current.play().catch(() => {});
       } else {
         webVideoRef.current.pause();
       }
     }
-  }, [isFocused, isReelsMuted]);
+  }, [shouldPlay, isReelsMuted]);
 
   useEffect(() => {
     if (!player) return;
     try {
-      if (isFocused) {
+      if (shouldPlay) {
         player.play();
       } else {
         player.pause();
       }
     } catch (e) {}
-  }, [isFocused, player]);
+  }, [shouldPlay, player]);
+
+  // Clean pause on unmount
+  useEffect(() => {
+    return () => {
+      if (player) {
+        try {
+          player.pause();
+        } catch (e) {}
+      }
+      if (webVideoRef.current) {
+        try {
+          webVideoRef.current.pause();
+        } catch (e) {}
+      }
+    };
+  }, [player]);
 
   useEffect(() => {
     if (player) {
@@ -95,6 +116,15 @@ export const SponsoredAdCard = ({ ad, isActive = false }) => {
     }
   };
 
+  const handleTogglePlayPause = () => {
+    if (isAdPaused || !shouldPlay) {
+      setIsAdPaused(false);
+      onPlayPress?.();
+    } else {
+      setIsAdPaused(true);
+    }
+  };
+
   return (
     <View style={styles.cardContainer}>
       {/* Header Bar */}
@@ -115,56 +145,84 @@ export const SponsoredAdCard = ({ ad, isActive = false }) => {
 
       {/* Media Display */}
       <View style={styles.mediaWrapper}>
-        {isVideo ? (
-          Platform.OS === 'web' ? (
-            <video
-              ref={webVideoRef}
-              src={ad.mediaUrl}
-              autoPlay
-              playsInline
-              loop
-              muted={isReelsMuted}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                backgroundColor: '#000000',
-              }}
-            />
-          ) : player ? (
-            <VideoView
-              player={player}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={isVideo ? handleTogglePlayPause : handleAction}
+          style={StyleSheet.absoluteFillObject}
+        >
+          {isVideo ? (
+            Platform.OS === 'web' ? (
+              <video
+                ref={webVideoRef}
+                src={ad.mediaUrl}
+                playsInline
+                loop
+                muted={isReelsMuted}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  backgroundColor: '#000000',
+                }}
+              />
+            ) : player ? (
+              <VideoView
+                player={player}
+                style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+                contentFit="cover"
+                surfaceType="textureView"
+                useExoShutter={false}
+                nativeControls={false}
+              />
+            ) : null
+          ) : (
+            <Image
+              source={{ uri: validPoster || ad.mediaUrl }}
               style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
-              contentFit="cover"
-              surfaceType="textureView"
-              useExoShutter={false}
-              nativeControls={false}
+              resizeMode="cover"
             />
-          ) : null
-        ) : (
-          <Image
-            source={{ uri: validPoster || ad.mediaUrl }}
-            style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
-            resizeMode="cover"
-          />
-        )}
+          )}
 
-        {/* Audio Mute Button for Video Ads */}
+          {/* Centered Play Pill when Video Ad is paused */}
+          {isVideo && (isAdPaused || !shouldPlay) && (
+            <View style={styles.centerPlayOverlay} pointerEvents="none">
+              <View style={styles.centerPlayPill}>
+                <Play size={24} color="#ffffff" />
+              </View>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Audio Mute & Play/Pause Controls for Video Ads */}
         {isVideo && (
-          <TouchableOpacity
-            style={styles.muteBtn}
-            onPress={toggleMute}
-            activeOpacity={0.8}
-          >
-            {isReelsMuted ? (
-              <VolumeX size={16} color="#ffffff" />
-            ) : (
-              <Volume2 size={16} color="#ffffff" />
-            )}
-          </TouchableOpacity>
+          <View style={styles.topRightControls}>
+            <TouchableOpacity
+              style={styles.iconCtrlBtn}
+              onPress={handleTogglePlayPause}
+              activeOpacity={0.8}
+            >
+              {isAdPaused || !shouldPlay ? (
+                <Play size={14} color="#ffffff" />
+              ) : (
+                <Pause size={14} color="#ffffff" />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconCtrlBtn}
+              onPress={toggleMute}
+              activeOpacity={0.8}
+            >
+              {isReelsMuted ? (
+                <VolumeX size={14} color="#ffffff" />
+              ) : (
+                <Volume2 size={14} color="#ffffff" />
+              )}
+            </TouchableOpacity>
+          </View>
         )}
 
         <LinearGradient
@@ -256,22 +314,41 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  mediaWrapper: {
-    width: '100%',
-    aspectRatio: 9 / 16,
-    position: 'relative',
-  },
-  muteBtn: {
+  topRightControls: {
     position: 'absolute',
     top: 14,
     right: 14,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 10,
+  },
+  iconCtrlBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
+  },
+  centerPlayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  centerPlayPill: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingLeft: 3,
   },
   bottomGradient: {
     position: 'absolute',

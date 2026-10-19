@@ -12,7 +12,7 @@ export const ReelsScreen = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const targetId = searchParams.get('id');
-  const { posts, blockedUsers, showMobileAd, adsList, setActivePlayingVideoId, isAuthenticated } = useApp();
+  const { posts, blockedUsers, setActivePlayingVideoId, isAuthenticated } = useApp();
 
   const [dedicatedReels, setDedicatedReels] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -111,11 +111,6 @@ export const ReelsScreen = () => {
     };
   }, [currentPost?.id, setActivePlayingVideoId]);
 
-  // Controlled Sequential Ad Frequency:
-  // Shows Ad 1 after 5 reels, Ad 2 after 10 reels (5 more reels), strictly ONCE per ad (never repeats)
-  const shownAdIdsRef = useRef(new Set());
-  const reelsScrolledCountRef = useRef(0);
-
   const handleNext = () => {
     if (visiblePosts.length === 0) return;
 
@@ -124,25 +119,6 @@ export const ReelsScreen = () => {
       nextIdx = 0; // Loop back smoothly
     }
     setCurrentIdx(nextIdx);
-
-    // Track total reels advanced
-    reelsScrolledCountRef.current += 1;
-
-    // Trigger ad strictly after 5 reels (5, 10, etc.) for unshown ads only, strictly for logged-in users
-    const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
-    if (isUserAuth && reelsScrolledCountRef.current > 0 && reelsScrolledCountRef.current % 5 === 0) {
-      // Exclude ads designated as 'Pop-up Ads' so they do not interrupt reels
-      const availableAds = (adsList || []).filter(a => 
-        a.active && 
-        a.frequency !== 'Pop-up Ads' && 
-        !shownAdIdsRef.current.has(a.id)
-      );
-      if (availableAds.length > 0) {
-        const nextAd = availableAds[0];
-        shownAdIdsRef.current.add(nextAd.id);
-        showMobileAd(nextAd.id);
-      }
-    }
   };
 
   const handlePrev = () => {

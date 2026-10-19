@@ -56,6 +56,13 @@ export const AppProvider = ({ children }) => {
     adContactTimings: 'Mon - Sat, 9:00 AM - 7:00 PM IST',
   });
 
+  // Dynamic Media Limits from Admin Settings (defaults: Reels 30s, Stories 15s, Posts 30s)
+  const [mediaLimits, setMediaLimits] = useState({
+    maxReelDuration: 30,
+    maxStoryDuration: 15,
+    maxPostDuration: 30,
+  });
+
   // In-app floating toast banner state
   const [inAppBanner, setInAppBanner] = useState({
     visible: false,
@@ -165,11 +172,16 @@ export const AppProvider = ({ children }) => {
           }
         } catch (e) {}
 
-        // Fetch central platform & ad contact settings
+        // Fetch central platform & ad contact settings + media limits
         try {
           const sData = await apiRequest('/settings');
           if (sData && sData.settings) {
             setAdContactSettings(sData.settings);
+            setMediaLimits({
+              maxReelDuration: Number(sData.settings.maxReelDuration) || 30,
+              maxStoryDuration: Number(sData.settings.maxStoryDuration) || 15,
+              maxPostDuration: Number(sData.settings.maxPostDuration) || 30,
+            });
           }
         } catch (e) {}
       } catch (err) {
@@ -235,11 +247,40 @@ export const AppProvider = ({ children }) => {
     fetchLiveStories();
   }, [fetchFeed, fetchLiveStories]);
 
-  // Login handler
+  // Login handler with Multi-Account Choice Support (Instagram-style)
   const login = async (identifier, password) => {
     const data = await apiRequest('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ identifier, password }),
+    });
+
+    if (data.requiresAccountChoice) {
+      return {
+        requiresAccountChoice: true,
+        accounts: data.accounts || [],
+        message: data.message || 'Multiple accounts found. Please choose an account to log in.',
+      };
+    }
+
+    if (data.token && data.user) {
+      const safeUser = sanitizeUser(data.user);
+      await setToken(data.token);
+      await setStoredUser(safeUser);
+      setCurrentUser(safeUser);
+      setIsAuthenticated(true);
+      registerForPushNotificationsAsync();
+      fetchFeed();
+      hasTriggeredAdOnLaunchRef.current = false;
+      return safeUser;
+    }
+    throw new Error(data.error || 'Invalid login response');
+  };
+
+  // Password-based select account handler (when multiple accounts share email/phone)
+  const selectAccount = async (username, password) => {
+    const data = await apiRequest('/auth/select-account', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
     });
 
     if (data.token && data.user) {
@@ -253,7 +294,7 @@ export const AppProvider = ({ children }) => {
       hasTriggeredAdOnLaunchRef.current = false;
       return safeUser;
     }
-    throw new Error('Invalid login response');
+    throw new Error(data.error || 'Failed to select account');
   };
 
   // Register handler
@@ -339,9 +380,15 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Logout handler
+  // Logout handler - thoroughly purge all session states to prevent multi-account contamination
   const logout = async () => {
     sessionSeenAdIdsRef.current.clear();
+    savedPostIdsRef.current.clear();
+    setSavedPostIds(new Set());
+    setFollowingUsernames(new Set());
+    setConversations([]);
+    setNotifications([]);
+    setFollowRequests([]);
     await setToken(null);
     await setStoredUser(null);
     setCurrentUser(null);
@@ -856,16 +903,7 @@ export const AppProvider = ({ children }) => {
         (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
         !sessionSeenAdIdsRef.current.has(a.id)
       );
-      // 2. If all popup ads have been seen, reset seen tracking and loop back through active popup ads
-      if (!target) {
-        const popupAds = activeAds.filter(a =>
-          a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session'
-        );
-        if (popupAds.length > 0) {
-          sessionSeenAdIdsRef.current.clear();
-          target = popupAds[0];
-        }
-      }
+      // Once all popup ads have been seen, never repeat them in the same session
     }
 
     if (target) {
@@ -876,28 +914,8 @@ export const AppProvider = ({ children }) => {
   }, [isAuthenticated, currentUser, isPaidInfluencer, adsList, recordAdMetric]);
 
   const dismissMobileAd = useCallback(() => {
-    const currentAdId = activePopupAd?.id;
-
-    // Sequential Pop-up Ads Queue: Check if another active Pop-up Ad is in queue for this session (1, 2, 3 ads in sequence)
-    if (isAuthenticated && currentUser && !isPaidInfluencer) {
-      const list = adsListRef.current?.length > 0 ? adsListRef.current : adsList;
-      const nextPopupAd = (list || []).find(a =>
-        a.active &&
-        (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
-        a.id !== currentAdId &&
-        !sessionSeenAdIdsRef.current.has(a.id)
-      );
-
-      if (nextPopupAd) {
-        sessionSeenAdIdsRef.current.add(nextPopupAd.id);
-        setActivePopupAd(nextPopupAd);
-        recordAdMetric(nextPopupAd.id, 'impression');
-        return;
-      }
-    }
-
     setActivePopupAd(null);
-  }, [activePopupAd, isAuthenticated, currentUser, isPaidInfluencer, adsList, recordAdMetric]);
+  }, []);
 
   // Story Viewed State Tracker
   const recordStoryView = useCallback(async (storyId, userGroupId) => {
@@ -1210,7 +1228,10 @@ export const AppProvider = ({ children }) => {
         isAuthenticated,
         isPaidInfluencer,
         isLoadingAuth,
+        mediaLimits,
+        setMediaLimits,
         login,
+        selectAccount,
         register,
         loginWithGoogle,
         selectGoogleAccount,

@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated, Platform, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated, Platform, RefreshControl, Modal } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Pause, Music, Bookmark, Plus, Eye, Check } from 'lucide-react-native';
+import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Pause, Music, Bookmark, Plus, Eye, Check, MoreVertical, Download, Flag } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { apiRequest } from '../../services/api';
 import { CommentsModal } from '../../components/feed/CommentsModal';
+import { ReportModal } from '../../components/common/ReportModal';
+import { downloadMediaFile } from '../../services/mediaDownloadService';
 import { colors } from '../../theme/colors';
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
@@ -45,6 +47,9 @@ export function ReelItem({
     toggleMute: appToggleMute,
     isReelsPaused: appPaused,
     togglePlayPause: appTogglePlayPause,
+    currentUser,
+    activePopupAd,
+    mediaLimits,
   } = useApp();
 
   const isReelsMuted = propMuted !== undefined ? propMuted : appMuted;
@@ -52,11 +57,24 @@ export function ReelItem({
   const isReelsPaused = propPaused !== undefined ? propPaused : appPaused;
   const togglePlayPause = propTogglePlayPause || appTogglePlayPause;
 
+  // Check if current user is owner of this reel (never show follow option on own content)
+  const isOwner = Boolean(
+    (currentUser?.username && item?.creator?.username && currentUser.username.toLowerCase() === item.creator.username.toLowerCase()) ||
+    (currentUser?.id && item?.creator?.id && Number(currentUser.id) === Number(item.creator.id))
+  );
+
+  // Dynamic admin showcase limit (defaults: Reels 30s)
+  const maxShowcaseDuration = Number(mediaLimits?.maxReelDuration) || 30;
+
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(Boolean(item?.isSaved));
   const [lastTap, setLastTap] = useState(0);
   const heartScale = useRef(new Animated.Value(0)).current;
   const hasRecordedViewRef = useRef(false);
+
+  // 3-Dots More Options & Reporting State
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   useEffect(() => {
     setIsSaved(Boolean(item?.isSaved));
@@ -83,14 +101,14 @@ export function ReelItem({
     /\.(mp4|webm|mov|m4v)($|\?)/i.test(mediaUrl) ||
     (!item?.mediaType && !/\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(mediaUrl));
 
-  // Hardware decoder safeguard: ONLY mount player on active reel when screen is focused
-  const shouldMountPlayer = Boolean(isVideo && isActive && isScreenFocused);
+  // Hardware decoder safeguard: ONLY mount player on active reel when screen is focused AND no popup ad is active
+  const shouldMountPlayer = Boolean(isVideo && isActive && isScreenFocused && !activePopupAd);
 
   const player = useVideoPlayer(shouldMountPlayer ? mediaUrl : null, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
-    if (shouldMountPlayer && !isReelsPaused) {
+    if (shouldMountPlayer && !isReelsPaused && !activePopupAd) {
       p.play();
     }
   });
@@ -103,7 +121,7 @@ export function ReelItem({
     if (!player) return;
     let viewTimer = null;
     try {
-      if (shouldMountPlayer && !isReelsPaused) {
+      if (shouldMountPlayer && !isReelsPaused && !activePopupAd) {
         player.play();
         // Record view only after 5 seconds of continuous playback
         if (!hasRecordedViewRef.current && recordPostView && item?.id) {
@@ -122,7 +140,34 @@ export function ReelItem({
     return () => {
       if (viewTimer) clearTimeout(viewTimer);
     };
-  }, [shouldMountPlayer, isReelsPaused, player, item?.id, recordPostView]);
+  }, [shouldMountPlayer, isReelsPaused, activePopupAd, player, item?.id, recordPostView]);
+
+  // Enforce Admin Reel Duration showcase limit: loops back to 0s when currentTime reaches maxShowcaseDuration
+  useEffect(() => {
+    if (!player) return;
+    const sub = player.addListener ? player.addListener('timeUpdate', (event) => {
+      if (event && event.currentTime >= maxShowcaseDuration) {
+        try {
+          player.seekTo(0);
+        } catch (e) {}
+      }
+    }) : null;
+
+    return () => {
+      sub?.remove?.();
+    };
+  }, [player, maxShowcaseDuration]);
+
+  // Clean unmount pause to prevent audio leaking into other screens
+  useEffect(() => {
+    return () => {
+      if (player) {
+        try {
+          player.pause();
+        } catch (e) {}
+      }
+    };
+  }, [player]);
 
   useEffect(() => {
     if (player) {
@@ -153,13 +198,25 @@ export function ReelItem({
   useEffect(() => {
     if (Platform.OS === 'web' && webVideoRef.current) {
       webVideoRef.current.muted = isReelsMuted;
-      if (isActive && isScreenFocused && !isReelsPaused) {
+      if (isActive && isScreenFocused && !isReelsPaused && !activePopupAd) {
         webVideoRef.current.play().catch(() => {});
       } else {
         webVideoRef.current.pause();
       }
+
+      // Enforce admin max showcase limit on web
+      const handleWebTime = () => {
+        if (webVideoRef.current && webVideoRef.current.currentTime >= maxShowcaseDuration) {
+          webVideoRef.current.currentTime = 0;
+        }
+      };
+      const el = webVideoRef.current;
+      el.addEventListener('timeupdate', handleWebTime);
+      return () => {
+        el.removeEventListener('timeupdate', handleWebTime);
+      };
     }
-  }, [isActive, isScreenFocused, isReelsPaused, isReelsMuted]);
+  }, [isActive, isScreenFocused, isReelsPaused, isReelsMuted, activePopupAd, maxShowcaseDuration]);
 
   const handleTogglePlayPause = () => {
     togglePlayPause();
@@ -207,8 +264,18 @@ export function ReelItem({
 
   return (
     <View style={[styles.reelContainer, { height: reelHeight }]}>
-      {/* Background Media — wrapped in pointerEvents="none" so native view never captures touch events */}
+      {/* Background Media — 2-Layer Instagram-style display (No Cropping, Ambient Backdrop) */}
       <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+        {/* Layer 1: Ambient Blurred Backdrop matching Instagram */}
+        <Image
+          source={{ uri: item.posterUrl || item.thumbnailUrl || item.thumbnail || item.poster || item.mediaUrl }}
+          style={StyleSheet.absoluteFillObject}
+          blurRadius={32}
+          opacity={0.32}
+          resizeMode="cover"
+        />
+
+        {/* Layer 2: True Aspect-Ratio Video (Never Cropped or Zoomed in) */}
         {shouldMountPlayer && player ? (
           Platform.OS === 'web' ? (
             <video
@@ -221,15 +288,15 @@ export function ReelItem({
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover',
-                backgroundColor: '#000000',
+                objectFit: 'contain',
+                backgroundColor: 'transparent',
               }}
             />
           ) : (
             <VideoView
               player={player}
               style={styles.fullscreenVideo}
-              contentFit="cover"
+              contentFit="contain"
               surfaceType="textureView"
               useExoShutter={false}
               nativeControls={false}
@@ -239,7 +306,7 @@ export function ReelItem({
           <Image
             source={{ uri: item.posterUrl || item.thumbnailUrl || item.thumbnail || item.poster || item.mediaUrl }}
             style={styles.fullscreenVideo}
-            resizeMode="cover"
+            resizeMode="contain"
           />
         )}
       </View>
@@ -299,7 +366,7 @@ export function ReelItem({
           >
             <Image source={{ uri: item.creator?.avatar }} style={styles.sideAvatar} />
           </TouchableOpacity>
-          {!item.isFollowing && (
+          {!isOwner && !item.isFollowing && (
             <TouchableOpacity
               style={styles.plusFollow}
               onPress={() => toggleFollowCreator(item.creator?.username)}
@@ -380,16 +447,16 @@ export function ReelItem({
           <Text style={styles.viewsCount}>{formatCount(item.viewsCount || 0)}</Text>
         </View>
 
-        {/* Dedicated Pause / Play Toggle Action */}
-        <TouchableOpacity style={styles.sideBtn} activeOpacity={0.7} onPress={togglePlayPause}>
-          <View style={styles.playPausePill}>
-            {isReelsPaused ? (
-              <Play size={20} color="#ff007a" fill="#ff007a" style={{ marginLeft: 2 }} />
-            ) : (
-              <Pause size={20} color="#fff" strokeWidth={2.2} />
-            )}
+        {/* 3-Dots More Options (Replaces Duplicate Pause Button with Report, Download, Share) */}
+        <TouchableOpacity
+          style={styles.sideBtn}
+          activeOpacity={0.7}
+          onPress={() => setIsMoreMenuOpen(true)}
+        >
+          <View style={styles.moreIconPill}>
+            <MoreVertical size={20} color="#fff" />
           </View>
-          <Text style={styles.sideCount}>{isReelsPaused ? 'Play' : 'Pause'}</Text>
+          <Text style={styles.sideCount}>More</Text>
         </TouchableOpacity>
       </View>
 
@@ -406,7 +473,7 @@ export function ReelItem({
             </View>
           </TouchableOpacity>
 
-          {!item.isFollowing && (
+          {!isOwner && !item.isFollowing && (
             <TouchableOpacity
               style={styles.followBadge}
               onPress={() => toggleFollowCreator(item.creator?.username)}
@@ -450,6 +517,121 @@ export function ReelItem({
         videoId={item?.id}
         onCommentAdded={() => setLocalCommentsCount(c => c + 1)}
       />
+
+      {/* 3-Dots Options Menu Modal (Instagram Style) */}
+      <Modal
+        visible={isMoreMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMoreMenuOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setIsMoreMenuOpen(false)}
+        >
+          <View style={styles.menuSheet}>
+            <View style={styles.menuHandle} />
+
+            {/* Report Option */}
+            <TouchableOpacity
+              style={[styles.menuOption, { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }]}
+              onPress={() => {
+                setIsMoreMenuOpen(false);
+                setIsReportModalOpen(true);
+              }}
+            >
+              <View style={[styles.menuIconWrap, { backgroundColor: 'rgba(244,63,94,0.15)' }]}>
+                <Flag size={18} color="#f43f5e" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuOptionText, { color: '#f43f5e', fontWeight: '800' }]}>Report Reel</Text>
+                <Text style={styles.menuOptionSub}>Flag inappropriate or copyright content</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Download Option */}
+            <TouchableOpacity
+              style={[styles.menuOption, { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }]}
+              onPress={() => {
+                setIsMoreMenuOpen(false);
+                downloadMediaFile(mediaUrl, `funflick_${item?.id || 'reel'}.mp4`);
+              }}
+            >
+              <View style={[styles.menuIconWrap, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
+                <Download size={18} color="#10b981" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuOptionText}>Download Video</Text>
+                <Text style={styles.menuOptionSub}>Save directly to your phone gallery</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Share Option */}
+            <TouchableOpacity
+              style={[styles.menuOption, { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }]}
+              onPress={() => {
+                setIsMoreMenuOpen(false);
+                if (handleShare) {
+                  handleShare(item);
+                } else {
+                  const shareUrl = `https://funflick.in/video/${item.id}`;
+                  Share.share({
+                    title: item.title || 'Watch on FunFlick',
+                    message: `Watch "${item.title || 'this reel'}" on FunFlick!\n${shareUrl}`,
+                    url: shareUrl,
+                  }).catch(() => {});
+                }
+              }}
+            >
+              <View style={[styles.menuIconWrap, { backgroundColor: 'rgba(0,112,243,0.15)' }]}>
+                <Share2 size={18} color="#0070f3" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuOptionText}>Share Reel</Text>
+                <Text style={styles.menuOptionSub}>Share link with friends and social apps</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Save to Collection */}
+            <TouchableOpacity
+              style={styles.menuOption}
+              onPress={() => {
+                setIsMoreMenuOpen(false);
+                setIsSaved(prev => !prev);
+                if (toggleSavePost && item?.id) {
+                  toggleSavePost(item.id);
+                }
+              }}
+            >
+              <View style={[styles.menuIconWrap, { backgroundColor: 'rgba(245,158,11,0.15)' }]}>
+                <Bookmark size={18} color={isSaved ? '#fbbf24' : '#ffffff'} fill={isSaved ? '#fbbf24' : 'transparent'} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuOptionText}>{isSaved ? 'Remove from Saved' : 'Save to Collection'}</Text>
+                <Text style={styles.menuOptionSub}>Add to your private bookmarked reels</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Cancel Button */}
+            <TouchableOpacity
+              style={styles.menuCloseBtn}
+              onPress={() => setIsMoreMenuOpen(false)}
+            >
+              <Text style={styles.menuCloseText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* In-App Content Report Modal */}
+      <ReportModal
+        visible={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        targetVideoId={item?.id}
+        targetUsername={item?.creator?.username}
+        title={item?.title}
+      />
     </View>
   );
 }
@@ -466,17 +648,13 @@ export const ReelsScreen = ({ navigation }) => {
     toggleLikePost,
     toggleFollowCreator,
     recordPostView,
-    showMobileAd,
-    isPaidInfluencer,
     isAuthenticated,
     currentUser,
-    adsList,
   } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
   const [reelsData, setReelsData] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const reelsScrolledCountRef = useRef(0);
 
   // Fetch category-personalized and dynamically seeded video-only feed
   const fetchDedicatedReels = useCallback(async (newSeed) => {
@@ -541,20 +719,6 @@ export const ReelsScreen = ({ navigation }) => {
     if (viewableItems.length > 0) {
       const newIdx = viewableItems[0].index || 0;
       setCurrentIndex(newIdx);
-      reelsScrolledCountRef.current += 1;
-      // Trigger ad strictly every 5 reels scrolled, strictly for LOGGED-IN unpaid normal users,
-      // and strictly if admin has posted an 'After 5 Reels' ad!
-      const isUserLoggedIn = isAuthenticated && Boolean(currentUser);
-      if (isUserLoggedIn && !isPaidInfluencer && reelsScrolledCountRef.current > 0 && reelsScrolledCountRef.current % 5 === 0) {
-        const reelAds = (adsList || []).filter(a => a.active && a.frequency === 'After 5 Reels');
-        if (reelAds.length > 0) {
-          const adIdx = Math.floor((reelsScrolledCountRef.current / 5) - 1) % reelAds.length;
-          const targetAd = reelAds[adIdx];
-          if (targetAd) {
-            showMobileAd?.(targetAd.id);
-          }
-        }
-      }
     }
   }).current;
 
@@ -921,5 +1085,74 @@ const styles = StyleSheet.create({
     color: '#e5e7eb',
     fontSize: 12.5,
     fontWeight: '600',
+  },
+  moreIconPill: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  menuSheet: {
+    backgroundColor: '#120a24',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.12)',
+  },
+  menuHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  menuOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    gap: 12,
+  },
+  menuIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuOptionText: {
+    color: '#ffffff',
+    fontSize: 14.5,
+    fontWeight: '700',
+  },
+  menuOptionSub: {
+    color: '#94a3b8',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  menuCloseBtn: {
+    marginTop: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  menuCloseText: {
+    color: '#cbd5e1',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

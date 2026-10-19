@@ -143,12 +143,14 @@ export const HomeScreen = () => {
                 const isVideo = !isImage && (post.mediaType === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(url));
                 
                 // Controlled Sequential Ad Placement:
-                // 1st ad strictly after 5 reels/posts (idx === 4)
-                // 2nd ad strictly after 10 reels/posts (idx === 9)
+                // 1st ad strictly after 5 reels/posts ((idx + 1) === 5) -> slot 0
+                // 2nd ad strictly after 10 reels/posts ((idx + 1) === 10) -> slot 1
+                // 3rd ad strictly after 15 reels/posts ((idx + 1) === 15) -> slot 2
                 // Strictly 1 time per ad, never repeating the same ad
-                const adSlotIdx = idx === 4 ? 0 : idx === 9 ? 1 : idx === 14 ? 2 : -1;
+                const isFifthPost = (idx + 1) % 5 === 0;
+                const adSlotIdx = isFifthPost ? Math.floor((idx + 1) / 5) - 1 : -1;
                 const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
-                const targetAd = isUserAuth && !isPaidInfluencer && adSlotIdx !== -1 && activeAds[adSlotIdx] ? activeAds[adSlotIdx] : null;
+                const targetAd = isUserAuth && !isPaidInfluencer && adSlotIdx >= 0 && adSlotIdx < activeAds.length ? activeAds[adSlotIdx] : null;
                 const shouldShowAd = Boolean(targetAd) && !isPaidInfluencer;
 
                 return (

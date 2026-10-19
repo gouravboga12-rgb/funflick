@@ -1965,43 +1965,6 @@ export const AppProvider = ({ children }) => {
   };
 
   const dismissMobileAd = () => {
-    const dismissedAd = activePopupAdRef.current;
-
-    // Sequential Pop-up Ads Queue:
-    // If the dismissed ad was an active Pop-up Ad and not in admin center,
-    // immediately check if another active Pop-up Ad is in queue for this session!
-    const isUserAuth = isAuthenticated || sessionStorage.getItem('funflick_authenticated') === 'true';
-    const isAdmin = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
-    const isPaidInfluencer = Boolean(
-      currentUser?.isInfluencer ||
-      currentUser?.role === 'influencer' ||
-      (currentUser?.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt) > new Date())
-    );
-
-    if (
-      isUserAuth &&
-      !isAdmin &&
-      !isPaidInfluencer &&
-      dismissedAd &&
-      (dismissedAd.frequency === 'Pop-up Ads' || dismissedAd.frequency === 'On App Open' || dismissedAd.frequency === 'Once per session')
-    ) {
-      const nextPopupAd = (adsList || []).find(a => 
-        a.active && 
-        (a.frequency === 'Pop-up Ads' || a.frequency === 'On App Open' || a.frequency === 'Once per session') &&
-        a.id !== dismissedAd.id &&
-        !sessionStorage.getItem(`funflick_session_seen_${a.id}`)
-      );
-
-      if (nextPopupAd) {
-        sessionStorage.setItem(`funflick_session_seen_${nextPopupAd.id}`, 'true');
-        activePopupAdRef.current = nextPopupAd;
-        setActivePopupAd(nextPopupAd);
-        recordAdImpression(nextPopupAd.id);
-        return;
-      }
-    }
-
-    // No further ads in queue: dismiss popup completely
     activePopupAdRef.current = null;
     setActivePopupAd(null);
   };

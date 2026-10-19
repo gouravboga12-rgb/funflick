@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
-import { X, Volume2, VolumeX, ExternalLink, Sparkles, Clock, Play } from 'lucide-react-native';
+import { X, Volume2, VolumeX, ExternalLink, Sparkles, Clock, Play, Pause } from 'lucide-react-native';
+import { navigationRef } from '../../navigation/navigationService';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 
@@ -22,7 +23,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isVideoExt = (url) => typeof url === 'string' && /\.(mp4|webm|mov|m4v)($|\?)/i.test(url);
 
 // Web-specific video player element to bypass browser autoplay restrictions cleanly
-function WebAdVideoPlayer({ mediaUrl, muted, setMuted, setIsLoading }) {
+function WebAdVideoPlayer({ mediaUrl, muted, setMuted, isPaused, setIsLoading }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -32,7 +33,7 @@ function WebAdVideoPlayer({ mediaUrl, muted, setMuted, setIsLoading }) {
     setIsLoading?.(true);
     video.muted = muted;
 
-    const attemptPlay = () => {
+    if (!isPaused) {
       const playPromise = video.play();
       if (playPromise !== undefined) {
         playPromise
@@ -48,33 +49,50 @@ function WebAdVideoPlayer({ mediaUrl, muted, setMuted, setIsLoading }) {
               .catch(() => setIsLoading?.(false));
           });
       }
-    };
-
-    if (video.readyState >= 2) {
-      attemptPlay();
     } else {
-      video.addEventListener('canplay', attemptPlay, { once: true });
+      video.pause();
+      setIsLoading?.(false);
     }
 
     return () => {
-      video.removeEventListener('canplay', attemptPlay);
+      try {
+        video.pause();
+        video.src = '';
+      } catch (e) {}
     };
   }, [mediaUrl]);
 
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.muted = muted;
-      if (videoRef.current.paused) {
+    }
+  }, [muted]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isPaused) {
+        videoRef.current.pause();
+      } else {
         videoRef.current.play().catch(() => {});
       }
     }
-  }, [muted]);
+  }, [isPaused]);
+
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        try {
+          videoRef.current.pause();
+          videoRef.current.src = '';
+        } catch (e) {}
+      }
+    };
+  }, []);
 
   return (
     <video
       ref={videoRef}
       src={mediaUrl}
-      autoPlay
       playsInline
       loop
       muted={muted}
@@ -95,22 +113,41 @@ function WebAdVideoPlayer({ mediaUrl, muted, setMuted, setIsLoading }) {
 }
 
 // Dedicated Video Player subcomponent to safely invoke useVideoPlayer only when video is active
-function NativeAdVideoPlayer({ mediaUrl, muted, setIsLoading }) {
+function NativeAdVideoPlayer({ mediaUrl, muted, isPaused, setIsLoading }) {
   const player = useVideoPlayer(mediaUrl, p => {
     if (!p) return;
     p.loop = true;
     p.muted = muted;
-    p.play();
+    if (!isPaused) {
+      p.play();
+    } else {
+      p.pause();
+    }
   });
 
   useEffect(() => {
     if (player) {
       try {
         player.muted = muted;
-        player.play();
+        if (isPaused) {
+          player.pause();
+        } else {
+          player.play();
+        }
       } catch (e) {}
     }
-  }, [muted, player]);
+  }, [muted, isPaused, player]);
+
+  // Clean pause on unmount to prevent audio leaking into background reels
+  useEffect(() => {
+    return () => {
+      if (player) {
+        try {
+          player.pause();
+        } catch (e) {}
+      }
+    };
+  }, [player]);
 
   useEffect(() => {
     if (!player) return;
@@ -138,13 +175,14 @@ function NativeAdVideoPlayer({ mediaUrl, muted, setIsLoading }) {
   );
 }
 
-function AdVideoPlayer({ mediaUrl, muted, setMuted, setIsLoading }) {
+function AdVideoPlayer({ mediaUrl, muted, setMuted, isPaused, setIsLoading }) {
   if (Platform.OS === 'web') {
     return (
       <WebAdVideoPlayer
         mediaUrl={mediaUrl}
         muted={muted}
         setMuted={setMuted}
+        isPaused={isPaused}
         setIsLoading={setIsLoading}
       />
     );
@@ -153,6 +191,7 @@ function AdVideoPlayer({ mediaUrl, muted, setMuted, setIsLoading }) {
     <NativeAdVideoPlayer
       mediaUrl={mediaUrl}
       muted={muted}
+      isPaused={isPaused}
       setIsLoading={setIsLoading}
     />
   );
@@ -179,6 +218,7 @@ export const MobileAdPopup = () => {
   );
 
   const [muted, setMuted] = useState(false);
+  const [isAdPaused, setIsAdPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
   const [canClose, setCanClose] = useState(false);
@@ -197,6 +237,7 @@ export const MobileAdPopup = () => {
 
   // Countdown timer before close is permitted
   useEffect(() => {
+    setIsAdPaused(false);
     if (!ad) {
       setCanClose(false);
       setSecondsRemaining(0);
@@ -224,7 +265,10 @@ export const MobileAdPopup = () => {
     return () => clearInterval(timer);
   }, [ad?.id]);
 
-  if (!ad || !currentUser || isPaidInfluencer) {
+  const currentRoute = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : null;
+  const isVideosOrReelsScreen = currentRoute === 'Videos' || currentRoute === 'VideoDetail';
+
+  if (!ad || !currentUser || isPaidInfluencer || isVideosOrReelsScreen) {
     return null;
   }
 
@@ -244,7 +288,7 @@ export const MobileAdPopup = () => {
 
   return (
     <Modal
-      visible={Boolean(activePopupAd && currentUser && !isPaidInfluencer)}
+      visible={Boolean(activePopupAd && currentUser && !isPaidInfluencer && !isVideosOrReelsScreen)}
       transparent
       animationType="fade"
       onRequestClose={handleClose}
@@ -260,17 +304,31 @@ export const MobileAdPopup = () => {
 
             <View style={styles.topRightActions}>
               {isVideo && (
-                <TouchableOpacity
-                  style={styles.iconCircleBtn}
-                  onPress={() => setMuted(m => !m)}
-                  activeOpacity={0.8}
-                >
-                  {muted ? (
-                    <VolumeX size={16} color="#ffffff" />
-                  ) : (
-                    <Volume2 size={16} color="#ffffff" />
-                  )}
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    style={styles.iconCircleBtn}
+                    onPress={() => setIsAdPaused(p => !p)}
+                    activeOpacity={0.8}
+                  >
+                    {isAdPaused ? (
+                      <Play size={16} color="#ffffff" />
+                    ) : (
+                      <Pause size={16} color="#ffffff" />
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.iconCircleBtn}
+                    onPress={() => setMuted(m => !m)}
+                    activeOpacity={0.8}
+                  >
+                    {muted ? (
+                      <VolumeX size={16} color="#ffffff" />
+                    ) : (
+                      <Volume2 size={16} color="#ffffff" />
+                    )}
+                  </TouchableOpacity>
+                </>
               )}
 
               {canClose ? (
@@ -293,35 +351,49 @@ export const MobileAdPopup = () => {
 
           {/* Ad Media Display */}
           <View style={styles.mediaContainer}>
-            {isVideo ? (
-              <>
-                {Boolean(validPoster) && (
-                  <Image
-                    source={{ uri: validPoster }}
-                    style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
-                    resizeMode="cover"
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={isVideo ? () => setIsAdPaused(p => !p) : handleActionPress}
+              style={StyleSheet.absoluteFillObject}
+            >
+              {isVideo ? (
+                <>
+                  {Boolean(validPoster) && (
+                    <Image
+                      source={{ uri: validPoster }}
+                      style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <AdVideoPlayer
+                    key={ad.id}
+                    mediaUrl={ad.mediaUrl}
+                    muted={muted}
+                    setMuted={setMuted}
+                    isPaused={isAdPaused}
+                    setIsLoading={setIsLoading}
                   />
-                )}
-                <AdVideoPlayer
-                  key={ad.id}
-                  mediaUrl={ad.mediaUrl}
-                  muted={muted}
-                  setMuted={setMuted}
-                  setIsLoading={setIsLoading}
+                  {isLoading && (
+                    <View style={styles.loadingOverlay} pointerEvents="none">
+                      <ActivityIndicator size="large" color={colors.primary || '#ec4899'} />
+                    </View>
+                  )}
+                  {isAdPaused && (
+                    <View style={styles.centerPlayOverlay} pointerEvents="none">
+                      <View style={styles.centerPlayPill}>
+                        <Play size={28} color="#ffffff" />
+                      </View>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <Image
+                  source={{ uri: validPoster || ad.mediaUrl }}
+                  style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+                  resizeMode="cover"
                 />
-                {isLoading && (
-                  <View style={styles.loadingOverlay} pointerEvents="none">
-                    <ActivityIndicator size="large" color={colors.primary || '#ec4899'} />
-                  </View>
-                )}
-              </>
-            ) : (
-              <Image
-                source={{ uri: validPoster || ad.mediaUrl }}
-                style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
-                resizeMode="cover"
-              />
-            )}
+              )}
+            </TouchableOpacity>
 
             <LinearGradient
               colors={['transparent', 'rgba(7,4,13,0.85)', '#07040d']}
@@ -496,5 +568,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 5,
+  },
+  centerPlayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    zIndex: 6,
+  },
+  centerPlayPill: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingLeft: 3,
   },
 });

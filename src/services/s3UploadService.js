@@ -8,10 +8,10 @@
  * @returns {Promise<string>} S3 public permanent URL
  */
 export async function uploadFileToS3(file, folder = 'videos', onProgress = () => {}) {
-  // Enforce 5MB limit for images, 20MB for videos
+  // Enforce 10MB limit for images, 50MB for videos
   const isImage = folder === 'images' || folder === 'thumbnails' || folder === 'avatars' || (file?.type && file.type.startsWith('image/'));
-  const maxBytes = isImage ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
-  const maxLabel = isImage ? '5MB' : '20MB';
+  const maxBytes = isImage ? 10 * 1024 * 1024 : 50 * 1024 * 1024;
+  const maxLabel = isImage ? '10MB' : '50MB';
 
   if (file && file.size > maxBytes) {
     throw new Error(`File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds the ${maxLabel} limit. Please select a ${isImage ? 'photo' : 'video'} under ${maxLabel}.`);

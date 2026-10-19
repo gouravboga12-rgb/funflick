@@ -163,10 +163,10 @@ export const UploadVideoScreen = () => {
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Enforce 20MB limit
-      const MAX_BYTES = 20 * 1024 * 1024;
+      // Enforce 50MB limit
+      const MAX_BYTES = 50 * 1024 * 1024;
       if (file.size > MAX_BYTES) {
-        showToast(`⚠️ Video size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Videos must be 20MB or less!`, 'error');
+        showToast(`⚠️ Video size is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Videos must be 50MB or less!`, 'error');
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
