@@ -294,31 +294,42 @@ export const AdminAdsScreen = () => {
               {/* Media preview and details */}
               <div className="flex items-start gap-4 flex-1">
                 <div className="relative w-24 h-28 rounded-2xl overflow-hidden bg-black/40 shrink-0 border border-white/10 group">
-                  {ad.type === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.mediaUrl) ? (
-                    ad.thumbnailUrl && !/\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.thumbnailUrl) ? (
+                  {(() => {
+                    const isDummyHeadphone = ad.thumbnailUrl && ad.thumbnailUrl.includes('photo-1505740420928');
+                    const hasCustomThumbnail = ad.thumbnailUrl && !isDummyHeadphone && !/\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.thumbnailUrl);
+
+                    if (ad.type === 'video' || /\.(mp4|webm|mov|m4v)($|\?)/i.test(ad.mediaUrl)) {
+                      if (hasCustomThumbnail) {
+                        return (
+                          <img
+                            src={ad.thumbnailUrl}
+                            alt={ad.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        );
+                      }
+                      return (
+                        <video
+                          src={ad.mediaUrl}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          muted
+                          playsInline
+                          preload="metadata"
+                          loop
+                          onMouseEnter={(e) => e.target.play().catch(() => {})}
+                          onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0; }}
+                        />
+                      );
+                    }
+
+                    return (
                       <img
-                        src={ad.thumbnailUrl}
+                        src={ad.mediaUrl || ad.thumbnailUrl}
                         alt={ad.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
-                    ) : (
-                      <video
-                        src={ad.mediaUrl}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        muted
-                        playsInline
-                        loop
-                        onMouseEnter={(e) => e.target.play().catch(() => {})}
-                        onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0; }}
-                      />
-                    )
-                  ) : (
-                    <img
-                      src={ad.mediaUrl || ad.thumbnailUrl}
-                      alt={ad.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                  )}
+                    );
+                  })()}
                   <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-black/70 text-white backdrop-blur-sm flex items-center gap-1 z-10">
                     {ad.type === 'video' ? <Video className="w-3 h-3 text-pink-400" /> : <ImageIcon className="w-3 h-3 text-blue-400" />}
                     <span>{ad.type} Ad</span>
