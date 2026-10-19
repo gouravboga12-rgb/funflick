@@ -237,8 +237,8 @@ export const MobileAdPopup = () => {
         videoRef.current.pause();
       } catch (e) {}
     }
-    showToast(`Redirecting to sponsor: ${activePopupAd.actionText || 'Visit'}`, 'success');
-    if (activePopupAd.actionUrl) {
+    if (activePopupAd?.actionUrl) {
+      showToast(`Redirecting to sponsor: ${activePopupAd.actionText || 'Visit'}`, 'success');
       window.open(activePopupAd.actionUrl, '_blank', 'noopener,noreferrer');
     }
   };
@@ -394,20 +394,25 @@ export const MobileAdPopup = () => {
 
           {/* Action CTA Button */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleAction}
-              className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-pink-500 via-[#ff007a] to-purple-600 hover:opacity-95 text-white font-extrabold text-xs shadow-lg shadow-pink-500/25 transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
-            >
-              <span>{activePopupAd.actionText || 'Visit Sponsor'}</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
+            {Boolean(activePopupAd.actionText || activePopupAd.actionUrl) && (
+              <button
+                onClick={handleAction}
+                className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-pink-500 via-[#ff007a] to-purple-600 hover:opacity-95 text-white font-extrabold text-xs shadow-lg shadow-pink-500/25 transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+              >
+                <span>{activePopupAd.actionText || 'Visit Sponsor'}</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            )}
 
             {canClose && (
               <button
                 onClick={handleClose}
-                className="py-3 px-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white text-xs font-semibold transition cursor-pointer"
+                className={`py-3 px-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white text-xs font-semibold transition cursor-pointer ${
+                  !Boolean(activePopupAd.actionText || activePopupAd.actionUrl) ? 'flex-1 flex items-center justify-center gap-2' : ''
+                }`}
                 title="Dismiss Ad"
               >
+                {!Boolean(activePopupAd.actionText || activePopupAd.actionUrl) && <span>Close Ad</span>}
                 <X className="w-4 h-4" />
               </button>
             )}

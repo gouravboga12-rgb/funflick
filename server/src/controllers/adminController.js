@@ -874,8 +874,8 @@ export async function createAdminAd(req, res) {
       startDate = '2026-10-01',
       endDate = '2026-11-30',
       frequency = 'After 5 Reels',
-      actionUrl = 'https://funflick.in',
-      actionText = 'Learn More'
+      actionUrl = '',
+      actionText = ''
     } = req.body;
 
     const normalizedFrequency = (frequency === 'Pop-up Ads' || frequency === 'On App Open' || frequency === 'Once per session')
@@ -885,6 +885,11 @@ export async function createAdminAd(req, res) {
     if (!title || !mediaUrl) {
       return res.status(400).json({ error: 'Title and media URL are required' });
     }
+
+    const cleanActionUrl = typeof actionUrl === 'string' && actionUrl.trim() ? actionUrl.trim() : null;
+    const cleanActionText = typeof actionText === 'string' && actionText.trim() ? actionText.trim() : null;
+    const isDummyThumb = typeof thumbnailUrl === 'string' && thumbnailUrl.includes('photo-1505740420928');
+    const cleanThumbnail = typeof thumbnailUrl === 'string' && thumbnailUrl.trim() && !isDummyThumb ? thumbnailUrl.trim() : null;
 
     await pool.query(
       `INSERT INTO platform_ads 
@@ -908,15 +913,15 @@ export async function createAdminAd(req, res) {
         title,
         type,
         mediaUrl,
-        thumbnailUrl || mediaUrl,
+        cleanThumbnail,
         duration,
         allowCloseAfter,
         active ? 1 : 0,
         startDate,
         endDate,
         normalizedFrequency,
-        actionUrl,
-        actionText
+        cleanActionUrl,
+        cleanActionText
       ]
     );
 

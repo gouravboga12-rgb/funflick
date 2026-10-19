@@ -1808,6 +1808,11 @@ export const AppProvider = ({ children }) => {
 
   // Admin: Create New Ad (Syncs with MySQL backend & localStorage)
   const createAd = async (adData) => {
+    const cleanActionUrl = typeof adData.actionUrl === 'string' ? adData.actionUrl.trim() : '';
+    const cleanActionText = typeof adData.actionText === 'string' ? adData.actionText.trim() : '';
+    const isDummyThumb = typeof adData.thumbnailUrl === 'string' && adData.thumbnailUrl.includes('photo-1505740420928');
+    const cleanThumbnail = typeof adData.thumbnailUrl === 'string' && adData.thumbnailUrl.trim() && !isDummyThumb ? adData.thumbnailUrl.trim() : '';
+
     const newAd = {
       ...adData,
       id: adData.id || ('ad_' + Date.now()),
@@ -1819,8 +1824,9 @@ export const AppProvider = ({ children }) => {
       startDate: adData.startDate || '2026-10-01',
       endDate: adData.endDate || '2026-11-30',
       frequency: adData.frequency || 'After 5 Reels',
-      actionUrl: adData.actionUrl || 'https://funflick.in',
-      actionText: adData.actionText || 'Learn More'
+      thumbnailUrl: cleanThumbnail,
+      actionUrl: cleanActionUrl,
+      actionText: cleanActionText
     };
 
     setAdsList(prev => [newAd, ...prev.filter(a => a.id !== newAd.id)]);
@@ -1843,10 +1849,22 @@ export const AppProvider = ({ children }) => {
 
   // Admin: Update Ad
   const updateAd = async (id, adData) => {
-    setAdsList(prev => prev.map(ad => ad.id === id ? { ...ad, ...adData } : ad));
+    const cleanActionUrl = typeof adData.actionUrl === 'string' ? adData.actionUrl.trim() : '';
+    const cleanActionText = typeof adData.actionText === 'string' ? adData.actionText.trim() : '';
+    const isDummyThumb = typeof adData.thumbnailUrl === 'string' && adData.thumbnailUrl.includes('photo-1505740420928');
+    const cleanThumbnail = typeof adData.thumbnailUrl === 'string' && !isDummyThumb ? adData.thumbnailUrl.trim() : '';
+
+    const updatedFields = {
+      ...adData,
+      thumbnailUrl: cleanThumbnail,
+      actionUrl: cleanActionUrl,
+      actionText: cleanActionText
+    };
+
+    setAdsList(prev => prev.map(ad => ad.id === id ? { ...ad, ...updatedFields } : ad));
 
     const target = adsList.find(a => a.id === id) || {};
-    const fullAd = { ...target, ...adData, id };
+    const fullAd = { ...target, ...updatedFields, id };
     const token = localStorage.getItem('funflick_admin_token') || localStorage.getItem('funflick_token');
     try {
       const res = await fetch('/api/admin/ads', {

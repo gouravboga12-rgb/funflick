@@ -406,23 +406,25 @@ export const MobileAdPopup = () => {
                 {ad.title || 'Sponsored Advertisement'}
               </Text>
 
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={handleActionPress}
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={[colors.primary, colors.secondary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.actionGradient}
+              {Boolean(ad.actionText || ad.actionUrl) && (
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={handleActionPress}
+                  activeOpacity={0.85}
                 >
-                  <Text style={styles.actionBtnText}>
-                    {ad.actionText || 'Visit Sponsor'}
-                  </Text>
-                  <ExternalLink size={16} color="#ffffff" style={{ marginLeft: 6 }} />
-                </LinearGradient>
-              </TouchableOpacity>
+                  <LinearGradient
+                    colors={[colors.primary, colors.secondary]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.actionGradient}
+                  >
+                    <Text style={styles.actionBtnText}>
+                      {ad.actionText || 'Visit Sponsor'}
+                    </Text>
+                    <ExternalLink size={16} color="#ffffff" style={{ marginLeft: 6 }} />
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>

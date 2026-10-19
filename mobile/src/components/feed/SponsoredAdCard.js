@@ -231,27 +231,29 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
         />
 
         {/* Bottom CTA Bar */}
-        <TouchableOpacity
-          style={styles.bottomCta}
-          onPress={handleAction}
-          activeOpacity={0.9}
-        >
-          <View style={styles.ctaTextContainer}>
-            <Text style={styles.ctaPrompt}>Special Offer</Text>
-            <Text style={styles.ctaTitle} numberOfLines={1}>
-              {ad.title || 'Tap to learn more'}
-            </Text>
-          </View>
-
-          <LinearGradient
-            colors={[colors.primary, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.ctaButton}
+        {Boolean(ad.actionText || ad.actionUrl) && (
+          <TouchableOpacity
+            style={styles.bottomCta}
+            onPress={handleAction}
+            activeOpacity={0.9}
           >
-            <Text style={styles.ctaButtonText}>{ad.actionText || 'Install / View'}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <View style={styles.ctaTextContainer}>
+              <Text style={styles.ctaPrompt}>Special Offer</Text>
+              <Text style={styles.ctaTitle} numberOfLines={1}>
+                {ad.title || 'Tap to learn more'}
+              </Text>
+            </View>
+
+            <LinearGradient
+              colors={[colors.primary, colors.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.ctaButton}
+            >
+              <Text style={styles.ctaButtonText}>{ad.actionText || 'Install / View'}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

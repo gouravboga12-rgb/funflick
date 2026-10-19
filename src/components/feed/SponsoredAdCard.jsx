@@ -233,13 +233,15 @@ export const SponsoredAdCard = ({ ad }) => {
             </p>
           </div>
 
-          <button
-            onClick={handleCtaClick}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 via-[#ff007a] to-purple-600 hover:opacity-95 text-white font-extrabold text-xs shadow-lg shadow-pink-500/25 flex items-center gap-1.5 shrink-0 transition active:scale-95 cursor-pointer"
-          >
-            <span>{ad.actionText || 'Learn More'}</span>
-            <ExternalLink className="w-3 h-3" />
-          </button>
+          {Boolean(ad.actionText || ad.actionUrl) && (
+            <button
+              onClick={handleCtaClick}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 via-[#ff007a] to-purple-600 hover:opacity-95 text-white font-extrabold text-xs shadow-lg shadow-pink-500/25 flex items-center gap-1.5 shrink-0 transition active:scale-95 cursor-pointer"
+            >
+              <span>{ad.actionText || 'Learn More'}</span>
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
     </div>

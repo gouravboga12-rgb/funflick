@@ -50,11 +50,11 @@ export const AdminAdsScreen = () => {
     duration: 20,
     allowCloseAfter: 8,
     active: true,
-    startDate: '2026-10-01',
-    endDate: '2026-11-30',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: '2026-12-31',
     frequency: 'After 5 Reels',
-    actionUrl: 'https://funflick.in',
-    actionText: 'Learn More'
+    actionUrl: '',
+    actionText: ''
   });
 
   // Direct file upload states
@@ -128,23 +128,23 @@ export const AdminAdsScreen = () => {
 
   const handleOpenCreate = () => {
     setModalMode('create');
-    setUploadedFileName('Young Guy Music Demo');
-    setUploadedFileSize('Video Preset');
+    setUploadedFileName('');
+    setUploadedFileSize('');
     setShowUrlFallback(false);
     setCurrentAd({
       id: '',
-      title: 'Summer Fest Ad Campaign 🏖️',
+      title: '',
       type: 'video',
-      mediaUrl: 'https://assets.mixkit.co/videos/preview/mixkit-young-man-wearing-headphones-enjoying-music-40955-large.mp4',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80',
+      mediaUrl: '',
+      thumbnailUrl: '',
       duration: 20,
       allowCloseAfter: 8,
       active: true,
-      startDate: '2026-10-01',
-      endDate: '2026-11-30',
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: '2026-12-31',
       frequency: 'After 5 Reels',
-      actionUrl: 'https://funflick.in',
-      actionText: 'Shop Special Offer'
+      actionUrl: '',
+      actionText: ''
     });
     setModalOpen(true);
   };
@@ -157,7 +157,14 @@ export const AdminAdsScreen = () => {
     const normalizedFrequency = (ad.frequency === 'Pop-up Ads' || ad.frequency === 'On App Open' || ad.frequency === 'Once per session')
       ? 'Pop-up Ads'
       : 'After 5 Reels';
-    setCurrentAd({ ...ad, frequency: normalizedFrequency });
+    const isDummyHeadphone = ad.thumbnailUrl && ad.thumbnailUrl.includes('photo-1505740420928');
+    setCurrentAd({
+      ...ad,
+      frequency: normalizedFrequency,
+      actionUrl: ad.actionUrl || '',
+      actionText: ad.actionText || '',
+      thumbnailUrl: isDummyHeadphone ? '' : (ad.thumbnailUrl || '')
+    });
     setModalOpen(true);
   };
 
@@ -168,42 +175,21 @@ export const AdminAdsScreen = () => {
       return;
     }
 
+    const payload = {
+      ...currentAd,
+      actionUrl: typeof currentAd.actionUrl === 'string' ? currentAd.actionUrl.trim() : '',
+      actionText: typeof currentAd.actionText === 'string' ? currentAd.actionText.trim() : ''
+    };
+
     if (modalMode === 'create') {
-      await createAd(currentAd);
-      showToast(`🚀 Ad "${currentAd.title}" published! It is now directly live on the user side.`, 'success');
+      await createAd(payload);
+      showToast(`🚀 Ad "${payload.title}" published! It is now directly live on the user side.`, 'success');
     } else {
-      await updateAd(currentAd.id, currentAd);
-      showToast(`✅ Ad "${currentAd.title}" updated and synced to the user side.`, 'success');
+      await updateAd(payload.id, payload);
+      showToast(`✅ Ad "${payload.title}" updated and synced to the user side.`, 'success');
     }
     setModalOpen(false);
   };
-
-  const sampleMediaPresets = [
-    {
-      name: 'Young Guy Music (Video 20s)',
-      type: 'video',
-      duration: 20,
-      closeAfter: 8,
-      url: 'https://assets.mixkit.co/videos/preview/mixkit-young-man-wearing-headphones-enjoying-music-40955-large.mp4',
-      thumb: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80'
-    },
-    {
-      name: 'DJ Neon Festival (Video 15s)',
-      type: 'video',
-      duration: 15,
-      closeAfter: 15,
-      url: 'https://assets.mixkit.co/videos/preview/mixkit-dj-mixing-music-at-a-party-with-neon-lights-42995-large.mp4',
-      thumb: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80'
-    },
-    {
-      name: 'Delicious Food Deal (Image)',
-      type: 'image',
-      duration: 10,
-      closeAfter: 5,
-      url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80',
-      thumb: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80'
-    }
-  ];
 
   return (
     <AdminLayout title="Ads & Promotions Management">
@@ -496,13 +482,10 @@ export const AdminAdsScreen = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const isCurrentlyImage = /\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i.test(currentAd.mediaUrl);
                         setCurrentAd(prev => ({
                           ...prev,
                           type: 'video',
-                          allowCloseAfter: prev.allowCloseAfter || 8,
-                          mediaUrl: isCurrentlyImage ? 'https://assets.mixkit.co/videos/preview/mixkit-young-man-wearing-headphones-enjoying-music-40955-large.mp4' : prev.mediaUrl,
-                          thumbnailUrl: isCurrentlyImage ? 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80' : prev.thumbnailUrl
+                          allowCloseAfter: prev.allowCloseAfter || 8
                         }));
                       }}
                       className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
@@ -517,13 +500,10 @@ export const AdminAdsScreen = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const isCurrentlyVideo = /\.(mp4|webm|mov|m4v)($|\?)/i.test(currentAd.mediaUrl);
                         setCurrentAd(prev => ({
                           ...prev,
                           type: 'image',
-                          allowCloseAfter: prev.allowCloseAfter || 8,
-                          mediaUrl: isCurrentlyVideo ? 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80' : prev.mediaUrl,
-                          thumbnailUrl: isCurrentlyVideo ? 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80' : prev.thumbnailUrl
+                          allowCloseAfter: prev.allowCloseAfter || 8
                         }));
                       }}
                       className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
@@ -535,34 +515,6 @@ export const AdminAdsScreen = () => {
                       <ImageIcon className="w-4 h-4" />
                       <span>Image Ad (With Countdown)</span>
                     </button>
-                  </div>
-                </div>
-
-                {/* Quick Presets */}
-                <div className="space-y-1.5">
-                  <span className="text-[11px] text-gray-400 block font-semibold">Or pick a demo preset:</span>
-                  <div className="flex flex-wrap gap-2">
-                    {sampleMediaPresets.map(preset => (
-                      <button
-                        key={preset.name}
-                        type="button"
-                        onClick={() => {
-                          setCurrentAd({
-                            ...currentAd,
-                            type: preset.type,
-                            mediaUrl: preset.url,
-                            thumbnailUrl: preset.thumb,
-                            duration: preset.duration,
-                            allowCloseAfter: preset.closeAfter
-                          });
-                          setUploadedFileName(preset.name);
-                          setUploadedFileSize(preset.type === 'video' ? 'Video Preset' : 'Image Preset');
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-white/5 hover:bg-white/10 border border-white/10 text-pink-300 transition"
-                      >
-                        {preset.name}
-                      </button>
-                    ))}
                   </div>
                 </div>
 
@@ -802,31 +754,40 @@ export const AdminAdsScreen = () => {
                 </div>
 
                 {/* CTA Action Details */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold block">CTA Button Label</label>
-                    <input
-                      type="text"
-                      value={currentAd.actionText}
-                      onChange={(e) => setCurrentAd({ ...currentAd, actionText: e.target.value })}
-                      placeholder="e.g. Shop Now"
-                      className={`w-full px-3.5 py-2.5 rounded-xl text-xs ${
-                        isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#0a0618] border-white/10'
-                      } border focus:outline-none`}
-                    />
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold block">
+                        CTA Button Label <span className="text-[10px] text-gray-400 font-normal">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={currentAd.actionText || ''}
+                        onChange={(e) => setCurrentAd({ ...currentAd, actionText: e.target.value })}
+                        placeholder="e.g. Shop Special Offer"
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs ${
+                          isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#0a0618] border-white/10'
+                        } border focus:outline-none`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold block">
+                        Destination Link <span className="text-[10px] text-gray-400 font-normal">(Optional)</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={currentAd.actionUrl || ''}
+                        onChange={(e) => setCurrentAd({ ...currentAd, actionUrl: e.target.value })}
+                        placeholder="https://sponsor.com"
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs ${
+                          isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#0a0618] border-white/10'
+                        } border focus:outline-none`}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold block">Destination Link</label>
-                    <input
-                      type="url"
-                      value={currentAd.actionUrl}
-                      onChange={(e) => setCurrentAd({ ...currentAd, actionUrl: e.target.value })}
-                      placeholder="https://sponsor.com"
-                      className={`w-full px-3.5 py-2.5 rounded-xl text-xs ${
-                        isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#0a0618] border-white/10'
-                      } border focus:outline-none`}
-                    />
-                  </div>
+                  <p className="text-[10px] text-gray-400">
+                    💡 <span className="font-semibold text-gray-300">Pure Awareness Ad:</span> Leave both fields empty if you don't want any CTA button or redirect link shown to users.
+                  </p>
                 </div>
 
                 {/* Form Buttons */}
