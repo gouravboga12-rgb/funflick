@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { Alert } from 'react-native';
 import { apiRequest, getToken, setToken, getStoredUser, setStoredUser, getStoredSavedPosts, setStoredSavedPosts } from '../services/api';
 import { registerForPushNotificationsAsync, scheduleLocalNotification } from '../services/pushService';
 import * as Notifications from 'expo-notifications';
@@ -489,39 +490,71 @@ export const AppProvider = ({ children }) => {
   }, [fetchMyFollowing]);
 
   // Toggle follow
-  const toggleFollowCreator = useCallback(async (username) => {
-    if (!username) return;
-    const cleanUser = username.toLowerCase();
+  const toggleFollowCreator = useCallback(
+    async (username, forceFollowState, options = {}) => {
+      if (!username) return { success: false };
+      const cleanUser = String(username).toLowerCase().replace(/^@/, '');
 
-    let willFollow = false;
-    setFollowingUsernames(prev => {
-      const next = new Set(prev);
-      if (next.has(cleanUser)) {
-        next.delete(cleanUser);
-        willFollow = false;
-      } else {
-        next.add(cleanUser);
-        willFollow = true;
+      // 1. Auth Guard
+      if (!currentUser) {
+        Alert.alert('Sign In Required', 'Please sign in to follow creators.');
+        return { success: false, requireAuth: true };
       }
-      return next;
-    });
 
-    setPosts(prev =>
-      prev.map(p => {
-        if (p.creator?.username?.toLowerCase() === cleanUser) {
-          return { ...p, isFollowing: willFollow };
+      // 2. Prevent self-following
+      if (currentUser?.username && currentUser.username.toLowerCase() === cleanUser) {
+        Alert.alert('Notice', 'You cannot follow yourself.');
+        return { success: false };
+      }
+
+      const currentlyFollowing = followingUsernames.has(cleanUser);
+      const willFollow =
+        typeof forceFollowState === 'boolean' ? forceFollowState : !currentlyFollowing;
+
+      // Optimistically update following set
+      setFollowingUsernames(prev => {
+        const next = new Set(prev);
+        if (willFollow) {
+          next.add(cleanUser);
+        } else {
+          next.delete(cleanUser);
         }
-        return p;
-      })
-    );
+        return next;
+      });
 
-    // Optimistically remove stories from tray immediately on unfollow
-    if (!willFollow) {
-      setStories(prev => prev.filter(s => s.isUser || s.username?.toLowerCase() !== cleanUser));
-    }
+      // Optimistically update posts in feed
+      setPosts(prev =>
+        prev.map(p => {
+          if (p.creator?.username?.toLowerCase() === cleanUser) {
+            return { ...p, isFollowing: willFollow };
+          }
+          return p;
+        })
+      );
+
+      // Optimistically remove stories from tray immediately on unfollow
+      if (!willFollow) {
+        setStories(prev => prev.filter(s => s.isUser || s.username?.toLowerCase() !== cleanUser));
+      }
+
+      // Explicit alert confirmation requested by user
+      if (options.showAlert !== false) {
+        if (willFollow) {
+          Alert.alert('Following @' + cleanUser, `You are now following @${cleanUser}.`);
+        } else {
+          Alert.alert('Unfollowed @' + cleanUser, `You have unfollowed @${cleanUser}.`);
+        }
+      }
+
+      // In-app banner toast confirmation
+      showInAppBanner({
+        title: willFollow ? `👤 Following @${cleanUser}` : `👤 Unfollowed @${cleanUser}`,
+        body: willFollow ? `You are now following @${cleanUser}.` : `You have unfollowed @${cleanUser}.`,
+        avatar: null,
+      });
 
       try {
-        const endpoint = willFollow ? `/follows/${username}/follow` : `/follows/${username}/unfollow`;
+        const endpoint = willFollow ? `/follows/${cleanUser}/follow` : `/follows/${cleanUser}/unfollow`;
         const res = await apiRequest(endpoint, { method: 'POST' });
         if (res && typeof res.following === 'boolean') {
           setFollowingUsernames(prev => {
@@ -535,12 +568,12 @@ export const AppProvider = ({ children }) => {
           });
         }
         fetchMyFollowing();
-        // Refresh story tray so unfollowed user's stories disappear immediately
         fetchLiveStories();
+        return { success: true, following: willFollow };
       } catch (e) {
         // Fallback: try /toggle if available
         try {
-          const res2 = await apiRequest(`/follows/${username}/toggle`, { method: 'POST' });
+          const res2 = await apiRequest(`/follows/${cleanUser}/toggle`, { method: 'POST' });
           if (res2 && typeof res2.following === 'boolean') {
             setFollowingUsernames(prev => {
               const next = new Set(prev);
@@ -553,14 +586,31 @@ export const AppProvider = ({ children }) => {
             });
           }
           fetchMyFollowing();
-          // Refresh story tray so unfollowed user's stories disappear immediately
           fetchLiveStories();
+          return { success: true, following: res2?.following ?? willFollow };
         } catch (err2) {
           console.warn('Toggle follow error:', err2);
+          // Rollback
+          setFollowingUsernames(prev => {
+            const next = new Set(prev);
+            if (currentlyFollowing) next.add(cleanUser);
+            else next.delete(cleanUser);
+            return next;
+          });
+          setPosts(prev =>
+            prev.map(p => {
+              if (p.creator?.username?.toLowerCase() === cleanUser) {
+                return { ...p, isFollowing: currentlyFollowing };
+              }
+              return p;
+            })
+          );
+          Alert.alert('Error', 'Unable to update follow status. Please try again.');
+          return { success: false, error: err2 };
         }
       }
     },
-    [fetchMyFollowing, fetchLiveStories]
+    [currentUser, followingUsernames, fetchMyFollowing, fetchLiveStories, showInAppBanner]
   );
 
   // Follow requests state (matching website)

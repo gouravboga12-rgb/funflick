@@ -45,13 +45,18 @@ export const HomeScreen = ({ navigation }) => {
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems && viewableItems.length > 0) {
-      setActiveVideoId(viewableItems[0].item?.id);
+      const candidate = viewableItems.find(v => v.isViewable && v.item?.id && !v.item?.isSponsoredAd);
+      const targetItem = candidate || viewableItems[0];
+      if (targetItem?.item?.id) {
+        setActiveVideoId(prev => (prev === targetItem.item.id ? prev : targetItem.item.id));
+      }
     }
   }).current;
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 45,
+    itemVisiblePercentThreshold: 60,
     waitForInteraction: false,
+    minimumViewTime: 120,
   }).current;
 
   const filteredPosts = useMemo(() => {

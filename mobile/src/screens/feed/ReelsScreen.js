@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated, Platform, RefreshControl, Modal } from 'react-native';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated, Platform, RefreshControl, Modal, Alert } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MessageCircle, Share2, Volume2, VolumeX, Play, Pause, Music, Bookmark, Plus, Eye, Check, MoreVertical, Download, Flag } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +16,24 @@ import { colors } from '../../theme/colors';
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
 
+// In-memory cache for extracted video thumbnails (eliminates black screen for videos without poster)
+const thumbnailMemoryCache = new Map();
+
+async function getOrGenerateVideoThumbnail(videoUrl) {
+  if (!videoUrl || typeof videoUrl !== 'string') return null;
+  if (thumbnailMemoryCache.has(videoUrl)) {
+    return thumbnailMemoryCache.get(videoUrl);
+  }
+  try {
+    const { uri } = await VideoThumbnails.getThumbnailAsync(videoUrl, { time: 100 });
+    if (uri) {
+      thumbnailMemoryCache.set(videoUrl, uri);
+      return uri;
+    }
+  } catch (e) {}
+  return null;
+}
+
 function formatCount(num) {
   if (!num) return '0';
   if (typeof num === 'string' && (num.includes('K') || num.includes('M'))) return num;
@@ -25,7 +44,7 @@ function formatCount(num) {
   return String(n);
 }
 
-export function ReelItem({
+export const ReelItem = React.memo(function ReelItem({
   item,
   isActive,
   isScreenFocused,
@@ -50,6 +69,7 @@ export function ReelItem({
     currentUser,
     activePopupAd,
     mediaLimits,
+    followingUsernames,
   } = useApp();
 
   const isReelsMuted = propMuted !== undefined ? propMuted : appMuted;
@@ -65,6 +85,29 @@ export function ReelItem({
 
   // Dynamic admin showcase limit (defaults: Reels 30s)
   const maxShowcaseDuration = Number(mediaLimits?.maxReelDuration) || 30;
+
+  // Authoritative follow state synced with followingUsernames set
+  const isFollowing = useMemo(() => {
+    const uName = item?.creator?.username?.toLowerCase().replace(/^@/, '');
+    if (!uName) return false;
+    if (followingUsernames && followingUsernames.has(uName)) return true;
+    return Boolean(item?.isFollowing);
+  }, [item?.creator?.username, item?.isFollowing, followingUsernames]);
+
+  const handleFollowPress = async (e) => {
+    e?.stopPropagation?.();
+    if (!currentUser) {
+      Alert.alert('Sign In Required', 'Please sign in to follow creators.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => navigation?.navigate?.('Login') },
+      ]);
+      return;
+    }
+    const target = item?.creator?.username;
+    if (target && toggleFollowCreator) {
+      await toggleFollowCreator(target);
+    }
+  };
 
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(Boolean(item?.isSaved));
@@ -118,11 +161,47 @@ export function ReelItem({
     return null;
   })();
 
-  const [isVideoReady, setIsVideoReady] = useState(false);
+  // Fallback: generate and cache thumbnail if no poster exists to eliminate black flash
+  const [generatedThumbnail, setGeneratedThumbnail] = useState(null);
 
   useEffect(() => {
-    setIsVideoReady(false);
-  }, [item?.id, isActive]);
+    let isMounted = true;
+    if (!validPoster && mediaUrl && isVideo) {
+      getOrGenerateVideoThumbnail(mediaUrl).then(uri => {
+        if (isMounted && uri) {
+          setGeneratedThumbnail(uri);
+        }
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [validPoster, mediaUrl, isVideo]);
+
+  const activePosterUri = validPoster || generatedThumbnail;
+
+  const [isVideoReady, setIsVideoReady] = useState(false);
+  const posterOpacity = useRef(new Animated.Value(1)).current;
+  const isFrameRenderedRef = useRef(false);
+
+  const onFirstFrameRendered = useCallback(() => {
+    if (isFrameRenderedRef.current) return;
+    isFrameRenderedRef.current = true;
+    setIsVideoReady(true);
+    Animated.timing(posterOpacity, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [posterOpacity]);
+
+  useEffect(() => {
+    if (!isActive || !isScreenFocused) {
+      isFrameRenderedRef.current = false;
+      posterOpacity.setValue(1);
+      setIsVideoReady(false);
+    }
+  }, [isActive, isScreenFocused, item?.id, posterOpacity]);
 
   // Hardware decoder safeguard: ONLY mount player on active reel when screen is focused AND no popup ad is active
   const shouldMountPlayer = Boolean(isVideo && isActive && isScreenFocused && !activePopupAd);
@@ -136,35 +215,26 @@ export function ReelItem({
     }
   });
 
-  // Track player readiness to eliminate black screen flicker on swipe
+  // Track player frame delivery to completely eliminate black flash
   useEffect(() => {
-    if (!player) {
-      setIsVideoReady(false);
-      return;
-    }
-    if (player.status === 'readyToPlay') {
-      setIsVideoReady(true);
-    }
-    const statusSub = player.addListener ? player.addListener('statusChange', (payload) => {
-      if (payload?.status === 'readyToPlay') {
-        setIsVideoReady(true);
+    if (!player) return;
+
+    const timeSub = player.addListener ? player.addListener('timeUpdate', (event) => {
+      if (event && event.currentTime > 0) {
+        onFirstFrameRendered();
       }
     }) : null;
     const playSub = player.addListener ? player.addListener('playingChange', (payload) => {
       if (payload?.isPlaying) {
-        setIsVideoReady(true);
+        setTimeout(onFirstFrameRendered, 140);
       }
-    }) : null;
-    const timeSub = player.addListener ? player.addListener('timeUpdate', () => {
-      setIsVideoReady(true);
     }) : null;
 
     return () => {
-      statusSub?.remove?.();
-      playSub?.remove?.();
       timeSub?.remove?.();
+      playSub?.remove?.();
     };
-  }, [player]);
+  }, [player, onFirstFrameRendered]);
 
   useEffect(() => {
     hasRecordedViewRef.current = false;
@@ -317,22 +387,25 @@ export function ReelItem({
 
   return (
     <View style={[styles.reelContainer, { height: reelHeight }]}>
-      {/* Background Media — 2-Layer Instagram-style display (No Cropping, Ambient Backdrop) */}
+      {/* Background Media — 3-Layer Seamless Transition (Zero Black Flash) */}
       <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-        {/* Layer 1: Ambient Blurred Backdrop matching Instagram */}
-        {validPoster ? (
+        {/* Layer 1: Ambient Blurred Backdrop */}
+        {activePosterUri ? (
           <Image
-            source={{ uri: validPoster }}
+            source={{ uri: activePosterUri }}
             style={StyleSheet.absoluteFillObject}
             blurRadius={32}
-            opacity={0.32}
+            opacity={0.35}
             resizeMode="cover"
           />
         ) : (
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#090514' }]} />
+          <LinearGradient
+            colors={['#1c0c33', '#090514', '#150826']}
+            style={StyleSheet.absoluteFillObject}
+          />
         )}
 
-        {/* Layer 2: True Aspect-Ratio Video (Never Cropped or Zoomed in) */}
+        {/* Layer 2: True Aspect-Ratio Video (Never Cropped or Zoomed in, underneath poster) */}
         {shouldMountPlayer && player && (
           Platform.OS === 'web' ? (
             <video
@@ -342,8 +415,9 @@ export function ReelItem({
               playsInline
               loop
               muted={isReelsMuted}
-              onLoadedData={() => setIsVideoReady(true)}
-              onPlaying={() => setIsVideoReady(true)}
+              onLoadedData={() => onFirstFrameRendered()}
+              onPlaying={() => onFirstFrameRendered()}
+              onTimeUpdate={() => onFirstFrameRendered()}
               style={{
                 width: '100%',
                 height: '100%',
@@ -363,14 +437,26 @@ export function ReelItem({
           )
         )}
 
-        {/* Persistent Poster Image until first video frame is decoded & ready to play — eliminates black flash on swipe */}
-        {(!isVideoReady || !shouldMountPlayer || !player) && validPoster && (
-          <Image
-            source={{ uri: validPoster }}
-            style={[styles.fullscreenVideo, StyleSheet.absoluteFillObject]}
-            resizeMode="contain"
-          />
-        )}
+        {/* Layer 3: Persistent Poster Image cross-fading out smoothly ONLY when first frame has painted */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFillObject,
+            { opacity: posterOpacity },
+          ]}
+        >
+          {activePosterUri ? (
+            <Image
+              source={{ uri: activePosterUri }}
+              style={[styles.fullscreenVideo, StyleSheet.absoluteFillObject]}
+              resizeMode="contain"
+            />
+          ) : (
+            <LinearGradient
+              colors={['#270f45', '#090514', '#1f0938']}
+              style={StyleSheet.absoluteFillObject}
+            />
+          )}
+        </Animated.View>
       </View>
 
       {/* Dedicated Tap Layer Covering Entire Screen */}
@@ -428,12 +514,14 @@ export function ReelItem({
           >
             <Image source={{ uri: item.creator?.avatar }} style={styles.sideAvatar} />
           </TouchableOpacity>
-          {!isOwner && !item.isFollowing && (
+          {!isOwner && !isFollowing && (
             <TouchableOpacity
               style={styles.plusFollow}
-              onPress={() => toggleFollowCreator(item.creator?.username)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              activeOpacity={0.8}
+              onPress={handleFollowPress}
             >
-              <Plus size={11} color="#fff" strokeWidth={3} />
+              <Plus size={12} color="#fff" strokeWidth={3} />
             </TouchableOpacity>
           )}
         </View>
@@ -535,12 +623,24 @@ export function ReelItem({
             </View>
           </TouchableOpacity>
 
-          {!isOwner && !item.isFollowing && (
+          {!isOwner && (
             <TouchableOpacity
-              style={styles.followBadge}
-              onPress={() => toggleFollowCreator(item.creator?.username)}
+              style={[
+                styles.followBadge,
+                isFollowing ? styles.followingBadge : styles.notFollowingBadge,
+              ]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.8}
+              onPress={handleFollowPress}
             >
-              <Text style={styles.followBadgeText}>Follow</Text>
+              {isFollowing ? (
+                <View style={styles.followingBadgeContent}>
+                  <Check size={11} color="#ffffff" strokeWidth={2.8} />
+                  <Text style={styles.followingBadgeText}>Following</Text>
+                </View>
+              ) : (
+                <Text style={styles.followBadgeText}>Follow</Text>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -712,11 +812,34 @@ export const ReelsScreen = ({ navigation }) => {
     recordPostView,
     isAuthenticated,
     currentUser,
+    followingUsernames,
   } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
   const [reelsData, setReelsData] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Follow creator handler specifically updating reelsData optimistic state
+  const handleToggleFollowInReels = useCallback(
+    async (targetUsername) => {
+      if (!targetUsername) return;
+      const cleanUser = targetUsername.toLowerCase().replace(/^@/, '');
+      const currentlyFollowing = followingUsernames?.has(cleanUser);
+      const nextState = !currentlyFollowing;
+
+      setReelsData(prev =>
+        prev.map(r => {
+          if (r.creator?.username?.toLowerCase() === cleanUser) {
+            return { ...r, isFollowing: nextState };
+          }
+          return r;
+        })
+      );
+
+      return toggleFollowCreator(cleanUser, nextState);
+    },
+    [followingUsernames, toggleFollowCreator]
+  );
 
   // Fetch category-personalized and dynamically seeded video-only feed
   const fetchDedicatedReels = useCallback(async (newSeed) => {
@@ -831,7 +954,7 @@ export const ReelsScreen = ({ navigation }) => {
             isReelsPaused={isReelsPaused}
             togglePlayPause={togglePlayPause}
             toggleLikePost={toggleLikePost}
-            toggleFollowCreator={toggleFollowCreator}
+            toggleFollowCreator={handleToggleFollowInReels}
             recordPostView={recordPostView}
             handleShare={handleShare}
             navigation={navigation}
@@ -1016,15 +1139,17 @@ const styles = StyleSheet.create({
   plusFollow: {
     position: 'absolute',
     bottom: -4,
-    left: 15,
-    width: 17,
-    height: 17,
-    borderRadius: 8.5,
+    left: 14,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: '#000',
+    zIndex: 50,
+    elevation: 50,
   },
   sideBtn: {
     alignItems: 'center',
@@ -1096,12 +1221,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   followBadge: {
-    backgroundColor: colors.primary,
     paddingHorizontal: 12,
-    paddingVertical: 3.5,
+    paddingVertical: 4,
     borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notFollowingBadge: {
+    backgroundColor: colors.primary,
+  },
+  followingBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  followingBadgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   followBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  followingBadgeText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',

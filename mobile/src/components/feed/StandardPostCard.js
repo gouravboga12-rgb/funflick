@@ -143,11 +143,21 @@ export const StandardPostCard = ({ post, navigation }) => {
     toggleSavePost?.(post.id);
   };
 
-  const handleToggleFollow = () => {
+  const handleToggleFollow = async () => {
+    if (!currentUser) {
+      Alert.alert('Sign In Required', 'Please sign in to follow creators.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => navigation?.navigate?.('Login') },
+      ]);
+      return;
+    }
     const next = !isFollowing;
     setIsFollowing(next);
     if (post?.creator?.username) {
-      toggleFollowCreator?.(post.creator.username);
+      const res = await toggleFollowCreator?.(post.creator.username, next);
+      if (res && res.error) {
+        setIsFollowing(!next);
+      }
     }
   };
 

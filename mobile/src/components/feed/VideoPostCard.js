@@ -6,7 +6,7 @@ import { useApp } from '../../context/AppContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export const VideoPostCard = ({ post, isActive = false, navigation }) => {
+export const VideoPostCard = React.memo(function VideoPostCard({ post, isActive = false, navigation }) {
   const isFocused = useIsFocused();
   const {
     isReelsMuted,
@@ -65,4 +65,4 @@ export const VideoPostCard = ({ post, isActive = false, navigation }) => {
       />
     </View>
   );
-};
+});
