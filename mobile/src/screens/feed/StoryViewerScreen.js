@@ -97,8 +97,8 @@ function StoryVideo({ mediaUrl, isPaused }) {
       player={player}
       style={StyleSheet.absoluteFillObject}
       contentFit="contain"
-      surfaceType="surfaceView"
-      useExoShutter={true}
+      surfaceType="textureView"
+      useExoShutter={false}
       nativeControls={false}
       pointerEvents="none"
     />

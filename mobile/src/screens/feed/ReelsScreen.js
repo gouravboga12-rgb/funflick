@@ -216,7 +216,7 @@ export const ReelItem = React.memo(function ReelItem({
   // Hardware decoder & audio safeguard: ONLY mount player when active, screen focused, app active in foreground, and no popup ad
   const shouldMountPlayer = Boolean(isVideo && isActive && isScreenFocused && isAppActive && !activePopupAd);
 
-  const player = useVideoPlayer(shouldMountPlayer ? mediaUrl : null, p => {
+  const player = useVideoPlayer(mediaUrl || null, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
@@ -241,21 +241,23 @@ export const ReelItem = React.memo(function ReelItem({
     }) : null;
     const playSub = player.addListener ? player.addListener('playingChange', (payload) => {
       if (payload?.isPlaying) {
-        setTimeout(onFirstFrameRendered, 140);
+        onFirstFrameRendered();
       }
     }) : null;
 
-    // Guaranteed fallback: fade out poster after 350ms so video is never blocked by a stuck poster
+    // Generous fallback: only fade out poster after 3000ms if active to protect against stuck poster on slow connections
     const fallbackTimer = setTimeout(() => {
-      onFirstFrameRendered();
-    }, 350);
+      if (shouldMountPlayer) {
+        onFirstFrameRendered();
+      }
+    }, 3000);
 
     return () => {
       timeSub?.remove?.();
       playSub?.remove?.();
       clearTimeout(fallbackTimer);
     };
-  }, [player, onFirstFrameRendered]);
+  }, [player, shouldMountPlayer, onFirstFrameRendered]);
 
   useEffect(() => {
     hasRecordedViewRef.current = false;
@@ -454,8 +456,8 @@ export const ReelItem = React.memo(function ReelItem({
               player={player}
               style={StyleSheet.absoluteFillObject}
               contentFit="contain"
-              surfaceType="surfaceView"
-              useExoShutter={true}
+              surfaceType="textureView"
+              useExoShutter={false}
               nativeControls={false}
               onFirstFrameRender={onFirstFrameRendered}
             />

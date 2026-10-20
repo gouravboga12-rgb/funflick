@@ -12,6 +12,7 @@ import {
   Alert,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Heart,
@@ -72,6 +73,7 @@ export const StandardPostCard = ({ post, navigation }) => {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [cardWidth, setCardWidth] = useState(SCREEN_WIDTH);
   const [imageError, setImageError] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(true);
   const carouselScrollRef = useRef(null);
 
   // Parse media list supporting single URL, JSON array, or comma-separated URLs
@@ -446,8 +448,18 @@ export const StandardPostCard = ({ post, navigation }) => {
               }}
               style={styles.postImage}
               resizeMode="cover"
-              onError={() => setImageError(true)}
+              onLoadStart={() => setIsImageLoading(true)}
+              onLoadEnd={() => setIsImageLoading(false)}
+              onError={() => {
+                setImageError(true);
+                setIsImageLoading(false);
+              }}
             />
+            {isImageLoading && !imageError && (
+              <View style={styles.imageLoaderCenter} pointerEvents="none">
+                <ActivityIndicator size="small" color="#ff007a" />
+              </View>
+            )}
           </TouchableOpacity>
         )}
 
@@ -879,6 +891,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: '#18122c',
+  },
+  imageLoaderCenter: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(24, 18, 44, 0.45)',
   },
   carouselWrap: {
     width: '100%',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Header } from '../../components/common/Header';
@@ -202,6 +202,21 @@ export const HomeScreen = ({ navigation }) => {
             colors={[colors.primary]}
           />
         }
+        ListEmptyComponent={
+          isLoadingFeed ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.emptyText}>Loading latest posts...</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No posts available right now.</Text>
+              <TouchableOpacity style={styles.emptyRefreshBtn} onPress={handleRefresh}>
+                <Text style={styles.emptyRefreshBtnText}>Tap to Refresh</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
@@ -220,6 +235,30 @@ const styles = StyleSheet.create({
   cardWrapper: {
     paddingHorizontal: 0,
     paddingTop: 0,
+  },
+  emptyContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  emptyText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  emptyRefreshBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 0, 122, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 0, 122, 0.3)',
+  },
+  emptyRefreshBtnText: {
+    color: '#ff007a',
+    fontSize: 12,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
