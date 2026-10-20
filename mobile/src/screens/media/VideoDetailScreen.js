@@ -214,12 +214,17 @@ export const VideoDetailScreen = ({ route, navigation }) => {
         }}
         renderItem={({ item, index }) => {
           const mediaUrl = item?.mediaUrl || item?.video_url || item?.videoUrl || '';
-          const isItemVideo = (item?.mediaType === 'video' || item?.media_type === 'video') &&
+          const isItemVideo =
+            (item?.mediaType === 'video' || item?.media_type === 'video') &&
             !mediaUrl.match(/\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i) &&
             item?.category !== 'Photo' &&
             item?.category !== 'Post';
 
-          if (!isItemVideo) {
+          // Also treat as video if URL extension is clearly a video file (handles cases where mediaType field is missing)
+          const isVideoByUrl = !isItemVideo && /\.(mp4|webm|mov|m4v)($|\?)/i.test(mediaUrl);
+          const shouldRenderAsVideo = isItemVideo || isVideoByUrl;
+
+          if (!shouldRenderAsVideo) {
             return (
               <ScrollView
                 style={{ width: WINDOW_WIDTH, height: containerHeight }}

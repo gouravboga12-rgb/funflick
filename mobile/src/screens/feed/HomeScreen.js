@@ -168,12 +168,14 @@ export const HomeScreen = ({ navigation }) => {
             );
           }
 
-          const mediaUrl = item.mediaUrl || item.video_url || '';
-          const isVideo =
+          const mediaUrl = item.mediaUrl || item.video_url || item.videoUrl || '';
+          const isVideoByType =
             (item.mediaType === 'video' || item.media_type === 'video') &&
             !mediaUrl.match(/\.(jpg|jpeg|png|webp|gif|svg|avif)($|\?)/i) &&
             item.category !== 'Photo' &&
             item.category !== 'Post';
+          const isVideoByUrl = !isVideoByType && /\.(mp4|webm|mov|m4v)($|\?)/i.test(mediaUrl);
+          const isVideo = isVideoByType || isVideoByUrl;
 
           const isPostActive = activeVideoId ? String(item.id) === String(activeVideoId) : index === 0;
 

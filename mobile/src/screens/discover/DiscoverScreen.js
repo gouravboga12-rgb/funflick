@@ -569,9 +569,9 @@ export const DiscoverScreen = ({ navigation }) => {
                     })}
                   >
                     <VideoThumbnail
-                      thumbnailUrl={video.thumbnailUrl}
-                      videoUrl={video.mediaUrl || video.videoUrl}
-                      posterUrl={video.posterUrl}
+                      thumbnailUrl={video.thumbnailUrl || video.thumbnail_url}
+                      videoUrl={video.mediaUrl || video.videoUrl || video.video_url}
+                      posterUrl={video.posterUrl || video.poster_url}
                       style={styles.gridVideoThumb}
                       fallbackTitle={video.title}
                     />
