@@ -239,11 +239,15 @@ export const StandardPostCard = ({ post, navigation }) => {
 
   const photoUri =
     (mediaList && mediaList.length > 0 ? mediaList[0] : null) ||
-    post.posterUrl ||
     post.mediaUrl ||
-    post.thumbnailUrl ||
-    post.thumbnail ||
+    post.media_url ||
     post.video_url ||
+    post.videoUrl ||
+    post.posterUrl ||
+    post.poster_url ||
+    post.thumbnailUrl ||
+    post.thumbnail_url ||
+    post.thumbnail ||
     'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80';
 
   const avatarUri =
@@ -438,7 +442,7 @@ export const StandardPostCard = ({ post, navigation }) => {
           <TouchableOpacity
             activeOpacity={1}
             onPress={handlePhotoPress}
-            style={StyleSheet.absoluteFillObject}
+            style={{ width: cardWidth || SCREEN_WIDTH, height: cardWidth || SCREEN_WIDTH }}
           >
             <Image
               source={{

@@ -194,32 +194,10 @@ export const ReelItem = React.memo(function ReelItem({
   }, []);
 
   const [isVideoReady, setIsVideoReady] = useState(false);
-  const posterOpacity = useRef(new Animated.Value(1)).current;
-  const isFrameRenderedRef = useRef(false);
 
-  const onFirstFrameRendered = useCallback(() => {
-    if (isFrameRenderedRef.current) return;
-    isFrameRenderedRef.current = true;
-    setIsVideoReady(true);
-    Animated.timing(posterOpacity, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [posterOpacity]);
+  const shouldPlay = Boolean(isVideo && isActive && isScreenFocused && isAppActive && !isReelsPaused && !activePopupAd);
 
-  useEffect(() => {
-    if (!isActive || !isScreenFocused || !isAppActive) {
-      isFrameRenderedRef.current = false;
-      posterOpacity.setValue(1);
-      setIsVideoReady(false);
-    }
-  }, [isActive, isScreenFocused, isAppActive, item?.id, posterOpacity]);
-
-  // Hardware decoder & audio safeguard: ONLY mount player when active, screen focused, app active in foreground, and no popup ad
-  const shouldMountPlayer = Boolean(isVideo && isActive && isScreenFocused && isAppActive && !activePopupAd);
-
-  const player = useVideoPlayer(mediaUrl || null, p => {
+  const player = useVideoPlayer(isVideo && Platform.OS !== 'web' ? (mediaUrl || null) : null, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
@@ -227,52 +205,50 @@ export const ReelItem = React.memo(function ReelItem({
       p.timeUpdateEventInterval = 0.25;
       p.staysActiveInBackground = false;
     } catch (e) {}
-    if (shouldMountPlayer && !isReelsPaused && !activePopupAd) {
+    if (shouldPlay) {
       p.play();
     } else {
       p.pause();
     }
   });
 
-  // Track player frame delivery to completely eliminate black flash
+  // Track video readiness reliably via status, play, and timeUpdate listeners (matching SponsoredAdCard)
   useEffect(() => {
-    if (!player) return;
-
-    const timeSub = player.addListener ? player.addListener('timeUpdate', (event) => {
-      if (event && event.currentTime > 0) {
-        onFirstFrameRendered();
-      }
+    if (!player) {
+      setIsVideoReady(false);
+      return;
+    }
+    if (player.status === 'readyToPlay') {
+      setIsVideoReady(true);
+    }
+    const statusSub = player.addListener ? player.addListener('statusChange', (payload) => {
+      if (payload?.status === 'readyToPlay') setIsVideoReady(true);
     }) : null;
     const playSub = player.addListener ? player.addListener('playingChange', (payload) => {
-      if (payload?.isPlaying) {
-        onFirstFrameRendered();
-      }
+      if (payload?.isPlaying) setIsVideoReady(true);
     }) : null;
-    const statusSub = player.addListener ? player.addListener('statusChange', (payload) => {
-      if (payload?.status === 'readyToPlay') {
-        onFirstFrameRendered();
-      }
+    const timeSub = player.addListener ? player.addListener('timeUpdate', () => {
+      setIsVideoReady(true);
     }) : null;
-
-    // Generous fallback: only fade out poster after 3000ms if active to protect against stuck poster on slow connections
-    const fallbackTimer = setTimeout(() => {
-      if (shouldMountPlayer) {
-        onFirstFrameRendered();
-      }
-    }, 3000);
 
     return () => {
-      timeSub?.remove?.();
-      playSub?.remove?.();
       statusSub?.remove?.();
-      clearTimeout(fallbackTimer);
+      playSub?.remove?.();
+      timeSub?.remove?.();
     };
-  }, [player, shouldMountPlayer, onFirstFrameRendered]);
+  }, [player]);
+
+  useEffect(() => {
+    if (!isActive || !isScreenFocused || !isAppActive) {
+      setIsVideoReady(false);
+    }
+  }, [isActive, isScreenFocused, isAppActive, item?.id]);
 
   useEffect(() => {
     hasRecordedViewRef.current = false;
   }, [item?.id]);
 
+  // Synchronize playback state without unmounting the native VideoView surface
   useEffect(() => {
     if (!player) return;
     let viewTimer = null;
@@ -280,7 +256,7 @@ export const ReelItem = React.memo(function ReelItem({
       try {
         player.staysActiveInBackground = false;
       } catch (e) {}
-      if (shouldMountPlayer && !isReelsPaused && !activePopupAd) {
+      if (shouldPlay) {
         player.play();
         // Record view only after 5 seconds of continuous playback
         if (!hasRecordedViewRef.current && recordPostView && item?.id) {
@@ -294,12 +270,12 @@ export const ReelItem = React.memo(function ReelItem({
       } else {
         player.pause();
       }
-    } catch {}
+    } catch (e) {}
 
     return () => {
       if (viewTimer) clearTimeout(viewTimer);
     };
-  }, [shouldMountPlayer, isReelsPaused, activePopupAd, player, item?.id, recordPostView]);
+  }, [shouldPlay, player, item?.id, recordPostView]);
 
   // Enforce Admin Reel Duration showcase limit: loops back to 0s when currentTime reaches maxShowcaseDuration
   useEffect(() => {
@@ -423,79 +399,58 @@ export const ReelItem = React.memo(function ReelItem({
 
   return (
     <View style={[styles.reelContainer, { height: reelHeight }]}>
-      {/* Background Media — 3-Layer Seamless Transition (Instagram-Style Contain + Ambient Blurred Backdrop) */}
-      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-        {/* Layer 1: Ambient Blurred Backdrop */}
-        {activePosterUri ? (
-          <Image
-            source={{ uri: activePosterUri }}
-            style={StyleSheet.absoluteFillObject}
-            blurRadius={32}
-            opacity={0.45}
-            resizeMode="cover"
+      {/* Layer 1: Ambient Blurred Backdrop */}
+      {activePosterUri ? (
+        <Image
+          source={{ uri: activePosterUri }}
+          style={StyleSheet.absoluteFillObject}
+          blurRadius={32}
+          opacity={0.35}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#090514' }]} />
+      )}
+
+      {/* Layer 2: True Aspect-Ratio Edge-to-Edge Video — Always mounted when player exists (matching working SponsoredAdCard) */}
+      {player && (
+        Platform.OS === 'web' ? (
+          <video
+            ref={webVideoRef}
+            src={mediaUrl}
+            autoPlay
+            playsInline
+            loop
+            muted={isReelsMuted}
+            onLoadedData={() => setIsVideoReady(true)}
+            onPlaying={() => setIsVideoReady(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              backgroundColor: 'transparent',
+            }}
           />
         ) : (
-          <LinearGradient
-            colors={['#1c0c33', '#090514', '#150826']}
+          <VideoView
+            player={player}
             style={StyleSheet.absoluteFillObject}
+            contentFit="contain"
+            surfaceType="textureView"
+            useExoShutter={false}
+            nativeControls={false}
           />
-        )}
+        )
+      )}
 
-        {/* Layer 2: True Aspect-Ratio Edge-to-Edge Video (Instagram-Style Contain) */}
-        {shouldMountPlayer && player && (
-          Platform.OS === 'web' ? (
-            <video
-              ref={webVideoRef}
-              src={item.mediaUrl}
-              autoPlay
-              playsInline
-              loop
-              muted={isReelsMuted}
-              onLoadedData={() => onFirstFrameRendered()}
-              onPlaying={() => onFirstFrameRendered()}
-              onTimeUpdate={() => onFirstFrameRendered()}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                backgroundColor: 'transparent',
-              }}
-            />
-          ) : (
-            <VideoView
-              player={player}
-              style={StyleSheet.absoluteFillObject}
-              contentFit="contain"
-              surfaceType="textureView"
-              useExoShutter={false}
-              nativeControls={false}
-              onFirstFrameRender={onFirstFrameRendered}
-            />
-          )
-        )}
-
-        {/* Layer 3: Persistent Poster Image cross-fading out smoothly ONLY when first frame has painted */}
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFillObject,
-            { opacity: posterOpacity },
-          ]}
-          pointerEvents="none"
-        >
-          {activePosterUri ? (
-            <Image
-              source={{ uri: activePosterUri }}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode="contain"
-            />
-          ) : (
-            <LinearGradient
-              colors={['#270f45', '#090514', '#1f0938']}
-              style={StyleSheet.absoluteFillObject}
-            />
-          )}
-        </Animated.View>
-      </View>
+      {/* Layer 3: Poster Image — ONLY visible while video frame is decoding/buffering, then completely unmounted */}
+      {(!isVideoReady || !shouldPlay) && activePosterUri && (
+        <Image
+          source={{ uri: activePosterUri }}
+          style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+          resizeMode="contain"
+        />
+      )}
 
       {/* Dedicated Tap Layer Covering Entire Screen */}
       <TouchableOpacity activeOpacity={1} onPress={handleMediaPress} style={StyleSheet.absoluteFillObject} />
