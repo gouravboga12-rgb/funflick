@@ -230,11 +230,12 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
           ) : (
             <VideoView
               player={player}
-              style={StyleSheet.absoluteFillObject}
+              style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
               contentFit="contain"
-              surfaceType="textureView"
-              useExoShutter={false}
+              surfaceType="surfaceView"
+              useExoShutter={true}
               nativeControls={false}
+              onFirstFrameRender={() => setIsVideoReady(true)}
             />
           )
         )}
