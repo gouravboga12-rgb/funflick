@@ -796,7 +796,7 @@ export const ReelItem = React.memo(function ReelItem({
       />
     </View>
   );
-}
+});
 
 export const ReelsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
