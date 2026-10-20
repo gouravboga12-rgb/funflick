@@ -149,9 +149,12 @@ export const ReelItem = React.memo(function ReelItem({
     const candidates = [
       item?.posterUrl,
       item?.thumbnailUrl,
+      item?.thumbnail_url,
+      item?.poster_url,
       item?.thumbnail,
       item?.poster,
       item?.mediaUrl,
+      item?.video_url,
     ];
     for (const c of candidates) {
       if (typeof c === 'string' && c.trim() && !/\.(mp4|webm|mov|m4v)($|\?)/i.test(c)) {
@@ -221,6 +224,7 @@ export const ReelItem = React.memo(function ReelItem({
     p.loop = true;
     p.muted = isReelsMuted;
     try {
+      p.timeUpdateEventInterval = 0.25;
       p.staysActiveInBackground = false;
     } catch (e) {}
     if (shouldMountPlayer && !isReelsPaused && !activePopupAd) {
@@ -244,6 +248,11 @@ export const ReelItem = React.memo(function ReelItem({
         onFirstFrameRendered();
       }
     }) : null;
+    const statusSub = player.addListener ? player.addListener('statusChange', (payload) => {
+      if (payload?.status === 'readyToPlay') {
+        onFirstFrameRendered();
+      }
+    }) : null;
 
     // Generous fallback: only fade out poster after 3000ms if active to protect against stuck poster on slow connections
     const fallbackTimer = setTimeout(() => {
@@ -255,6 +264,7 @@ export const ReelItem = React.memo(function ReelItem({
     return () => {
       timeSub?.remove?.();
       playSub?.remove?.();
+      statusSub?.remove?.();
       clearTimeout(fallbackTimer);
     };
   }, [player, shouldMountPlayer, onFirstFrameRendered]);
