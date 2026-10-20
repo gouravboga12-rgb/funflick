@@ -231,8 +231,8 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
             <VideoView
               player={player}
               style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
-              contentFit="cover"
-              surfaceType="surfaceView"
+              contentFit="contain"
+              surfaceType="textureView"
               useExoShutter={false}
               nativeControls={false}
             />
@@ -244,7 +244,7 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
           <Image
             source={{ uri: validPoster }}
             style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
-            resizeMode="cover"
+            resizeMode="contain"
           />
         )}
 
@@ -427,6 +427,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
     position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
     overflow: 'hidden',
   },
   fullscreenVideo: {

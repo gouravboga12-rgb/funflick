@@ -186,7 +186,7 @@ function NativeAdVideoPlayer({ mediaUrl, muted, isPaused, setIsLoading }) {
       player={player}
       style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
       contentFit="cover"
-      surfaceType="surfaceView"
+      surfaceType="textureView"
       useExoShutter={false}
       nativeControls={false}
     />

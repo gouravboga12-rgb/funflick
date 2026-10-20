@@ -129,7 +129,7 @@ function StoryVideoPreview({ videoUri }) {
       player={player}
       style={styles.fullMedia}
       contentFit="cover"
-      surfaceType="surfaceView"
+      surfaceType="textureView"
       useExoShutter={false}
       nativeControls={false}
     />
