@@ -10,6 +10,7 @@ import {
   Linking,
   ActivityIndicator,
   Platform,
+  AppState,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -114,11 +115,25 @@ function WebAdVideoPlayer({ mediaUrl, muted, setMuted, isPaused, setIsLoading })
 
 // Dedicated Video Player subcomponent to safely invoke useVideoPlayer only when video is active
 function NativeAdVideoPlayer({ mediaUrl, muted, isPaused, setIsLoading }) {
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      setIsAppActive(nextState === 'active');
+    });
+    return () => sub.remove();
+  }, []);
+
+  const shouldPlay = !isPaused && isAppActive;
+
   const player = useVideoPlayer(mediaUrl, p => {
     if (!p) return;
     p.loop = true;
     p.muted = muted;
-    if (!isPaused) {
+    try {
+      p.staysActiveInBackground = false;
+    } catch (e) {}
+    if (shouldPlay) {
       p.play();
     } else {
       p.pause();
@@ -128,15 +143,18 @@ function NativeAdVideoPlayer({ mediaUrl, muted, isPaused, setIsLoading }) {
   useEffect(() => {
     if (player) {
       try {
+        try {
+          player.staysActiveInBackground = false;
+        } catch (e) {}
         player.muted = muted;
-        if (isPaused) {
-          player.pause();
-        } else {
+        if (shouldPlay) {
           player.play();
+        } else {
+          player.pause();
         }
       } catch (e) {}
     }
-  }, [muted, isPaused, player]);
+  }, [muted, shouldPlay, player]);
 
   // Clean pause on unmount to prevent audio leaking into background reels
   useEffect(() => {
@@ -168,7 +186,7 @@ function NativeAdVideoPlayer({ mediaUrl, muted, isPaused, setIsLoading }) {
       player={player}
       style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
       contentFit="cover"
-      surfaceType="textureView"
+      surfaceType="surfaceView"
       useExoShutter={false}
       nativeControls={false}
     />

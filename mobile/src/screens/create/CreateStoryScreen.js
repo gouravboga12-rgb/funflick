@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Platform,
   Dimensions,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -80,19 +81,55 @@ function StoryVideoPreview({ videoUri }) {
     );
   }
 
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      setIsAppActive(nextState === 'active');
+    });
+    return () => sub.remove();
+  }, []);
+
   const player = useVideoPlayer(videoUri, p => {
     if (!p) return;
     p.loop = true;
     p.muted = false;
-    p.play();
+    try {
+      p.staysActiveInBackground = false;
+    } catch (e) {}
+    if (isAppActive) {
+      p.play();
+    } else {
+      p.pause();
+    }
   });
+
+  useEffect(() => {
+    if (player) {
+      try {
+        player.staysActiveInBackground = false;
+        if (isAppActive) player.play();
+        else player.pause();
+      } catch (e) {}
+    }
+  }, [isAppActive, player]);
+
+  useEffect(() => {
+    return () => {
+      if (player) {
+        try {
+          player.pause();
+        } catch (e) {}
+      }
+    };
+  }, [player]);
 
   return (
     <VideoView
       player={player}
       style={styles.fullMedia}
       contentFit="cover"
-      surfaceType="textureView"
+      surfaceType="surfaceView"
       useExoShutter={false}
       nativeControls={false}
     />

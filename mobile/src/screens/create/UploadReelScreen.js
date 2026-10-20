@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
+  AppState,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -83,18 +84,52 @@ const showAppAlert = (title, message, buttons) => {
 };
 
 function ReelPreview({ videoUri, isMuted }) {
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      setIsAppActive(nextState === 'active');
+    });
+    return () => sub.remove();
+  }, []);
+
   const player = useVideoPlayer(videoUri, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isMuted;
-    p.play();
+    try {
+      p.staysActiveInBackground = false;
+    } catch (e) {}
+    if (isAppActive) {
+      p.play();
+    } else {
+      p.pause();
+    }
   });
 
   useEffect(() => {
     if (player) {
-      player.muted = isMuted;
+      try {
+        player.staysActiveInBackground = false;
+        player.muted = isMuted;
+        if (isAppActive) {
+          player.play();
+        } else {
+          player.pause();
+        }
+      } catch (e) {}
     }
-  }, [isMuted, player]);
+  }, [isMuted, isAppActive, player]);
+
+  useEffect(() => {
+    return () => {
+      if (player) {
+        try {
+          player.pause();
+        } catch (e) {}
+      }
+    };
+  }, [player]);
 
   return (
     <VideoView

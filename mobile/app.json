@@ -2,7 +2,7 @@
   "expo": {
     "name": "FunFlick",
     "slug": "funflick",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "scheme": "funflick",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -21,7 +21,7 @@
       }
     },
     "android": {
-      "versionCode": 5,
+      "versionCode": 6,
       "softwareKeyboardLayoutMode": "resize",
       "package": "com.funflick.app",
       "adaptiveIcon": {

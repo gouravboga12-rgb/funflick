@@ -13,6 +13,7 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -45,18 +46,49 @@ function StoryVideo({ mediaUrl, isPaused }) {
     );
   }
 
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      setIsAppActive(nextState === 'active');
+    });
+    return () => sub.remove();
+  }, []);
+
+  const shouldPlay = !isPaused && isAppActive;
+
   const player = useVideoPlayer(mediaUrl, p => {
     if (!p) return;
     p.loop = false;
-    p.play();
+    try {
+      p.staysActiveInBackground = false;
+    } catch (e) {}
+    if (shouldPlay) {
+      p.play();
+    } else {
+      p.pause();
+    }
   });
 
   useEffect(() => {
     if (player) {
-      if (isPaused) player.pause();
-      else player.play();
+      try {
+        player.staysActiveInBackground = false;
+        if (shouldPlay) player.play();
+        else player.pause();
+      } catch (e) {}
     }
-  }, [isPaused, player]);
+  }, [shouldPlay, player]);
+
+  useEffect(() => {
+    return () => {
+      if (player) {
+        try {
+          player.pause();
+        } catch (e) {}
+      }
+    };
+  }, [player]);
 
   if (!player) return null;
 

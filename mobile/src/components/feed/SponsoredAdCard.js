@@ -8,6 +8,7 @@ import {
   Dimensions,
   Linking,
   Platform,
+  AppState,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -48,7 +49,16 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
     )
   );
 
-  const shouldPlay = Boolean(isVideo && isActive && isFocused && !isAdPaused && !activePopupAd);
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      setIsAppActive(nextState === 'active');
+    });
+    return () => sub.remove();
+  }, []);
+
+  const shouldPlay = Boolean(isVideo && isActive && isFocused && isAppActive && !isAdPaused && !activePopupAd);
 
   // Safe poster image URI that is NOT an mp4 video URL
   const validPoster = (() => {
@@ -65,6 +75,9 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
+    try {
+      p.staysActiveInBackground = false;
+    } catch (e) {}
     if (shouldPlay) {
       p.play();
     } else {
@@ -112,6 +125,9 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
   useEffect(() => {
     if (!player) return;
     try {
+      try {
+        player.staysActiveInBackground = false;
+      } catch (e) {}
       if (shouldPlay) {
         player.play();
       } else {
@@ -214,9 +230,9 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
           ) : (
             <VideoView
               player={player}
-              style={styles.fullscreenVideo}
-              contentFit="contain"
-              surfaceType="textureView"
+              style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+              contentFit="cover"
+              surfaceType="surfaceView"
               useExoShutter={false}
               nativeControls={false}
             />
@@ -227,8 +243,8 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
         {(!isVideoReady || !player) && validPoster && (
           <Image
             source={{ uri: validPoster }}
-            style={[styles.fullscreenVideo, StyleSheet.absoluteFillObject]}
-            resizeMode="contain"
+            style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+            resizeMode="cover"
           />
         )}
 

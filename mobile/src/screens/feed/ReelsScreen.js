@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated, Platform, RefreshControl, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, Share, Animated, Platform, RefreshControl, Modal, Alert, AppState } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import * as VideoThumbnails from 'expo-video-thumbnails';
@@ -180,6 +180,16 @@ export const ReelItem = React.memo(function ReelItem({
 
   const activePosterUri = validPoster || generatedThumbnail;
 
+  // Monitor app lifecycle: immediately pause video/audio when app is minimized or backgrounded
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      setIsAppActive(nextState === 'active');
+    });
+    return () => sub.remove();
+  }, []);
+
   const [isVideoReady, setIsVideoReady] = useState(false);
   const posterOpacity = useRef(new Animated.Value(1)).current;
   const isFrameRenderedRef = useRef(false);
@@ -190,28 +200,33 @@ export const ReelItem = React.memo(function ReelItem({
     setIsVideoReady(true);
     Animated.timing(posterOpacity, {
       toValue: 0,
-      duration: 250,
+      duration: 200,
       useNativeDriver: true,
     }).start();
   }, [posterOpacity]);
 
   useEffect(() => {
-    if (!isActive || !isScreenFocused) {
+    if (!isActive || !isScreenFocused || !isAppActive) {
       isFrameRenderedRef.current = false;
       posterOpacity.setValue(1);
       setIsVideoReady(false);
     }
-  }, [isActive, isScreenFocused, item?.id, posterOpacity]);
+  }, [isActive, isScreenFocused, isAppActive, item?.id, posterOpacity]);
 
-  // Hardware decoder safeguard: ONLY mount player on active reel when screen is focused AND no popup ad is active
-  const shouldMountPlayer = Boolean(isVideo && isActive && isScreenFocused && !activePopupAd);
+  // Hardware decoder & audio safeguard: ONLY mount player when active, screen focused, app active in foreground, and no popup ad
+  const shouldMountPlayer = Boolean(isVideo && isActive && isScreenFocused && isAppActive && !activePopupAd);
 
   const player = useVideoPlayer(shouldMountPlayer ? mediaUrl : null, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
+    try {
+      p.staysActiveInBackground = false;
+    } catch (e) {}
     if (shouldMountPlayer && !isReelsPaused && !activePopupAd) {
       p.play();
+    } else {
+      p.pause();
     }
   });
 
@@ -244,6 +259,9 @@ export const ReelItem = React.memo(function ReelItem({
     if (!player) return;
     let viewTimer = null;
     try {
+      try {
+        player.staysActiveInBackground = false;
+      } catch (e) {}
       if (shouldMountPlayer && !isReelsPaused && !activePopupAd) {
         player.play();
         // Record view only after 5 seconds of continuous playback
@@ -387,14 +405,14 @@ export const ReelItem = React.memo(function ReelItem({
 
   return (
     <View style={[styles.reelContainer, { height: reelHeight }]}>
-      {/* Background Media — 3-Layer Seamless Transition (Zero Black Flash) */}
+      {/* Background Media — 3-Layer Seamless Transition (Full Screen, Zero Letterbox, Zero Black Flash) */}
       <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
         {/* Layer 1: Ambient Blurred Backdrop */}
         {activePosterUri ? (
           <Image
             source={{ uri: activePosterUri }}
             style={StyleSheet.absoluteFillObject}
-            blurRadius={32}
+            blurRadius={28}
             opacity={0.35}
             resizeMode="cover"
           />
@@ -405,7 +423,7 @@ export const ReelItem = React.memo(function ReelItem({
           />
         )}
 
-        {/* Layer 2: True Aspect-Ratio Video (Never Cropped or Zoomed in, underneath poster) */}
+        {/* Layer 2: True Fullscreen Edge-to-Edge Video */}
         {shouldMountPlayer && player && (
           Platform.OS === 'web' ? (
             <video
@@ -421,18 +439,19 @@ export const ReelItem = React.memo(function ReelItem({
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'contain',
+                objectFit: 'cover',
                 backgroundColor: 'transparent',
               }}
             />
           ) : (
             <VideoView
               player={player}
-              style={styles.fullscreenVideo}
-              contentFit="contain"
-              surfaceType="textureView"
+              style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+              contentFit="cover"
+              surfaceType="surfaceView"
               useExoShutter={false}
               nativeControls={false}
+              onFirstFrameRender={onFirstFrameRendered}
             />
           )
         )}
@@ -443,12 +462,13 @@ export const ReelItem = React.memo(function ReelItem({
             StyleSheet.absoluteFillObject,
             { opacity: posterOpacity },
           ]}
+          pointerEvents="none"
         >
           {activePosterUri ? (
             <Image
               source={{ uri: activePosterUri }}
-              style={[styles.fullscreenVideo, StyleSheet.absoluteFillObject]}
-              resizeMode="contain"
+              style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+              resizeMode="cover"
             />
           ) : (
             <LinearGradient
@@ -926,7 +946,7 @@ export const ReelsScreen = ({ navigation }) => {
     <View
       style={styles.container}
       onLayout={e => {
-        const h = e.nativeEvent.layout.height;
+        const h = Math.floor(e.nativeEvent.layout.height);
         if (h > 200 && h !== containerHeight) {
           setContainerHeight(h);
         }
@@ -968,7 +988,6 @@ export const ReelsScreen = ({ navigation }) => {
             colors={[colors.primary]}
           />
         }
-        pagingEnabled
         showsVerticalScrollIndicator={false}
         snapToInterval={containerHeight}
         snapToAlignment="start"
@@ -1032,6 +1051,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   fullscreenVideo: {
+    ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
   },
