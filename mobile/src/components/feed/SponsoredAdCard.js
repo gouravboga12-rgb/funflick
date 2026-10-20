@@ -169,15 +169,22 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
     }
   }, [ad.rawAdId, ad.id, recordAdMetric]);
 
+  const hasActionUrl = Boolean(
+    ad.actionUrl &&
+    typeof ad.actionUrl === 'string' &&
+    ad.actionUrl.trim() !== '' &&
+    (ad.actionUrl.startsWith('http://') || ad.actionUrl.startsWith('https://'))
+  );
+
   const handleAction = () => {
+    if (!hasActionUrl) {
+      return;
+    }
     const rawId = ad.rawAdId || ad.id;
     if (rawId) {
       recordAdMetric?.(rawId, 'click');
     }
-    const targetUrl = ad.actionUrl || 'https://funflick.in';
-    if (targetUrl) {
-      Linking.openURL(targetUrl).catch(e => console.warn('Could not open ad URL:', e));
-    }
+    Linking.openURL(ad.actionUrl.trim()).catch(e => console.warn('Could not open ad URL:', e));
   };
 
   const handleTogglePlayPause = () => {
@@ -249,7 +256,7 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
           />
         )}
 
-        {/* Dedicated Tap Layer Covering Entire Screen */}
+        {/* Dedicated Tap Layer Covering Entire Screen for Play/Pause */}
         <TouchableOpacity
           activeOpacity={1}
           onPress={handleTogglePlayPause}
@@ -273,10 +280,12 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
             <Text style={styles.title} numberOfLines={1}>{ad.title || 'Featured Brand'}</Text>
           </View>
 
-          <TouchableOpacity onPress={handleAction} style={styles.learnMoreBtn} activeOpacity={0.85}>
-            <Text style={styles.learnMoreText}>Visit</Text>
-            <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
-          </TouchableOpacity>
+          {hasActionUrl && (
+            <TouchableOpacity onPress={handleAction} style={styles.learnMoreBtn} activeOpacity={0.85}>
+              <Text style={styles.learnMoreText}>Visit</Text>
+              <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Top Right Controls: Mute & Play/Pause */}
@@ -324,28 +333,39 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
 
         {/* Bottom CTA Bar */}
         <View style={styles.bottomCtaWrapper} pointerEvents="box-none">
-          <TouchableOpacity
-            style={styles.bottomCta}
-            onPress={handleAction}
-            activeOpacity={0.9}
-          >
-            <View style={styles.ctaTextContainer}>
-              <Text style={styles.ctaPrompt}>Sponsored Promotion</Text>
-              <Text style={styles.ctaTitle} numberOfLines={1}>
-                {ad.title || 'Tap to learn more'}
-              </Text>
-            </View>
-
-            <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.ctaButton}
+          {hasActionUrl ? (
+            <TouchableOpacity
+              style={styles.bottomCta}
+              onPress={handleAction}
+              activeOpacity={0.9}
             >
-              <Text style={styles.ctaButtonText}>{ad.actionText || 'Visit Now'}</Text>
-              <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
-            </LinearGradient>
-          </TouchableOpacity>
+              <View style={styles.ctaTextContainer}>
+                <Text style={styles.ctaPrompt}>Sponsored Promotion</Text>
+                <Text style={styles.ctaTitle} numberOfLines={1}>
+                  {ad.title || 'Tap to learn more'}
+                </Text>
+              </View>
+
+              <LinearGradient
+                colors={[colors.primary, colors.secondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.ctaButton}
+              >
+                <Text style={styles.ctaButtonText}>{ad.actionText || 'Visit Now'}</Text>
+                <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.bottomCta, { backgroundColor: 'rgba(15, 10, 28, 0.75)' }]}>
+              <View style={styles.ctaTextContainer}>
+                <Text style={styles.ctaPrompt}>Sponsored Promotion</Text>
+                <Text style={styles.ctaTitle} numberOfLines={1}>
+                  {ad.title || 'Featured Brand'}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -373,18 +393,16 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
           </View>
         </View>
 
-        <TouchableOpacity onPress={handleAction} style={styles.learnMoreBtn} activeOpacity={0.85}>
-          <Text style={styles.learnMoreText}>Visit</Text>
-          <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
-        </TouchableOpacity>
+        {hasActionUrl && (
+          <TouchableOpacity onPress={handleAction} style={styles.learnMoreBtn} activeOpacity={0.85}>
+            <Text style={styles.learnMoreText}>Visit</Text>
+            <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Image Media Container */}
-      <TouchableOpacity
-        activeOpacity={0.95}
-        onPress={handleAction}
-        style={[styles.imageMediaWrapper, { height: IMAGE_CARD_HEIGHT }]}
-      >
+      {/* Image Media Container - Normal View so user scroll swiping never triggers accidental link opening */}
+      <View style={[styles.imageMediaWrapper, { height: IMAGE_CARD_HEIGHT }]}>
         <Image
           source={{ uri: validPoster || ad.mediaUrl }}
           style={styles.postImage}
@@ -395,26 +413,30 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
           style={styles.bottomVignette}
           pointerEvents="none"
         />
-      </TouchableOpacity>
+      </View>
 
       {/* Bottom Action Bar */}
       <View style={styles.postFooter}>
         <View style={{ flex: 1, marginRight: 12 }}>
           <Text style={styles.footerTitle} numberOfLines={1}>{ad.title || 'Special Offer'}</Text>
-          <Text style={styles.footerPrompt}>Tap below to check out this offer</Text>
+          <Text style={styles.footerPrompt}>
+            {hasActionUrl ? 'Tap below to check out this offer' : 'Sponsored Brand Promotion'}
+          </Text>
         </View>
 
-        <TouchableOpacity onPress={handleAction} activeOpacity={0.9}>
-          <LinearGradient
-            colors={[colors.primary, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.ctaButton}
-          >
-            <Text style={styles.ctaButtonText}>{ad.actionText || 'Visit Now'}</Text>
-            <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
-          </LinearGradient>
-        </TouchableOpacity>
+        {hasActionUrl && (
+          <TouchableOpacity onPress={handleAction} activeOpacity={0.9}>
+            <LinearGradient
+              colors={[colors.primary, colors.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.ctaButton}
+            >
+              <Text style={styles.ctaButtonText}>{ad.actionText || 'Visit Now'}</Text>
+              <ExternalLink size={12} color="#ffffff" style={{ marginLeft: 4 }} />
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

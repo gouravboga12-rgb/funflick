@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator, Text, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Header } from '../../components/common/Header';
@@ -148,6 +148,10 @@ export const HomeScreen = ({ navigation }) => {
         keyExtractor={item => String(item.id)}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        initialNumToRender={2}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        removeClippedSubviews={Platform.OS === 'android'}
         ListHeaderComponent={
           <StoryBar
             onAddStory={() => navigation.navigate('CreateStory')}

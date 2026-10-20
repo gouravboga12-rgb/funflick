@@ -32,6 +32,7 @@ import {
   ChevronRight,
   Download,
   Flag,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../context/AppContext';
@@ -76,33 +77,56 @@ export const StandardPostCard = ({ post, navigation }) => {
   const [isImageLoading, setIsImageLoading] = useState(true);
   const carouselScrollRef = useRef(null);
 
+  // Reset image error and loading state on FlatList item recycling
+  React.useEffect(() => {
+    setImageError(false);
+    setIsImageLoading(true);
+    setActiveMediaIndex(0);
+  }, [post?.id]);
+
+  // Helper to determine if a URL points to video media (to avoid breaking <Image>)
+  const isVideoUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    return /\.(mp4|webm|mov|m4v|m3u8)($|\?)/i.test(url.trim());
+  };
+
   // Parse media list supporting single URL, JSON array, or comma-separated URLs
   const mediaList = React.useMemo(() => {
     const raw =
       post?.media_urls ||
       post?.media_url ||
       post?.mediaUrl ||
-      post?.video_url ||
-      post?.videoUrl ||
       post?.image_url ||
       post?.imageUrl ||
       post?.posterUrl ||
+      post?.poster_url ||
       post?.thumbnailUrl ||
+      post?.thumbnail_url ||
       post?.thumbnail ||
       '';
-    if (Array.isArray(raw)) return raw.filter(Boolean);
-    if (typeof raw === 'string') {
+    let candidates = [];
+    if (Array.isArray(raw)) candidates = raw.filter(Boolean);
+    else if (typeof raw === 'string') {
       const trimmed = raw.trim();
       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
         try {
           const parsed = JSON.parse(trimmed);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed.filter(Boolean);
+          if (Array.isArray(parsed) && parsed.length > 0) candidates = parsed.filter(Boolean);
         } catch (e) {}
+      } else if (trimmed.includes(',') && !trimmed.startsWith('data:')) {
+        candidates = trimmed.split(',').map(s => s.trim()).filter(Boolean);
+      } else if (trimmed) {
+        candidates = [trimmed];
       }
-      if (trimmed.includes(',') && !trimmed.startsWith('data:')) {
-        return trimmed.split(',').map(s => s.trim()).filter(Boolean);
-      }
-      return [trimmed].filter(Boolean);
+    }
+    // Filter out video files (.mp4 etc) so they don't break React Native <Image>
+    const imageCandidates = candidates.filter(u => typeof u === 'string' && u.trim() && !isVideoUrl(u));
+    if (imageCandidates.length > 0) return imageCandidates;
+
+    // If only video was supplied, fallback to poster/thumbnail if available
+    const fallbackPoster = post?.posterUrl || post?.poster_url || post?.thumbnailUrl || post?.thumbnail_url || post?.thumbnail;
+    if (fallbackPoster && typeof fallbackPoster === 'string' && !isVideoUrl(fallbackPoster)) {
+      return [fallbackPoster.trim()];
     }
     return [];
   }, [post]);
@@ -239,16 +263,16 @@ export const StandardPostCard = ({ post, navigation }) => {
 
   const photoUri =
     (mediaList && mediaList.length > 0 ? mediaList[0] : null) ||
-    post.mediaUrl ||
-    post.media_url ||
-    post.video_url ||
-    post.videoUrl ||
-    post.posterUrl ||
-    post.poster_url ||
-    post.thumbnailUrl ||
-    post.thumbnail_url ||
-    post.thumbnail ||
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80';
+    (!isVideoUrl(post?.mediaUrl) ? post?.mediaUrl : null) ||
+    (!isVideoUrl(post?.media_url) ? post?.media_url : null) ||
+    (!isVideoUrl(post?.imageUrl) ? post?.imageUrl : null) ||
+    (!isVideoUrl(post?.image_url) ? post?.image_url : null) ||
+    (!isVideoUrl(post?.posterUrl) ? post?.posterUrl : null) ||
+    (!isVideoUrl(post?.poster_url) ? post?.poster_url : null) ||
+    (!isVideoUrl(post?.thumbnailUrl) ? post?.thumbnailUrl : null) ||
+    (!isVideoUrl(post?.thumbnail_url) ? post?.thumbnail_url : null) ||
+    (!isVideoUrl(post?.thumbnail) ? post?.thumbnail : null) ||
+    null;
 
   const avatarUri =
     post.creator?.avatar ||
@@ -438,18 +462,14 @@ export const StandardPostCard = ({ post, navigation }) => {
               ))}
             </View>
           </View>
-        ) : (
+        ) : photoUri && !imageError ? (
           <TouchableOpacity
             activeOpacity={1}
             onPress={handlePhotoPress}
             style={{ width: cardWidth || SCREEN_WIDTH, height: cardWidth || SCREEN_WIDTH }}
           >
             <Image
-              source={{
-                uri: imageError
-                  ? 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80'
-                  : (photoUri || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80'),
-              }}
+              source={{ uri: photoUri }}
               style={styles.postImage}
               resizeMode="cover"
               onLoadStart={() => setIsImageLoading(true)}
@@ -465,6 +485,20 @@ export const StandardPostCard = ({ post, navigation }) => {
               </View>
             )}
           </TouchableOpacity>
+        ) : (
+          <View style={[styles.postPlaceholder, { width: cardWidth || SCREEN_WIDTH, height: cardWidth || SCREEN_WIDTH }]}>
+            <LinearGradient
+              colors={['#18122c', '#090514']}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={styles.placeholderContent}>
+              <View style={styles.placeholderIconPill}>
+                <ImageIcon size={32} color="#64748b" />
+              </View>
+              <Text style={styles.placeholderTitle}>Media unavailable</Text>
+              <Text style={styles.placeholderSubtitle}>This post image could not be loaded</Text>
+            </View>
+          </View>
         )}
 
         {/* Category Pill */}
@@ -894,13 +928,46 @@ const styles = StyleSheet.create({
   postImage: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#18122c',
+    backgroundColor: '#090514',
+  },
+  postPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#090514',
+  },
+  placeholderContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  placeholderIconPill: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  placeholderTitle: {
+    color: '#cbd5e1',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  placeholderSubtitle: {
+    color: '#64748b',
+    fontSize: 12,
   },
   imageLoaderCenter: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(24, 18, 44, 0.45)',
+    backgroundColor: 'rgba(9, 5, 20, 0.45)',
   },
   carouselWrap: {
     width: '100%',
