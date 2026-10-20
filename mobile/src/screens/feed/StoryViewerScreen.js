@@ -95,9 +95,10 @@ function StoryVideo({ mediaUrl, isPaused }) {
   return (
     <VideoView
       player={player}
-      style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+      style={StyleSheet.absoluteFillObject}
       contentFit="contain"
       surfaceType="surfaceView"
+      useExoShutter={true}
       nativeControls={false}
       pointerEvents="none"
     />

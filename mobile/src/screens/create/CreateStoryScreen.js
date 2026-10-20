@@ -130,6 +130,7 @@ function StoryVideoPreview({ videoUri }) {
       style={styles.fullMedia}
       contentFit="cover"
       surfaceType="surfaceView"
+      useExoShutter={true}
       nativeControls={false}
     />
   );

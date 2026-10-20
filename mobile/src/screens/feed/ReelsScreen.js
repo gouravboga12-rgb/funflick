@@ -412,7 +412,7 @@ export const ReelItem = React.memo(function ReelItem({
   return (
     <View style={[styles.reelContainer, { height: reelHeight }]}>
       {/* Background Media — 3-Layer Seamless Transition (Instagram-Style Contain + Ambient Blurred Backdrop) */}
-      <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }]}>
+      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
         {/* Layer 1: Ambient Blurred Backdrop */}
         {activePosterUri ? (
           <Image
@@ -452,9 +452,10 @@ export const ReelItem = React.memo(function ReelItem({
           ) : (
             <VideoView
               player={player}
-              style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+              style={StyleSheet.absoluteFillObject}
               contentFit="contain"
               surfaceType="surfaceView"
+              useExoShutter={true}
               nativeControls={false}
               onFirstFrameRender={onFirstFrameRendered}
             />
@@ -465,14 +466,14 @@ export const ReelItem = React.memo(function ReelItem({
         <Animated.View
           style={[
             StyleSheet.absoluteFillObject,
-            { opacity: posterOpacity, justifyContent: 'center', alignItems: 'center' },
+            { opacity: posterOpacity },
           ]}
           pointerEvents="none"
         >
           {activePosterUri ? (
             <Image
               source={{ uri: activePosterUri }}
-              style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+              style={StyleSheet.absoluteFillObject}
               resizeMode="contain"
             />
           ) : (
@@ -1050,9 +1051,6 @@ const styles = StyleSheet.create({
     width: WINDOW_WIDTH,
     backgroundColor: '#000000',
     position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
   },
   mediaTouch: {
     width: '100%',

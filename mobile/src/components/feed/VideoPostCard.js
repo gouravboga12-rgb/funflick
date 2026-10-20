@@ -45,7 +45,6 @@ export const VideoPostCard = React.memo(function VideoPostCard({ post, isActive 
         backgroundColor: '#000000',
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(255,255,255,0.06)',
-        overflow: 'hidden',
       }}
     >
       <ReelItem

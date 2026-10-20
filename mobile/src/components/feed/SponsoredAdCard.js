@@ -230,9 +230,10 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
           ) : (
             <VideoView
               player={player}
-              style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+              style={StyleSheet.absoluteFillObject}
               contentFit="contain"
               surfaceType="surfaceView"
+              useExoShutter={true}
               nativeControls={false}
             />
           )
@@ -426,9 +427,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
     position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
   },
   fullscreenVideo: {
     width: '100%',

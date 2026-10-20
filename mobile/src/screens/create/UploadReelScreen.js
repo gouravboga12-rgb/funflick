@@ -136,6 +136,8 @@ function ReelPreview({ videoUri, isMuted }) {
       player={player}
       style={styles.previewVideo}
       contentFit="cover"
+      surfaceType="surfaceView"
+      useExoShutter={true}
       nativeControls={false}
     />
   );
