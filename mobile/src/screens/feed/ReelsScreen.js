@@ -181,7 +181,7 @@ export const ReelItem = React.memo(function ReelItem({
   const activePosterUri = validPoster || generatedThumbnail;
 
   // Monitor app lifecycle: immediately pause video/audio when app is minimized or backgrounded
-  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+  const [isAppActive, setIsAppActive] = useState(true);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', nextState => {
@@ -245,9 +245,15 @@ export const ReelItem = React.memo(function ReelItem({
       }
     }) : null;
 
+    // Guaranteed fallback: fade out poster after 350ms so video is never blocked by a stuck poster
+    const fallbackTimer = setTimeout(() => {
+      onFirstFrameRendered();
+    }, 350);
+
     return () => {
       timeSub?.remove?.();
       playSub?.remove?.();
+      clearTimeout(fallbackTimer);
     };
   }, [player, onFirstFrameRendered]);
 
@@ -448,8 +454,7 @@ export const ReelItem = React.memo(function ReelItem({
               player={player}
               style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
               contentFit="contain"
-              surfaceType="textureView"
-              useExoShutter={false}
+              surfaceType="surfaceView"
               nativeControls={false}
               onFirstFrameRender={onFirstFrameRendered}
             />

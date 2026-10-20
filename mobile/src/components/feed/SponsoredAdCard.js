@@ -232,8 +232,7 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
               player={player}
               style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
               contentFit="contain"
-              surfaceType="textureView"
-              useExoShutter={false}
+              surfaceType="surfaceView"
               nativeControls={false}
             />
           )
