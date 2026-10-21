@@ -4,7 +4,7 @@
 **Current Version:** `1.0.16` (versionCode `17`)  
 **Previous Version:** `1.0.15` (versionCode `16`) — superseded, do not upload  
 **Active Git Branch:** `main`  
-**EAS Build URL (v1.0.16):** _See the latest build on the EAS dashboard: [https://expo.dev/accounts/gouravboga64/projects/funflick/builds](https://expo.dev/accounts/gouravboga64/projects/funflick/builds)_
+**EAS Build URL (v1.0.16):** [https://expo.dev/accounts/gouravboga64/projects/funflick/builds/15365b31-11c5-4dea-9f00-88c7b8e4a5be](https://expo.dev/accounts/gouravboga64/projects/funflick/builds/15365b31-11c5-4dea-9f00-88c7b8e4a5be)
 
 ---
 
