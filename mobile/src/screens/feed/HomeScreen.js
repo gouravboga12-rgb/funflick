@@ -239,8 +239,11 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   cardWrapper: {
+    width: '100%',
     paddingHorizontal: 0,
     paddingTop: 0,
+    backgroundColor: '#090514',
+    overflow: 'hidden',
   },
   emptyContainer: {
     paddingVertical: 60,

@@ -131,7 +131,7 @@ export const SubmitAdRequestModal = ({ isOpen, onClose }) => {
         adType,
         mediaUrl: uploadedUrl,
         thumbnailUrl: uploadedUrl,
-        actionUrl: actionUrl.trim() || 'https://funflick.in',
+        actionUrl: actionUrl.trim() || null,
         actionText: actionText.trim() || 'Learn More'
       });
 

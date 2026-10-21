@@ -412,8 +412,8 @@ export const ReelItem = React.memo(function ReelItem({
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#090514' }]} />
       )}
 
-      {/* Layer 2: True Aspect-Ratio Edge-to-Edge Video — Always mounted when player exists (matching working SponsoredAdCard) */}
-      {player && (
+      {/* Layer 2: True Aspect-Ratio Edge-to-Edge Video — Mounted strictly when active & focused to eliminate SurfaceView hardware leaks */}
+      {player && isActive && isScreenFocused && (
         Platform.OS === 'web' ? (
           <video
             ref={webVideoRef}
@@ -444,8 +444,8 @@ export const ReelItem = React.memo(function ReelItem({
         )
       )}
 
-      {/* Layer 3: Poster Image — ONLY visible while video frame is decoding/buffering, then completely unmounted */}
-      {(!isVideoReady || !shouldPlay) && activePosterUri && (
+      {/* Layer 3: Poster Image — Visible while video frame is decoding/buffering or when reel is not actively playing */}
+      {(!isVideoReady || !shouldPlay || !isActive) && activePosterUri && (
         <Image
           source={{ uri: activePosterUri }}
           style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}

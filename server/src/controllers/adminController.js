@@ -847,7 +847,7 @@ export async function getAdminAds(req, res) {
       frequency: (r.frequency === 'Pop-up Ads' || r.frequency === 'On App Open' || r.frequency === 'Once per session') 
         ? 'Pop-up Ads' 
         : 'After 5 Reels',
-      actionUrl: r.action_url || 'https://funflick.in',
+      actionUrl: (r.action_url && r.action_url.trim() && r.action_url.trim() !== 'https://funflick.in' && r.action_url.trim() !== 'https://www.funflick.in') ? r.action_url.trim() : null,
       actionText: r.action_text || 'Learn More',
       impressions: Number(r.impressions) || 0,
       clicks: Number(r.clicks) || 0
@@ -1129,7 +1129,7 @@ export async function createAdRequest(req, res) {
       adType = 'video',
       mediaUrl,
       thumbnailUrl = null,
-      actionUrl = 'https://funflick.in',
+      actionUrl = null,
       actionText = 'Learn More'
     } = req.body;
 
@@ -1241,7 +1241,7 @@ export async function getAdminAdRequests(req, res) {
       adType: r.ad_type || 'video',
       mediaUrl: r.media_url,
       thumbnailUrl: r.thumbnail_url || r.media_url,
-      actionUrl: r.action_url || 'https://funflick.in',
+      actionUrl: (r.action_url && r.action_url.trim() && r.action_url.trim() !== 'https://funflick.in' && r.action_url.trim() !== 'https://www.funflick.in') ? r.action_url.trim() : null,
       actionText: r.action_text || 'Learn More',
       status: r.status || 'Pending',
       adminNotes: r.admin_notes || '',
@@ -1301,7 +1301,7 @@ export async function approveAdminAdRequest(req, res) {
         startDate,
         endDate,
         normalizedFrequency,
-        request.action_url || 'https://funflick.in',
+        (request.action_url && request.action_url.trim() && request.action_url.trim() !== 'https://funflick.in' && request.action_url.trim() !== 'https://www.funflick.in') ? request.action_url.trim() : null,
         request.action_text || 'Learn More'
       ]
     );

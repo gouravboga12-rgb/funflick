@@ -1,9 +1,10 @@
 # FunFlick Mobile App - Project Handover & Status Report
 
-**Date:** October 21, 2026 (Night Handover)  
-**Current Version:** `1.0.15` (versionCode `16`)  
-**Active Git Branch:** `main` (Latest Commit: `d591f56`)  
-**EAS Build URL:** [https://expo.dev/accounts/gouravboga64/projects/funflick/builds/9d24d9fc-f52b-404f-af45-3670ca7611c6](https://expo.dev/accounts/gouravboga64/projects/funflick/builds/9d24d9fc-f52b-404f-af45-3670ca7611c6)
+**Date:** October 21, 2026 (Morning Update)  
+**Current Version:** `1.0.16` (versionCode `17`)  
+**Previous Version:** `1.0.15` (versionCode `16`) — superseded, do not upload  
+**Active Git Branch:** `main`  
+**EAS Build URL (v1.0.16):** _See the latest build on the EAS dashboard: [https://expo.dev/accounts/gouravboga64/projects/funflick/builds](https://expo.dev/accounts/gouravboga64/projects/funflick/builds)_
 
 ---
 
@@ -60,6 +61,51 @@ This document details all root causes, fixes, and architectural notes for three 
 
 ---
 
+## 2b. v1.0.16 Update (October 21, 2026 — Morning)
+
+### Issue 4: Previous Video Visible Behind Photo Posts
+
+#### The Symptoms
+- On the Home feed, some photo posts showed a blurred/full image behind the card (in the 12px side gaps and above/below the card), along with the `♫ Original Audio • @username  More` overlay at the top.
+- It only happened on photo posts located directly after a video post. Photo posts surrounded by other photos looked clean.
+
+#### The Root Cause
+1. The "background image" was actually the **previous video post** in the feed (e.g. Krishna's quote post `id 126` showed video `id 127` behind it).
+2. Android `VideoView` uses `surfaceType="surfaceView"` (required — see Section 3). A `SurfaceView` renders on a separate hardware layer behind the app window and punches a hole through the UI. **Android does not clip it to FlatList item bounds.**
+3. When the user scrolled past a video, it was paused but its `VideoView` **stayed mounted** (FlatList `windowSize={3}` keeps neighbours alive), so its surface stayed active.
+4. `StandardPostCard` has `marginHorizontal: 12` / `marginBottom: 16` and rounded corners, leaving transparent gaps through which the lingering surface showed.
+
+#### The Fixes Applied
+- **`mobile/src/screens/feed/ReelsScreen.js` (`ReelItem`, also used by `VideoPostCard`):** `VideoView` is now mounted **only** when `isActive && isScreenFocused`. Inactive items show the poster thumbnail. The `useVideoPlayer` instance stays alive, so buffering and resume are unaffected.
+- **`mobile/src/components/feed/SponsoredAdCard.js`:** Same rule for video ads — `VideoView` mounted only when `isActive`.
+- **`mobile/src/components/feed/VideoPostCard.js`:** Added `overflow: 'hidden'` so overlays never spill into neighbouring items.
+- **`mobile/src/screens/feed/HomeScreen.js`:** `cardWrapper` is now full width, opaque (`#090514`) and `overflow: 'hidden'`.
+
+> **Rule for future developers:** With `surfaceType="surfaceView"`, never leave an inactive `VideoView` mounted inside a scrolling list. Mount it only for the active item.
+
+---
+
+### Issue 5: Ads Without a Link Still Opening `funflick.in` (Backend Root Cause)
+
+#### The Root Cause
+The v1.0.15 mobile fix removed the client-side fallback, but the **backend** was still injecting it:
+- `server/src/controllers/adminController.js` returned `actionUrl: r.action_url || 'https://funflick.in'` in `getAdminAds` (public `GET /api/ads`) and in the user ad-requests listing.
+- `approveAdRequest` saved `request.action_url || 'https://funflick.in'` into `platform_ads`.
+- `createAdRequest` defaulted `actionUrl = 'https://funflick.in'`.
+- Both ad request forms (mobile `SubmitAdRequestModal.js`, web `SubmitAdRequestModal.jsx`) also sent `'https://funflick.in'` when the field was empty.
+
+So the app always received a "valid" URL and showed the Visit/CTA button.
+
+#### The Fixes Applied
+- **Backend (`adminController.js`):** All 4 fallbacks removed. Empty links — and legacy rows already stored as `https://funflick.in` / `https://www.funflick.in` — are returned/stored as `null`.
+- **Mobile & web ad request forms:** Send `null` instead of `funflick.in` when no link is entered.
+- **Mobile `SponsoredAdCard.js`:** `hasActionUrl` additionally rejects `funflick.in` variants as a safety net, so even before the backend is deployed, those ads render as pure brand sponsorships with no button and no redirect.
+
+> [!IMPORTANT]
+> The backend change must be **deployed to the production server** (EC2) and the Node process restarted for the server-side part to take effect.
+
+---
+
 ## 3. Reference Note: Previous Black/Blank Screen Issue
 *(Keep this for future developers or team reference)*
 
@@ -92,13 +138,17 @@ Set all `VideoView` components to:
 ## 5. How to Resume in the Morning
 
 1. **Check EAS Build Status:**
-   - Visit the build page: [https://expo.dev/accounts/gouravboga64/projects/funflick/builds/9d24d9fc-f52b-404f-af45-3670ca7611c6](https://expo.dev/accounts/gouravboga64/projects/funflick/builds/9d24d9fc-f52b-404f-af45-3670ca7611c6)
-   - When finished, download the `.aab` file.
+   - Visit the builds page: [https://expo.dev/accounts/gouravboga64/projects/funflick/builds](https://expo.dev/accounts/gouravboga64/projects/funflick/builds)
+   - When the `1.0.16 (17)` build finishes, download the `.aab` file.
 2. **Upload to Google Play Console:**
    - Go to Google Play Console -> FunFlick -> Production / Closed Testing.
-   - Create a new release with the downloaded `.aab` (version `1.0.15`, versionCode `16`).
+   - Create a new release with the downloaded `.aab` (version `1.0.16`, versionCode `17`).
    - The signing key will match automatically because local keystore `ddb4f68bf737f6f9e87a3f93b2c272f8` was used.
-3. **Device Verification Checklist:**
+3. **Deploy Backend:** Pull latest `main` on the server and restart the Node API so `adminController.js` changes go live.
+4. **Device Verification Checklist:**
    - [ ] Scroll past 10+ feed items and reels: app should never exit or launch Play Store.
    - [ ] View an ad that has no redirect link: verify no redirect occurs and no "Visit" button is shown.
    - [ ] Check standard image posts: verify no stock dog photos appear, and missing media shows the clean dark placeholder.
+   - [ ] Scroll video → photo → video on Home: photo cards must have clean dark edges, with no previous video visible behind them.
+   - [ ] Swipe through the Videos tab: playback starts normally (a brief poster flash before the first frame is expected).
+   - [ ] Video ads in feed play when active and show poster when scrolled away.

@@ -169,15 +169,26 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
     }
   }, [ad.rawAdId, ad.id, recordAdMetric]);
 
-  const hasActionUrl = Boolean(
-    ad.actionUrl &&
-    typeof ad.actionUrl === 'string' &&
-    ad.actionUrl.trim() !== '' &&
-    (ad.actionUrl.startsWith('http://') || ad.actionUrl.startsWith('https://'))
-  );
+  const hasActionUrl = React.useMemo(() => {
+    if (!ad?.actionUrl || typeof ad.actionUrl !== 'string') return false;
+    const trimmed = ad.actionUrl.trim();
+    if (!trimmed) return false;
+    // Exclude default placeholder fallbacks
+    if (
+      trimmed === 'https://funflick.in' ||
+      trimmed === 'https://funflick.in/' ||
+      trimmed === 'https://www.funflick.in' ||
+      trimmed === 'https://www.funflick.in/' ||
+      trimmed === 'http://funflick.in' ||
+      trimmed === 'http://funflick.in/'
+    ) {
+      return false;
+    }
+    return trimmed.startsWith('http://') || trimmed.startsWith('https://');
+  }, [ad?.actionUrl]);
 
   const handleAction = () => {
-    if (!hasActionUrl) {
+    if (!hasActionUrl || !ad?.actionUrl) {
       return;
     }
     const rawId = ad.rawAdId || ad.id;
@@ -215,8 +226,8 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
           <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#090514' }]} />
         )}
 
-        {/* Layer 2: True Aspect-Ratio VideoView */}
-        {player && (
+        {/* Layer 2: True Aspect-Ratio VideoView — Mounted only when active to avoid SurfaceView hardware leak */}
+        {player && isActive && (
           Platform.OS === 'web' ? (
             <video
               ref={webVideoRef}
@@ -248,7 +259,7 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
         )}
 
         {/* Persistent Poster Image until first video frame is decoded & ready to play */}
-        {(!isVideoReady || !player) && validPoster && (
+        {(!isVideoReady || !player || !isActive) && validPoster && (
           <Image
             source={{ uri: validPoster }}
             style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
