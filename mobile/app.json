@@ -11,13 +11,15 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.funflick.app",
+      "buildNumber": "18",
       "associatedDomains": [
         "applinks:funflick.in",
         "applinks:www.funflick.in"
       ],
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "FunFlick requires access to your photo and video gallery so you can upload viral reels, posts, and stories.",
-        "NSCameraUsageDescription": "FunFlick requires camera access so you can record videos and snap photos directly within the app."
+        "NSCameraUsageDescription": "FunFlick requires camera access so you can record videos and snap photos directly within the app.",
+        "NSMicrophoneUsageDescription": "FunFlick requires microphone access to record audio for your reels, stories, and videos."
       }
     },
     "android": {

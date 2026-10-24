@@ -26,6 +26,10 @@ export async function getUploadUrl(req, res) {
 /**
  * Proxy download media to ensure browser downloads the real uploaded file directly
  * with proper Content-Disposition: attachment header.
+ *
+ * SECURITY: Only files from the configured S3 bucket are allowed.
+ * The previous `url.startsWith('http')` check was an SSRF vulnerability
+ * that could expose AWS EC2 IAM credentials via the instance metadata endpoint.
  */
 export async function downloadMedia(req, res) {
   try {
@@ -34,10 +38,13 @@ export async function downloadMedia(req, res) {
       return res.status(400).json({ error: 'url parameter is required' });
     }
 
-    // Security check: Only allow downloading from the configured AWS S3 media bucket or safe http origins
+    // SECURITY: Strict allowlist — only our S3 bucket domain is permitted.
+    // Never use `url.startsWith('http')` — that would allow SSRF attacks.
     const bucket = process.env.S3_MEDIA_BUCKET || 'funflick-media-storage-live';
-    const isAllowed = url.includes(bucket) || url.startsWith('http');
-    if (!isAllowed) {
+    const region = process.env.AWS_REGION || 'ap-south-2';
+    const allowedOrigin = `https://${bucket}.s3.${region}.amazonaws.com/`;
+
+    if (!url.startsWith(allowedOrigin)) {
       return res.status(403).json({ error: 'Unauthorized media source' });
     }
 
@@ -52,10 +59,13 @@ export async function downloadMedia(req, res) {
     res.setHeader('Content-Disposition', `attachment; filename="${cleanFilename}"`);
     res.setHeader('Content-Type', contentType);
 
-    const arrayBuffer = await response.arrayBuffer();
-    return res.send(Buffer.from(arrayBuffer));
+    // PERFORMANCE: Stream the response — never load entire video into Node.js RAM.
+    // Previously used response.arrayBuffer() which would OOM-crash on large videos.
+    const { Readable } = await import('stream');
+    Readable.fromWeb(response.body).pipe(res);
   } catch (err) {
     console.error('Download media proxy error:', err);
     return res.status(500).json({ error: 'Download failed' });
   }
 }
+
