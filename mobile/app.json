@@ -91,6 +91,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-apple-authentication",
       "expo-video",
       "expo-web-browser",
       "expo-secure-store",

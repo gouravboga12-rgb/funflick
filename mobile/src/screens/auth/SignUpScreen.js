@@ -17,9 +17,11 @@ import { UserPlus, User, Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle2, X } f
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { startGoogleOAuth } from '../../services/googleAuth';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { startAppleAuth } from '../../services/appleAuth';
 
 export default function SignUpScreen({ route, navigation }) {
-  const { register } = useApp();
+  const { register, hydrateOAuthSession } = useApp();
   const initialEmail = route?.params?.initialEmail || '';
   const incomingProfile = route?.params?.googleProfile;
 
@@ -32,8 +34,9 @@ export default function SignUpScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Google Sign-Up state
+  // Google & Apple Sign-Up state
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [isGoogleVerified, setIsGoogleVerified] = useState(Boolean(initialEmail || incomingProfile?.email));
 
   useEffect(() => {
@@ -85,6 +88,39 @@ export default function SignUpScreen({ route, navigation }) {
       Alert.alert('Google Sign-Up Error', err.message || 'Failed to authenticate with Google');
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleSignUpWithApple = async () => {
+    setAppleLoading(true);
+    setErrorMessage('');
+
+    try {
+      const result = await startAppleAuth();
+
+      if (result.type === 'cancelled') {
+        return;
+      }
+
+      if (result.type === 'success' && result.token && result.user) {
+        await hydrateOAuthSession(result.token, result.user);
+        Alert.alert('Welcome to FunFlick!', `Account created successfully as @${result.user.username}`);
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          navigation.replace('MainTabs');
+        }
+        return;
+      }
+
+      if (result.type === 'error') {
+        setErrorMessage(result.error || 'Failed to authenticate with Apple');
+      }
+    } catch (err) {
+      console.error('Apple sign-up error:', err);
+      setErrorMessage(err.message || 'Failed to authenticate with Apple');
+    } finally {
+      setAppleLoading(false);
     }
   };
 
@@ -163,6 +199,19 @@ export default function SignUpScreen({ route, navigation }) {
         ) : null}
 
         <View style={styles.formArea}>
+          {/* Sign in with Apple Button (iOS Only - Guideline 4.8) */}
+          {Platform.OS === 'ios' && (
+            <View style={{ marginBottom: 12, width: '100%' }}>
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={14}
+                style={{ width: '100%', height: 48 }}
+                onPress={handleSignUpWithApple}
+              />
+            </View>
+          )}
+
           {/* Sign Up with Google Button */}
           <TouchableOpacity
             style={styles.googleBtn}

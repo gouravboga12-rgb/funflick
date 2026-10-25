@@ -1337,4 +1337,139 @@ export async function getAdminMe(req, res) {
   }
 }
 
+/**
+ * Sign in with Apple Handler
+ * Handles both login and auto-registration from iOS devices
+ */
+export async function appleLogin(req, res) {
+  try {
+    const { identityToken, appleUserId, fullName, email: clientEmail } = req.body;
+
+    if (!identityToken && !appleUserId) {
+      return res.status(400).json({ error: 'Apple authentication credentials are required' });
+    }
+
+    let appleSub = appleUserId;
+    let appleEmail = clientEmail;
+
+    if (identityToken) {
+      try {
+        const decoded = jwt.decode(identityToken);
+        if (decoded) {
+          if (decoded.sub) appleSub = decoded.sub;
+          if (decoded.email) appleEmail = decoded.email;
+        }
+      } catch (e) {
+        console.warn('Failed to decode Apple identityToken:', e);
+      }
+    }
+
+    if (!appleSub) {
+      return res.status(400).json({ error: 'Invalid Apple identity token: missing sub' });
+    }
+
+    const cleanEmail = appleEmail ? appleEmail.trim().toLowerCase() : null;
+
+    // 1. Look up user by apple_id
+    let [users] = await pool.query(
+      'SELECT * FROM users WHERE apple_id = ? LIMIT 1',
+      [appleSub]
+    );
+
+    // 2. If not found by apple_id, look up by email (if email is known)
+    if (users.length === 0 && cleanEmail) {
+      [users] = await pool.query(
+        'SELECT * FROM users WHERE email = ? LIMIT 1',
+        [cleanEmail]
+      );
+      if (users.length > 0) {
+        // Link apple_id to this existing user account
+        await pool.query('UPDATE users SET apple_id = ? WHERE id = ?', [appleSub, users[0].id]);
+        users[0].apple_id = appleSub;
+      }
+    }
+
+    let user = users[0];
+
+    // 3. If user still does not exist, automatically register a new user
+    if (!user) {
+      const givenName = fullName?.givenName || '';
+      const familyName = fullName?.familyName || '';
+      const derivedName = [givenName, familyName].filter(Boolean).join(' ').trim() || (cleanEmail ? cleanEmail.split('@')[0] : 'Apple User');
+
+      // Generate a unique username: e.g. apple_user_xxxx
+      const baseHandle = cleanEmail 
+        ? cleanEmail.split('@')[0].replace(/[^a-z0-9_]/g, '').slice(0, 15)
+        : 'apple_user';
+      let uniqueUsername = `${baseHandle}_${Math.floor(1000 + Math.random() * 9000)}`;
+
+      // Double check username uniqueness
+      const [existingUser] = await pool.query('SELECT id FROM users WHERE username = ? LIMIT 1', [uniqueUsername]);
+      if (existingUser.length > 0) {
+        uniqueUsername = `user_${Date.now().toString().slice(-6)}`;
+      }
+
+      const randomPassword = await bcrypt.hash(`Apple_${appleSub.slice(-8)}_${Date.now()}`, 10);
+      const userEmail = cleanEmail || `${appleSub}@privaterelay.appleid.com`;
+      const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80';
+
+      const [insertResult] = await pool.query(
+        `INSERT INTO users (name, username, email, apple_id, password_hash, avatar_url, role)
+         VALUES (?, ?, ?, ?, ?, ?, 'user')`,
+        [derivedName, uniqueUsername, userEmail, appleSub, randomPassword, defaultAvatar]
+      );
+
+      const [newRows] = await pool.query('SELECT * FROM users WHERE id = ? LIMIT 1', [insertResult.insertId]);
+      user = newRows[0];
+    }
+
+    // Check account suspension status
+    if (user.status === 'Suspended') {
+      if (user.suspended_until && new Date(user.suspended_until) <= new Date()) {
+        await pool.query('UPDATE users SET status = "Active", suspended_until = NULL, suspension_reason = NULL WHERE id = ?', [user.id]);
+        user.status = 'Active';
+      } else {
+        const endStr = user.suspended_until 
+          ? `until ${new Date(user.suspended_until).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` 
+          : 'permanently';
+        return res.status(403).json({
+          error: `Your account has been suspended ${endStr}. Reason: ${user.suspension_reason || 'Violation of FunFlick community guidelines'}.`,
+          isSuspended: true,
+          suspendedUntil: user.suspended_until
+        });
+      }
+    }
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'funflick_secret',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    return res.json({
+      message: 'Apple authentication successful',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        avatar: user.avatar_url || '/brand/default-avatar.svg',
+        avatar_url: user.avatar_url || '/brand/default-avatar.svg',
+        bio: user.bio,
+        role: user.role,
+        isInfluencer: Boolean(user.is_influencer),
+        is_influencer: Boolean(user.is_influencer),
+        subscriptionExpiresAt: user.subscription_expires_at,
+        subscription_expires_at: user.subscription_expires_at,
+      },
+    });
+  } catch (err) {
+    console.error('Apple login error:', err);
+    return res.status(500).json({ error: 'Server error during Apple authentication' });
+  }
+}
+
+
 

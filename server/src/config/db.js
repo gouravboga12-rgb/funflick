@@ -26,6 +26,7 @@ export async function initDatabase() {
         name VARCHAR(100) NOT NULL,
         username VARCHAR(50) NOT NULL UNIQUE,
         email VARCHAR(120) NOT NULL,
+        apple_id VARCHAR(255) DEFAULT NULL,
         phone VARCHAR(20) DEFAULT NULL,
         password_hash VARCHAR(255) NOT NULL,
         avatar_url TEXT DEFAULT NULL,
@@ -33,6 +34,7 @@ export async function initDatabase() {
         role ENUM('user', 'creator', 'admin', 'moderator') DEFAULT 'user',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_email (email),
+        INDEX idx_apple_id (apple_id),
         INDEX idx_phone (phone)
       ) ENGINE=InnoDB;
     `);
@@ -42,6 +44,16 @@ export async function initDatabase() {
       await connection.query(`
         ALTER TABLE users MODIFY COLUMN role ENUM('user', 'creator', 'admin', 'moderator') DEFAULT 'user'
       `);
+    } catch (err) {}
+
+    // Migration helper: add apple_id column if not present
+    try {
+      const [appleRows] = await connection.query(`
+        SHOW COLUMNS FROM users LIKE 'apple_id'
+      `);
+      if (appleRows.length === 0) {
+        await connection.query(`ALTER TABLE users ADD COLUMN apple_id VARCHAR(255) DEFAULT NULL AFTER email, ADD INDEX idx_apple_id (apple_id)`);
+      }
     } catch (err) {}
 
     // Migration helper: add phone column if not present

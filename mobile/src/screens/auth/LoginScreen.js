@@ -18,6 +18,8 @@ import { LogIn, Lock, User, Eye, EyeOff, ArrowLeft, Mail, X } from 'lucide-react
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { startGoogleOAuth } from '../../services/googleAuth';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { startAppleAuth } from '../../services/appleAuth';
 
 export default function LoginScreen({ navigation }) {
   const { login, hydrateOAuthSession, selectGoogleAccount, selectAccount } = useApp();
@@ -33,6 +35,7 @@ export default function LoginScreen({ navigation }) {
   const [savedPasswordForChoice, setSavedPasswordForChoice] = useState('');
   const [googleEmail, setGoogleEmail] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [accountChoices, setAccountChoices] = useState(null);
 
   const handleLogin = async () => {
@@ -134,6 +137,39 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
+  const handleContinueWithApple = async () => {
+    setAppleLoading(true);
+    setErrorMessage('');
+
+    try {
+      const result = await startAppleAuth();
+
+      if (result.type === 'cancelled') {
+        return;
+      }
+
+      if (result.type === 'success' && result.token && result.user) {
+        await hydrateOAuthSession(result.token, result.user);
+        Alert.alert('Welcome Back!', `Signed in successfully as @${result.user.username}`);
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          navigation.replace('MainTabs');
+        }
+        return;
+      }
+
+      if (result.type === 'error') {
+        setErrorMessage(result.error || 'Failed to authenticate with Apple');
+      }
+    } catch (err) {
+      console.error('Apple login error:', err);
+      setErrorMessage(err.message || 'Failed to authenticate with Apple');
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
   const handleSelectAccount = async (account) => {
     setGoogleLoading(true);
     try {
@@ -193,6 +229,19 @@ export default function LoginScreen({ navigation }) {
         ) : null}
 
         <View style={styles.formArea}>
+          {/* Sign in with Apple Button (iOS Only - Guideline 4.8) */}
+          {Platform.OS === 'ios' && (
+            <View style={{ marginBottom: 12, width: '100%' }}>
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={14}
+                style={{ width: '100%', height: 48 }}
+                onPress={handleContinueWithApple}
+              />
+            </View>
+          )}
+
           {/* Continue with Google Button */}
           <TouchableOpacity
             style={styles.googleBtn}

@@ -18,7 +18,8 @@ import {
   updateUserProfile,
   deleteAccount,
   adminLogin,
-  getAdminMe
+  getAdminMe,
+  appleLogin
 } from '../controllers/authController.js';
 import { authenticateToken } from '../middlewares/authMiddleware.js';
 
@@ -51,6 +52,10 @@ router.post('/google', googleLogin);
 router.post('/google-login', googleLogin);
 router.post('/google-select-account', googleSelectAccount);
 router.post('/google-signup-complete', googleSignupComplete);
+
+// Apple Sign In (iOS native authentication)
+router.post('/apple', appleLogin);
+router.post('/apple-login', appleLogin);
 
 // Protected session check
 router.get('/me', authenticateToken, getCurrentUser);
