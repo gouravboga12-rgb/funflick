@@ -9,12 +9,10 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#07040d",
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "com.funflick.app",
       "buildNumber": "18",
       "associatedDomains": [
-        "applinks:funflick.in",
-        "applinks:www.funflick.in",
         "applinks:funflick.in",
         "applinks:www.funflick.in"
       ],
