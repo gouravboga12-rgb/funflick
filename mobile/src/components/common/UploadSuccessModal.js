@@ -108,7 +108,7 @@ export const UploadSuccessModal = ({
               style={styles.ctaButton}
             >
               <Crown size={18} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={styles.ctaButtonText}>Unlock Creator Payouts</Text>
+              <Text style={styles.ctaButtonText}>Activate Free Influencer Pass (₹0)</Text>
               <ArrowRight size={16} color="#fff" style={{ marginLeft: 6 }} />
             </LinearGradient>
           </TouchableOpacity>

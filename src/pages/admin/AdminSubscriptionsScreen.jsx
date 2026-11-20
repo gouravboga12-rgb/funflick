@@ -212,8 +212,8 @@ export const AdminSubscriptionsScreen = () => {
       showToast('Plan name is required', 'error');
       return;
     }
-    if (Number(editingPlan.price) <= 0) {
-      showToast('Price must be greater than 0', 'error');
+    if (Number(editingPlan.price) < 0 || isNaN(Number(editingPlan.price))) {
+      showToast('Price cannot be negative', 'error');
       return;
     }
 
@@ -838,10 +838,10 @@ export const AdminSubscriptionsScreen = () => {
                         <input
                           type="number"
                           required
-                          min="1"
+                          min="0"
                           value={editingPlan.price}
                           onChange={e => setEditingPlan({ ...editingPlan, price: Number(e.target.value) })}
-                          placeholder="199"
+                          placeholder="0"
                           className="w-full bg-[#1b1338] border border-white/10 rounded-xl pl-7 pr-3 py-2 text-xs text-white font-bold font-heading focus:outline-none focus:border-pink-500"
                         />
                       </div>

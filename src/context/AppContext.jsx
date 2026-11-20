@@ -38,7 +38,7 @@ export const AppProvider = ({ children }) => {
     bio: '',
     role: 'user',
     isInfluencer: false,
-    hasPublishingSubscription: true,
+    hasPublishingSubscription: false,
     accountStatus: 'User',
     subscriptionPlan: null,
     stats: { posts: 0, following: 0, followers: '0' },
@@ -115,7 +115,7 @@ export const AppProvider = ({ children }) => {
               ...data.user,
               avatar: validAvatar,
               avatar_url: validAvatar,
-              hasPublishingSubscription: true
+              hasPublishingSubscription: Boolean(data.user.is_influencer || data.user.isInfluencer || data.user.hasPublishingSubscription)
             };
           });
           if (data.user.role === 'admin') {
@@ -187,7 +187,7 @@ export const AppProvider = ({ children }) => {
       bio: '',
       role: 'user',
       isInfluencer: false,
-      hasPublishingSubscription: true,
+      hasPublishingSubscription: false,
       accountStatus: 'User',
       subscriptionPlan: null,
       stats: { posts: 0, following: 0, followers: '0' },
@@ -275,6 +275,8 @@ export const AppProvider = ({ children }) => {
   const [phoneFrame, setPhoneFrame] = useState(true);
   const [subscriptionGateModalOpen, setSubscriptionGateModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+  const [pendingCreatePath, setPendingCreatePath] = useState(null);
   const [toasts, setToasts] = useState([]);
 
   // Advertiser Contact Settings (Dynamic from DB, editable by Admin)
@@ -3125,6 +3127,10 @@ export const AppProvider = ({ children }) => {
         setSubscriptionGateModalOpen,
         createModalOpen,
         setCreateModalOpen,
+        payoutModalOpen,
+        setPayoutModalOpen,
+        pendingCreatePath,
+        setPendingCreatePath,
         toasts,
         showToast,
         activeStoryGroup,

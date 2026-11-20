@@ -231,8 +231,37 @@ export const UserProfileScreen = ({ navigation, route }) => {
     }
   }, [currentUser?.username]);
 
+  // Content Library fetching (Videos, Posts & Stories)
+  const fetchMyMedia = useCallback(async () => {
+    setIsLoadingMyMedia(true);
+    try {
+      const [mediaRes, storiesRes] = await Promise.all([
+        apiRequest('/videos/my-media').catch(() => ({ media: [] })),
+        currentUser?.id ? apiRequest(`/stories?userId=${currentUser.id}`).catch(() => ({ stories: [] })) : Promise.resolve({ stories: [] })
+      ]);
+
+      if (mediaRes && Array.isArray(mediaRes.media)) {
+        setMyMediaList(mediaRes.media);
+      }
+
+      if (storiesRes && Array.isArray(storiesRes.stories)) {
+        const group = storiesRes.stories.find(g => g.userId === currentUser?.id || g.isUser);
+        const stList = group?.stories || (storiesRes.stories[0]?.stories ? storiesRes.stories[0].stories : storiesRes.stories);
+        setMyStoriesList(Array.isArray(stList) ? stList : []);
+      } else if (stories) {
+        const userGroup = (stories || []).find(s => s.isUser || String(s.userId) === String(currentUser?.id));
+        setMyStoriesList(userGroup?.stories || []);
+      }
+    } catch (e) {
+      console.warn('Could not fetch content library:', e);
+    } finally {
+      setIsLoadingMyMedia(false);
+    }
+  }, [currentUser?.id, stories]);
+
   useEffect(() => {
     fetchFollowCounts();
+    fetchMyMedia();
     if (currentUser) {
       setSettingsEmail(currentUser.email || '');
       setSettingsPhone(currentUser.phone || '');
@@ -245,15 +274,17 @@ export const UserProfileScreen = ({ navigation, route }) => {
 
     const unsub = navigation.addListener('focus', () => {
       fetchFollowCounts();
+      fetchMyMedia();
     });
     return unsub;
-  }, [fetchFollowCounts, currentUser, navigation]);
+  }, [fetchFollowCounts, fetchMyMedia, currentUser, navigation]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       await Promise.all([
         fetchFollowCounts(),
+        fetchMyMedia(),
         fetchFeed ? fetchFeed() : Promise.resolve(),
       ]);
     } catch (e) {
@@ -399,33 +430,7 @@ export const UserProfileScreen = ({ navigation, route }) => {
     );
   };
 
-  // Content Library fetching and deletion (Videos, Posts & Stories)
-  const fetchMyMedia = async () => {
-    setIsLoadingMyMedia(true);
-    try {
-      const [mediaRes, storiesRes] = await Promise.all([
-        apiRequest('/videos/my-media').catch(() => ({ media: [] })),
-        currentUser?.id ? apiRequest(`/stories?userId=${currentUser.id}`).catch(() => ({ stories: [] })) : Promise.resolve({ stories: [] })
-      ]);
-
-      if (mediaRes && Array.isArray(mediaRes.media)) {
-        setMyMediaList(mediaRes.media);
-      }
-
-      if (storiesRes && Array.isArray(storiesRes.stories)) {
-        const group = storiesRes.stories.find(g => g.userId === currentUser?.id || g.isUser);
-        const stList = group?.stories || (storiesRes.stories[0]?.stories ? storiesRes.stories[0].stories : storiesRes.stories);
-        setMyStoriesList(Array.isArray(stList) ? stList : []);
-      } else if (stories) {
-        const userGroup = (stories || []).find(s => s.isUser || String(s.userId) === String(currentUser?.id));
-        setMyStoriesList(userGroup?.stories || []);
-      }
-    } catch (e) {
-      console.warn('Could not fetch content library:', e);
-    } finally {
-      setIsLoadingMyMedia(false);
-    }
-  };
+  // Content Library deletion (Videos, Posts & Stories)
 
   const handleDeleteVideo = (videoId, videoTitle) => {
     showAppConfirm(
@@ -739,7 +744,13 @@ export const UserProfileScreen = ({ navigation, route }) => {
   const myLikedPosts = (posts || []).filter(p => p.isLiked);
   const mySavedPosts = (posts || []).filter(p => p.isSaved || (savedPostIds && savedPostIds.has && savedPostIds.has(String(p.id))));
 
-  const realPostCount = myPosts.length;
+  const realPostCount = (myMediaList && myMediaList.length > 0)
+    ? myMediaList.length
+    : (currentUser?.postsCount !== undefined
+        ? currentUser.postsCount
+        : (currentUser?.stats?.posts !== undefined
+            ? currentUser.stats.posts
+            : myPosts.length));
   const isInfluencer = Boolean(currentUser?.isInfluencer);
 
   // Viewer Menu Items matching website (image copy 32.png & image copy 33.png)

@@ -2,6 +2,10 @@ import pool from '../config/db.js';
 
 export async function listStories(req, res) {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
     const currentUserId = req.user?.id || 0;
     const { userId, username } = req.query;
 
@@ -328,11 +332,14 @@ export async function deleteStory(req, res) {
                     req.user.username === 'gourav.boga1';
 
     let [storyRows] = await pool.query('SELECT id, user_id FROM stories WHERE id = ? OR id = ?', [cleanId, rawId]);
-    if (storyRows.length === 0 && (String(rawId).startsWith('st_user_') || cleanId === String(userId))) {
-      [storyRows] = await pool.query('SELECT id, user_id FROM stories WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [cleanId]);
+    if (storyRows.length === 0 && (String(rawId).startsWith('st_user_') || cleanId === String(userId) || rawId === 'my-story')) {
+      [storyRows] = await pool.query('SELECT id, user_id FROM stories WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [userId]);
     }
+    
+    // Idempotent deletion: if already removed (e.g. concurrent/rapid delete call),
+    // return 200 success so the client completes gracefully without a "Delete Failed" popup.
     if (storyRows.length === 0) {
-      return res.status(404).json({ error: 'Story not found' });
+      return res.json({ success: true, message: 'Story deleted successfully', storyId: cleanId });
     }
 
     if (String(storyRows[0].user_id) !== String(userId) && !isAdmin) {

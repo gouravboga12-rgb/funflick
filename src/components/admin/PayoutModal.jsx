@@ -355,37 +355,46 @@ export const PayoutModal = ({ creator, video = null, isOpen, onClose, onPaidSucc
               </div>
 
               {hasDetails ? (
-                <div className="space-y-1.5 text-xs text-gray-300 bg-black/40 p-3 rounded-xl border border-white/5">
-                  {isBank ? (
-                    <>
-                      <div>Bank Name: <strong className="text-white">{d.bank_name}</strong></div>
+                <div className="space-y-2 text-xs text-gray-300 bg-black/40 p-3 rounded-xl border border-white/5">
+                  {/* PhonePe / UPI ID if provided */}
+                  {d.upi_id && (
+                    <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-500/30 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-purple-300 block font-bold">PhonePe / UPI ID:</span>
+                        <strong className="text-white font-mono text-xs">{d.upi_id}</strong>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(d.upi_id, 'UPI ID')}
+                        className="px-2.5 py-1 rounded-lg bg-purple-500/25 hover:bg-purple-500/40 text-purple-200 border border-purple-500/40 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                      >
+                        {copiedField === 'UPI ID' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>Copy UPI</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Bank Account if provided */}
+                  {d.account_number && (
+                    <div className="p-2.5 rounded-xl bg-pink-950/40 border border-pink-500/30 space-y-1.5">
+                      <div className="text-[10px] text-pink-300 font-bold">Bank Account Details:</div>
+                      <div>Bank: <strong className="text-white">{d.bank_name}</strong></div>
                       {[['Account Number', d.account_number], ['IFSC Code', d.ifsc_code]].map(([label, val]) => (
-                        <div key={label} className="flex items-center justify-between">
+                        <div key={label} className="flex items-center justify-between text-[11px]">
                           <span>{label}: <strong className="text-white font-mono">{val}</strong></span>
                           <button
                             type="button"
                             onClick={() => copyToClipboard(val, label)}
-                            className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-pink-300 flex items-center gap-1"
+                            className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-pink-300 flex items-center gap-1 transition cursor-pointer"
                           >
                             {copiedField === label ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                             <span>Copy</span>
                           </button>
                         </div>
                       ))}
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <span>UPI ID: <strong className="text-white font-mono">{d.upi_id}</strong></span>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(d.upi_id, 'UPI ID')}
-                        className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-pink-300 flex items-center gap-1"
-                      >
-                        {copiedField === 'UPI ID' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                        <span>Copy</span>
-                      </button>
                     </div>
                   )}
+
                   <div className="text-[10px] text-gray-400 pt-1 border-t border-white/5">
                     Phone: {d.contact_phone || d.phone || creator.phone || '—'} • Email: {d.contact_email || d.email || creator.email || '—'}
                   </div>

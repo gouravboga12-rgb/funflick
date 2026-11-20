@@ -608,13 +608,32 @@ export async function getCurrentUser(req, res) {
     }
 
     const [rows] = await pool.query(
-      'SELECT id, name, username, email, phone, avatar_url, bio, role, is_influencer, is_private, subscription_expires_at, created_at FROM users WHERE id = ?',
+      'SELECT id, name, username, email, phone, avatar_url, bio, role, is_influencer, subscription_plan, has_payout_details, is_private, subscription_expires_at, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
 
     if (rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    const [pRows] = await pool.query(
+      'SELECT payout_type, bank_name, account_number, ifsc_code, upi_id FROM creator_payout_details WHERE user_id = ?',
+      [req.user.id]
+    );
+    const hasBank = Boolean(pRows[0]?.account_number && pRows[0]?.ifsc_code);
+    const hasUpi = Boolean(pRows[0]?.upi_id && pRows[0]?.upi_id.includes('@'));
+    const hasPayout = hasBank || hasUpi;
+
+    const [statsRows] = await pool.query(
+      `SELECT 
+        (SELECT COUNT(*) FROM videos WHERE user_id = ?) AS posts_count,
+        (SELECT COUNT(*) FROM follows WHERE following_id = ?) AS followers_count,
+        (SELECT COUNT(*) FROM follows WHERE follower_id = ?) AS following_count`,
+      [req.user.id, req.user.id, req.user.id]
+    );
+    const postsCount = statsRows[0]?.posts_count || 0;
+    const followersCount = statsRows[0]?.followers_count || 0;
+    const followingCount = statsRows[0]?.following_count || 0;
 
     const u = rows[0];
     const user = {
@@ -623,10 +642,23 @@ export async function getCurrentUser(req, res) {
       avatar_url: u.avatar_url || '/brand/default-avatar.svg',
       isInfluencer: Boolean(u.is_influencer),
       is_influencer: Boolean(u.is_influencer),
+      hasPayoutDetails: hasPayout,
+      has_payout_details: hasPayout,
+      payoutType: hasBank && hasUpi ? 'both' : (hasBank ? 'bank' : (hasUpi ? 'upi' : null)),
+      payoutDetails: pRows[0] || null,
+      hasPublishingSubscription: Boolean(u.is_influencer),
       isPrivate: Boolean(u.is_private),
       is_private: Boolean(u.is_private),
       subscriptionExpiresAt: u.subscription_expires_at,
       subscription_expires_at: u.subscription_expires_at,
+      postsCount,
+      followersCount,
+      followingCount,
+      stats: {
+        posts: postsCount,
+        followers: followersCount,
+        following: followingCount
+      }
     };
 
     return res.json({ user });

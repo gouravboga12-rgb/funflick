@@ -39,6 +39,10 @@ rzp-key*
 *credential*
 credentials.json
 client_secret*.json
+*firebase-adminsdk*.json
+*service-account*.json
+google-services (1).json
+0
 
 # Temporary screenshot captures
 /image*.png

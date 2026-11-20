@@ -1,8 +1,11 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { PhoneFrame } from './components/common/PhoneFrame';
 import { ToastContainer } from './components/common/Toast';
+import { CreateChooserModal } from './components/user/create/CreateChooserModal';
+import { SubscriptionGateModal } from './components/common/SubscriptionGateModal';
+import { CreatorPayoutDetailsModal } from './components/user/CreatorPayoutDetailsModal';
 
 // Auth Pages
 import { SplashScreen } from './pages/auth/SplashScreen';
@@ -71,7 +74,15 @@ const MobileAppWrapper = ({ children }) => {
 
 function AppRoutes() {
   const location = useLocation();
-  const { theme, isAuthenticated } = useApp();
+  const navigate = useNavigate();
+  const { 
+    theme, 
+    isAuthenticated,
+    payoutModalOpen,
+    setPayoutModalOpen,
+    pendingCreatePath,
+    setPendingCreatePath
+  } = useApp();
   const isAdmin = location.pathname.startsWith('/admin');
   const isCreatorStudio = location.pathname.startsWith('/creator') && location.pathname !== '/creator/pavani_official' && !location.pathname.startsWith('/creator/c');
 
@@ -81,6 +92,25 @@ function AppRoutes() {
     <div className={`min-h-screen ${isLight ? 'bg-slate-100 text-slate-900 light' : 'bg-[#07040d] text-white dark'} flex flex-col font-sans transition-colors duration-200`}>
       {/* Global Toast Container */}
       <ToastContainer />
+
+      {/* Global Modals for Upload & Free Plan Activation */}
+      <CreateChooserModal />
+      <SubscriptionGateModal />
+      <CreatorPayoutDetailsModal
+        isOpen={payoutModalOpen}
+        onClose={() => {
+          setPayoutModalOpen(false);
+          setPendingCreatePath(null);
+        }}
+        isFreePlanActivation={true}
+        onSaved={() => {
+          setPayoutModalOpen(false);
+          if (pendingCreatePath) {
+            navigate(pendingCreatePath);
+            setPendingCreatePath(null);
+          }
+        }}
+      />
 
       <div className="flex-1 flex flex-col">
         <Routes>

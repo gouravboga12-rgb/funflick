@@ -11,6 +11,7 @@ import { ReelsScreen } from '../screens/feed/ReelsScreen';
 import { InboxScreen } from '../screens/inbox/InboxScreen';
 import { UserProfileScreen } from '../screens/profile/UserProfileScreen';
 import { CreateChooserModal } from '../screens/create/CreateChooserModal';
+import { CreatorPayoutDetailsModal } from '../components/user/CreatorPayoutDetailsModal';
 import { useApp } from '../context/AppContext';
 import { colors } from '../theme/colors';
 
@@ -24,6 +25,13 @@ export default function BottomTabNavigator({ navigation }) {
   const insets = useSafeAreaInsets();
   const { currentUser, conversations, isChatOpen } = useApp();
   const [isChooserVisible, setIsChooserVisible] = useState(false);
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [pendingCreateType, setPendingCreateType] = useState(null);
+
+  const isCreatorReady = Boolean(
+    currentUser?.isInfluencer && 
+    (currentUser?.hasPayoutDetails || currentUser?.subscriptionPlan === 'Free Influencer Pass')
+  );
 
   const bottomInset = Math.max(insets.bottom, 14);
   const tabHeight = 60 + bottomInset;
@@ -151,6 +159,22 @@ export default function BottomTabNavigator({ navigation }) {
         visible={isChooserVisible}
         onClose={() => setIsChooserVisible(false)}
         onSelect={handleSelectCreateType}
+      />
+      <CreatorPayoutDetailsModal
+        visible={showPayoutModal}
+        isFreePlanActivation={true}
+        onClose={() => {
+          setShowPayoutModal(false);
+          setPendingCreateType(null);
+        }}
+        onSaved={() => {
+          setShowPayoutModal(false);
+          if (pendingCreateType) {
+            const dest = pendingCreateType;
+            setPendingCreateType(null);
+            navigation.navigate(dest);
+          }
+        }}
       />
     </View>
   );

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "469919575594",
+    "project_id": "funflick-3d3d5",
+    "storage_bucket": "funflick-3d3d5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:469919575594:android:ec7d6d586a2b5b9fdc1d53",
+        "android_client_info": {
+          "package_name": "com.funflick.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAscw9ApvZU1yrBky08s2Je6YyixtpK-4o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -27,6 +27,7 @@ import {
   ChevronRight,
   Trash2,
   Plus,
+  Crown,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ensureMediaLibraryPermission } from '../../services/permissionsService';
@@ -35,6 +36,7 @@ import { apiRequest, getToken } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 import { UploadSuccessModal } from '../../components/common/UploadSuccessModal';
+import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDetailsModal';
 
 const CATEGORIES = [
   'Comedy',
@@ -78,6 +80,12 @@ const showAppAlert = (title, message, buttons) => {
 
 export const CreatePostScreen = ({ navigation }) => {
   const { fetchFeed, isAuthenticated, currentUser } = useApp();
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+
+  const isCreatorReady = Boolean(
+    currentUser?.isInfluencer && 
+    (currentUser?.hasPayoutDetails || currentUser?.subscriptionPlan === 'Free Influencer Pass')
+  );
 
   const handleExitScreen = () => {
     if (navigation.canGoBack && navigation.canGoBack()) {
@@ -220,6 +228,12 @@ export const CreatePostScreen = ({ navigation }) => {
   const handlePublish = async () => {
     if (isSubmittingRef.current || isUploading) return;
 
+    if (!isCreatorReady) {
+      setShowPayoutModal(true);
+      showAppAlert('Influencer Pass Required', 'Please activate your Free Influencer Pass & add payout details to post.');
+      return;
+    }
+
     if (photos.length === 0) {
       showAppAlert('Photo Required', 'Please select at least one photo first.');
       return;
@@ -320,6 +334,30 @@ export const CreatePostScreen = ({ navigation }) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Creator / Influencer Status Banner */}
+        {!isCreatorReady && (
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              padding: 12,
+              borderRadius: 14,
+              marginBottom: 12,
+              borderWidth: 1,
+              borderColor: 'rgba(245, 158, 11, 0.3)',
+            }}
+            activeOpacity={0.85}
+            onPress={() => setShowPayoutModal(true)}
+          >
+            <Crown size={15} color="#fbbf24" style={{ marginRight: 8 }} />
+            <Text style={{ color: '#fef08a', fontSize: 12, fontWeight: '700', flex: 1 }}>
+              Activate Free Influencer Pass (₹0) • Earn Cash For Views
+            </Text>
+            <Text style={{ color: '#38bdf8', fontSize: 12, fontWeight: '800' }}>Activate ›</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Media Picker */}
         <TouchableOpacity
           style={[styles.pickerBox, { position: 'relative' }]}
@@ -683,8 +721,14 @@ export const CreatePostScreen = ({ navigation }) => {
         }}
         onUnlockMonetization={() => {
           setUploadSuccessModalVisible(false);
-          navigation.navigate('Subscription');
+          setShowPayoutModal(true);
         }}
+      />
+      <CreatorPayoutDetailsModal
+        visible={showPayoutModal}
+        isFreePlanActivation={true}
+        onClose={() => setShowPayoutModal(false)}
+        onSaved={() => setShowPayoutModal(false)}
       />
     </SafeAreaView>
   );

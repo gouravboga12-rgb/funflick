@@ -103,7 +103,7 @@ export const UploadSuccessMonetizationModal = ({
           </div>
 
           <div className="pt-0.5 border-t border-white/10 text-[10px] text-pink-200 leading-normal">
-            ⭐ <strong>Subscribe to an Influencer Plan</strong> to activate deep 8-factor analytics (Views, Likes, Comments, Shares, Saves, Performance) & become eligible for reward payouts!
+            ⭐ <strong>Activate your Free Influencer Pass (₹0)</strong> to enter your PhonePe UPI / Bank details & qualify for Admin video cash rewards!
           </div>
         </div>
 
@@ -115,10 +115,10 @@ export const UploadSuccessMonetizationModal = ({
                 if (onClose) onClose();
                 navigate('/subscription');
               }}
-              className="w-full py-3 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:opacity-95 text-white font-extrabold text-xs shadow-lg shadow-pink-500/30 flex items-center justify-center gap-2 transition active:scale-95 animate-pulse"
+              className="w-full py-3 px-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-pink-500 hover:opacity-95 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition active:scale-95 animate-pulse"
             >
               <Crown className="w-4 h-4 text-amber-200" />
-              <span>Subscribe & Unlock Creator Payments</span>
+              <span>Activate Free Influencer Pass & Get Paid (₹0)</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           ) : (

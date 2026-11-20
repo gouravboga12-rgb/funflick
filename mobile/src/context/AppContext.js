@@ -39,6 +39,11 @@ export const AppProvider = ({ children }) => {
   const [posts, setPosts] = useState([]);
   const [stories, setStories] = useState([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
+  const [isLoadingMoreFeed, setIsLoadingMoreFeed] = useState(false);
+  const [hasMoreFeed, setHasMoreFeed] = useState(true);
+  const feedOffsetRef = useRef(0);
+  const feedSeedRef = useRef(Date.now());
+  const isLoadingMoreFeedRef = useRef(false);
   // Mute audio by default on app launch (matching web & standard social feeds)
   const [isReelsMuted, setIsReelsMuted] = useState(false);
   // Global pause state (like volume/mute) so all reels pause/play together
@@ -163,6 +168,17 @@ export const AppProvider = ({ children }) => {
           registerForPushNotificationsAsync();
         }
 
+        // Live refresh user profile from AWS backend to ensure posts count & influencer status are 100% up-to-date
+        if (token) {
+          apiRequest('/auth/me').then(async (meData) => {
+            if (meData?.user) {
+              const safeUser = sanitizeUser(meData.user);
+              await setStoredUser(safeUser);
+              setCurrentUser(safeUser);
+            }
+          }).catch(() => {});
+        }
+
         // Restore persistent saved post IDs
         try {
           const savedIds = await getStoredSavedPosts();
@@ -194,11 +210,25 @@ export const AppProvider = ({ children }) => {
     })();
   }, []);
 
-  // Fetch feed videos
-  const fetchFeed = useCallback(async () => {
-    setIsLoadingFeed(true);
+  // Fetch feed videos with deterministic seeded shuffle and infinite pagination
+  const fetchFeed = useCallback(async ({ refresh = false, loadMore = false } = {}) => {
+    if (loadMore) {
+      if (isLoadingMoreFeedRef.current || !hasMoreFeed) return;
+      isLoadingMoreFeedRef.current = true;
+      setIsLoadingMoreFeed(true);
+    } else {
+      setIsLoadingFeed(true);
+      if (refresh) {
+        feedSeedRef.current = Date.now();
+        feedOffsetRef.current = 0;
+        setHasMoreFeed(true);
+      }
+    }
+
     try {
-      const data = await apiRequest('/videos');
+      const currentOffset = loadMore ? feedOffsetRef.current : 0;
+      const seedParam = feedSeedRef.current;
+      const data = await apiRequest(`/videos?limit=25&offset=${currentOffset}&seed=${seedParam}`);
       if (data && data.videos && Array.isArray(data.videos)) {
         const mapped = data.videos.map(v => {
           const url = v.video_url || '';
@@ -217,6 +247,8 @@ export const AppProvider = ({ children }) => {
             likesCount: Number(v.likes_count) || 0,
             viewsCount: String(v.views_count || '0'),
             commentsCount: Number(v.comments_count) || 0,
+            createdAt: v.created_at,
+            created_at: v.created_at,
             timeAgo: v.created_at ? new Date(v.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Recently',
             isLiked: Boolean(v.user_liked),
             isSaved: Boolean(savedPostIdsRef.current.has(String(v.id))),
@@ -234,14 +266,42 @@ export const AppProvider = ({ children }) => {
             }
           };
         });
-        setPosts(mapped);
+
+        if (loadMore) {
+          setPosts(prev => {
+            const existingIds = new Set(prev.map(p => String(p.id)));
+            const fresh = mapped.filter(p => !existingIds.has(String(p.id)));
+            if (fresh.length === 0 || mapped.length < 25) {
+              setHasMoreFeed(false);
+            }
+            feedOffsetRef.current = prev.length + fresh.length;
+            return [...prev, ...fresh];
+          });
+        } else {
+          setPosts(mapped);
+          feedOffsetRef.current = mapped.length;
+          if (mapped.length < 25) {
+            setHasMoreFeed(false);
+          } else {
+            setHasMoreFeed(true);
+          }
+        }
       }
     } catch (e) {
       console.warn('Error fetching feed:', e.message);
     } finally {
-      setIsLoadingFeed(false);
+      if (loadMore) {
+        isLoadingMoreFeedRef.current = false;
+        setIsLoadingMoreFeed(false);
+      } else {
+        setIsLoadingFeed(false);
+      }
     }
-  }, []);
+  }, [hasMoreFeed]);
+
+  const loadMoreFeed = useCallback(() => {
+    fetchFeed({ loadMore: true });
+  }, [fetchFeed]);
 
   useEffect(() => {
     fetchFeed();
@@ -1268,11 +1328,18 @@ export const AppProvider = ({ children }) => {
     }
   }, [fetchFeed]);
 
+  const updateCurrentUser = useCallback((uOrUpdater) => {
+    setCurrentUser(prev => {
+      const next = typeof uOrUpdater === 'function' ? uOrUpdater(prev) : uOrUpdater;
+      return next ? sanitizeUser(next) : null;
+    });
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
         currentUser,
-        setCurrentUser: (u) => setCurrentUser(u ? sanitizeUser(u) : null),
+        setCurrentUser: updateCurrentUser,
         cleanAvatar,
         sanitizeUser,
         isAuthenticated,
@@ -1296,6 +1363,9 @@ export const AppProvider = ({ children }) => {
         recordStoryView,
         isLoadingFeed,
         fetchFeed,
+        loadMoreFeed,
+        isLoadingMoreFeed,
+        hasMoreFeed,
         isReelsMuted,
         setIsReelsMuted,
         toggleMute: () => setIsReelsMuted(prev => !prev),

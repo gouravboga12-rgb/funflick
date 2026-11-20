@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { PUBLISHING_PLANS } from '../../data/mockData';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,23 +7,29 @@ import { Sparkles, Check, X, ShieldAlert, ArrowRight, Zap, Crown } from 'lucide-
 import confetti from 'canvas-confetti';
 
 export const SubscriptionGateModal = () => {
+  const navigate = useNavigate();
   const { 
     subscriptionGateModalOpen, 
     setSubscriptionGateModalOpen, 
-    purchasePublishingSubscription,
     publishingPlans = PUBLISHING_PLANS,
+    setPayoutModalOpen,
     showToast
   } = useApp();
 
   const activePlans = (publishingPlans && publishingPlans.length > 0) ? publishingPlans : PUBLISHING_PLANS;
-  const [selectedPlanId, setSelectedPlanId] = useState(() => activePlans[0]?.id || 'monthly');
+  const [selectedPlanId, setSelectedPlanId] = useState(() => activePlans[0]?.id || 'free_influencer');
   const [processing, setProcessing] = useState(false);
 
   if (!subscriptionGateModalOpen) return null;
 
   const handleSubscribe = () => {
-    showToast('Online subscriptions are temporarily paused while payment gateway verification is in progress. Please check back shortly!', 'info');
     setSubscriptionGateModalOpen(false);
+    const chosenPlan = activePlans.find(p => p.id === selectedPlanId);
+    if (!chosenPlan || chosenPlan.id === 'free_influencer' || Number(chosenPlan.price) === 0) {
+      if (setPayoutModalOpen) setPayoutModalOpen(true);
+    } else {
+      navigate('/subscription');
+    }
   };
 
   return (

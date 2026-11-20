@@ -4,27 +4,39 @@ import { sendPushNotification } from '../services/pushService.js';
 export async function savePayoutDetails(req, res) {
   try {
     const userId = req.user.id;
-    const payout_type = req.body.payout_type || req.body.payout_method || 'bank';
-    const bank_name = req.body.bank_name || '';
-    const account_number = req.body.account_number || '';
-    const ifsc_code = req.body.ifsc_code || '';
-    const upi_id = req.body.upi_id || '';
-    const phone_number = req.body.phone_number || req.body.phone || '';
-    const email_id = req.body.email_id || req.body.email || '';
+    const bank_name = (req.body.bank_name || '').trim();
+    const account_number = (req.body.account_number || '').trim();
+    const ifsc_code = (req.body.ifsc_code || '').trim().toUpperCase();
+    const upi_id = (req.body.upi_id || '').trim().toLowerCase();
+    const phone_number = (req.body.phone_number || req.body.phone || '').trim();
+    const email_id = (req.body.email_id || req.body.email || '').trim();
 
-    // Validation
-    if (payout_type === 'bank') {
-      if (!account_number || !ifsc_code || !bank_name) {
-        return res.status(400).json({ error: 'Bank Name, Account Number, and IFSC Code are required for bank payout' });
+    const hasBank = Boolean(account_number && ifsc_code);
+    const hasUpi = Boolean(upi_id && upi_id.includes('@'));
+
+    // Flexible validation: User must provide at least ONE method (PhonePe UPI OR Bank Details, or both)
+    if (!hasBank && !hasUpi) {
+      return res.status(400).json({ 
+        error: 'Please provide at least one valid payout method: PhonePe UPI ID (e.g. name@ybl) or Bank Account details.' 
+      });
+    }
+
+    if (hasBank) {
+      if (!bank_name) {
+        return res.status(400).json({ error: 'Please enter Bank Name.' });
       }
-    } else if (payout_type === 'upi') {
-      if (!upi_id) {
-        return res.status(400).json({ error: 'UPI ID is required for UPI payout' });
+      if (account_number.length < 8) {
+        return res.status(400).json({ error: 'Please enter a valid Bank Account Number (minimum 8 digits).' });
+      }
+      if (ifsc_code.length !== 11) {
+        return res.status(400).json({ error: 'Please enter an 11-character IFSC code (e.g. SBIN0001234).' });
       }
     }
 
+    const finalPayoutType = (hasBank && hasUpi) ? 'both' : (hasBank ? 'bank' : 'upi');
+
     // Default phone and email from user profile if not provided
-    const [uRows] = await pool.query('SELECT phone, email FROM users WHERE id = ?', [userId]);
+    const [uRows] = await pool.query('SELECT phone, email, is_influencer, subscription_plan FROM users WHERE id = ?', [userId]);
     const finalPhone = phone_number || uRows[0]?.phone || '';
     const finalEmail = email_id || uRows[0]?.email || '';
 
@@ -42,21 +54,32 @@ export async function savePayoutDetails(req, res) {
         updated_at = CURRENT_TIMESTAMP`,
       [
         userId,
-        payout_type,
-        bank_name.trim(),
-        account_number.trim(),
-        ifsc_code.trim().toUpperCase(),
-        upi_id.trim().toLowerCase(),
-        finalPhone.trim(),
-        finalEmail.trim()
+        finalPayoutType,
+        bank_name,
+        account_number,
+        ifsc_code,
+        upi_id,
+        finalPhone,
+        finalEmail
       ]
+    );
+
+    // Automatically mark user as having payout details and activate Influencer status
+    await pool.query(
+      `UPDATE users SET 
+        has_payout_details = 1,
+        is_influencer = 1,
+        subscription_plan = COALESCE(NULLIF(subscription_plan, ''), 'Free Influencer Pass'),
+        subscription_start = COALESCE(subscription_start, NOW())
+       WHERE id = ?`,
+      [userId]
     );
 
     const responseDetails = {
       user_id: userId,
       userId,
-      payout_method: payout_type,
-      payout_type,
+      payout_method: finalPayoutType,
+      payout_type: finalPayoutType,
       bank_name,
       account_number,
       ifsc_code,
@@ -64,12 +87,17 @@ export async function savePayoutDetails(req, res) {
       phone: finalPhone,
       phone_number: finalPhone,
       email: finalEmail,
-      email_id: finalEmail
+      email_id: finalEmail,
+      hasBankDetails: hasBank,
+      hasUpiDetails: hasUpi,
+      hasAnyDetails: true
     };
 
     return res.json({
       success: true,
       message: 'Payout details saved successfully',
+      isInfluencer: true,
+      subscriptionPlan: uRows[0]?.subscription_plan || 'Free Influencer Pass',
       payoutDetails: responseDetails,
       details: responseDetails
     });
@@ -92,9 +120,13 @@ export async function getPayoutDetails(req, res) {
     const userEmail = uRows[0]?.email || '';
 
     const d = rows[0] || {};
+    const hasBank = Boolean(d.account_number && d.ifsc_code);
+    const hasUpi = Boolean(d.upi_id && d.upi_id.includes('@'));
+    const finalPayoutType = d.payout_type || (hasBank && hasUpi ? 'both' : (hasBank ? 'bank' : 'upi'));
+
     const details = {
-      payout_type: d.payout_type || 'bank',
-      payout_method: d.payout_type || 'bank',
+      payout_type: finalPayoutType,
+      payout_method: finalPayoutType,
       bank_name: d.bank_name || '',
       account_number: d.account_number || '',
       ifsc_code: d.ifsc_code || '',
@@ -102,11 +134,14 @@ export async function getPayoutDetails(req, res) {
       phone: d.phone_number || userPhone,
       phone_number: d.phone_number || userPhone,
       email: d.email_id || userEmail,
-      email_id: d.email_id || userEmail
+      email_id: d.email_id || userEmail,
+      hasBankDetails: hasBank,
+      hasUpiDetails: hasUpi,
+      hasAnyDetails: hasBank || hasUpi
     };
 
     return res.json({
-      hasDetails: rows.length > 0,
+      hasDetails: hasBank || hasUpi,
       payoutDetails: details,
       details
     });
@@ -195,8 +230,9 @@ export async function getAdminEligibleCreators(req, res) {
       );
 
       const hasBankDetails = Boolean(c.account_number && c.ifsc_code);
-      const hasUpiDetails = Boolean(c.upi_id);
+      const hasUpiDetails = Boolean(c.upi_id && c.upi_id.includes('@'));
       const hasAnyDetails = hasBankDetails || hasUpiDetails;
+      const finalType = c.payout_type || (hasBankDetails && hasUpiDetails ? 'both' : (hasBankDetails ? 'bank' : 'upi'));
 
       creatorList.push({
         id: c.id,
@@ -206,8 +242,8 @@ export async function getAdminEligibleCreators(req, res) {
         phone: c.phone,
         avatar: c.avatar_url || '/brand/default-avatar.svg',
         isInfluencer: Boolean(c.is_influencer),
-        subscriptionPlan: c.subscription_plan || (c.is_influencer ? 'Weekly Influencer' : 'Free User'),
-        planName: c.subscription_plan || (c.is_influencer ? 'Weekly Influencer' : 'Free User'),
+        subscriptionPlan: c.subscription_plan || (c.is_influencer ? 'Free Influencer Pass' : 'Free User'),
+        planName: c.subscription_plan || (c.is_influencer ? 'Free Influencer Pass' : 'Free User'),
         walletBalance: c.wallet_balance || 0,
         totalViews: Number(c.total_views) || 0,
         totalLikes: Number(c.total_likes) || 0,
@@ -222,11 +258,14 @@ export async function getAdminEligibleCreators(req, res) {
         },
         hasPayoutDetails: hasAnyDetails,
         payoutDetails: {
-          payout_type: c.payout_type || 'bank',
+          payout_type: finalType,
+          payout_method: finalType,
           bank_name: c.bank_name || '',
           account_number: c.account_number || '',
           ifsc_code: c.ifsc_code || '',
           upi_id: c.upi_id || '',
+          hasBankDetails,
+          hasUpiDetails,
           registered_phone: c.phone || '',
           registered_email: c.email || '',
           contact_phone: c.payout_phone || c.phone || '',

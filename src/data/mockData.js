@@ -10,6 +10,25 @@ export const BRAND = {
 // Influencer Subscription Plans (Free uploads for all; Subscription unlocks Influencer status & analytics)
 export const INFLUENCER_SUBSCRIPTION_PLANS = [
   {
+    id: 'free_influencer',
+    name: 'Free Influencer Pass',
+    price: 0,
+    formattedPrice: '₹0',
+    period: 'lifetime',
+    duration: 'Lifetime',
+    label: 'Free Creator',
+    description: 'Zero cost. Enter PhonePe UPI or Bank details to receive video cash rewards from Admin.',
+    popular: true,
+    active: true,
+    savings: '100% FREE',
+    features: [
+      'Official Influencer verification badge',
+      'Eligible for Admin View & Like Cash Rewards',
+      'Advanced performance analytics (Views, Likes, Comments)',
+      'Direct payouts to PhonePe UPI or Bank Account'
+    ]
+  },
+  {
     id: 'weekly',
     name: 'Weekly Influencer',
     price: 99,

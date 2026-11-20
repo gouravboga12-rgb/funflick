@@ -39,6 +39,7 @@ import { uploadMediaToS3 } from '../../services/s3Upload';
 import { apiRequest } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { UploadSuccessModal } from '../../components/common/UploadSuccessModal';
+import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDetailsModal';
 
 const CATEGORIES = [
   'Comedy',
@@ -146,6 +147,12 @@ function ReelPreview({ videoUri, isMuted }) {
 export const UploadReelScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { fetchFeed, currentUser } = useApp();
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+
+  const isCreatorReady = Boolean(
+    currentUser?.isInfluencer && 
+    (currentUser?.hasPayoutDetails || currentUser?.subscriptionPlan === 'Free Influencer Pass')
+  );
 
   // Media state
   const [videoUri, setVideoUri] = useState(null);
@@ -294,6 +301,12 @@ export const UploadReelScreen = ({ navigation }) => {
 
   // Publish / Upload flow
   const handlePublish = async () => {
+    if (!isCreatorReady) {
+      setShowPayoutModal(true);
+      showAppAlert('Influencer Pass Required', 'Please activate your Free Influencer Pass & add payout details to upload reels.');
+      return;
+    }
+
     if (!videoUri && !selectedFile) {
       showAppAlert('Video Required', 'Please choose a video from your device or gallery first.');
       return;
@@ -377,16 +390,28 @@ export const UploadReelScreen = ({ navigation }) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Publishing Subscription Banner */}
-        <View style={styles.planBanner}>
+        {/* Creator / Influencer Status Banner */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => {
+            if (!isCreatorReady) {
+              setShowPayoutModal(true);
+            }
+          }}
+          style={styles.planBanner}
+        >
           <View style={styles.planBannerLeft}>
-            <Crown size={15} color="#f59e0b" style={{ marginRight: 6 }} />
+            <Crown size={15} color={isCreatorReady ? '#f59e0b' : '#34d399'} style={{ marginRight: 6 }} />
             <Text style={styles.planBannerText}>
-              Publishing Plan Active ({currentUser?.subscriptionPlan || 'Weekly Influencer'})
+              {isCreatorReady
+                ? `Influencer Active (${currentUser?.subscriptionPlan || 'Free Influencer Pass'})`
+                : 'Free Influencer Pass Available • Earn Cash For Views'}
             </Text>
           </View>
-          <Text style={styles.planBannerRight}>Ready to Upload</Text>
-        </View>
+          <Text style={styles.planBannerRight}>
+            {isCreatorReady ? 'Ready to Upload' : 'Activate Free ›'}
+          </Text>
+        </TouchableOpacity>
 
         {/* Video Player & Media Preview Box */}
         <View style={styles.videoSection}>
@@ -849,8 +874,14 @@ export const UploadReelScreen = ({ navigation }) => {
         }}
         onUnlockMonetization={() => {
           setUploadSuccessModalVisible(false);
-          navigation.navigate('Subscription');
+          setShowPayoutModal(true);
         }}
+      />
+      <CreatorPayoutDetailsModal
+        visible={showPayoutModal}
+        isFreePlanActivation={true}
+        onClose={() => setShowPayoutModal(false)}
+        onSaved={() => setShowPayoutModal(false)}
       />
     </SafeAreaView>
   );

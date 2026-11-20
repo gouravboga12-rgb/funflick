@@ -23,7 +23,12 @@ import { uploadFileToS3 } from '../../../services/s3UploadService';
 
 export const CreateStoryScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, setSubscriptionGateModalOpen, mediaLimits, showToast, fetchLiveStories } = useApp();
+  const { currentUser, setSubscriptionGateModalOpen, setPayoutModalOpen, mediaLimits, showToast, fetchLiveStories } = useApp();
+
+  const isCreatorReady = Boolean(
+    currentUser?.isInfluencer && 
+    (currentUser?.hasPayoutDetails || currentUser?.subscriptionPlan === 'Free Influencer Pass')
+  );
 
   const maxStoryDuration = mediaLimits?.maxStoryDuration || 15;
   const fileInputRef = useRef(null);
@@ -76,9 +81,9 @@ export const CreateStoryScreen = () => {
       return;
     }
 
-    if (!currentUser.hasPublishingSubscription) {
-      setSubscriptionGateModalOpen(true);
-      showToast('⚠️ Creator Publishing Plan required to post stories!', 'error');
+    if (!isCreatorReady) {
+      if (setPayoutModalOpen) setPayoutModalOpen(true);
+      showToast('⚠️ Please activate your Free Influencer Pass & add payout details to post stories!', 'error');
       return;
     }
 
@@ -331,13 +336,13 @@ export const CreateStoryScreen = () => {
         </div>
 
         {/* Publishing Guard if not subscribed */}
-        {!currentUser.hasPublishingSubscription && (
+        {!isCreatorReady && (
           <div 
-            onClick={() => setSubscriptionGateModalOpen(true)}
+            onClick={() => setPayoutModalOpen ? setPayoutModalOpen(true) : navigate('/subscription')}
             className="p-2.5 rounded-xl bg-pink-950/60 border border-pink-500/40 text-center text-xs text-pink-300 cursor-pointer font-semibold flex items-center justify-center gap-1.5"
           >
             <Crown className="w-3.5 h-3.5 text-amber-400" />
-            <span>Publishing Pass Required (Tap to Unlock)</span>
+            <span>Activate Free Influencer Pass (₹0) to Post</span>
           </div>
         )}
       </div>

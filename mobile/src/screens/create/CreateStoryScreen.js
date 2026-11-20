@@ -34,6 +34,7 @@ import { apiRequest, getToken } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 import { UploadSuccessModal } from '../../components/common/UploadSuccessModal';
+import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDetailsModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -138,6 +139,12 @@ function StoryVideoPreview({ videoUri }) {
 
 export const CreateStoryScreen = ({ navigation }) => {
   const { currentUser, fetchLiveStories, mediaLimits } = useApp();
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+
+  const isCreatorReady = Boolean(
+    currentUser?.isInfluencer && 
+    (currentUser?.hasPayoutDetails || currentUser?.subscriptionPlan === 'Free Influencer Pass')
+  );
 
   const [mediaUri, setMediaUri] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
@@ -246,6 +253,12 @@ export const CreateStoryScreen = ({ navigation }) => {
   // Handle Publish / Share Story
   const handlePublish = async () => {
     if (isSubmittingRef.current || isUploading) return;
+
+    if (!isCreatorReady) {
+      setShowPayoutModal(true);
+      showAppAlert('Influencer Pass Required', 'Please activate your Free Influencer Pass & add payout details to post stories.');
+      return;
+    }
 
     if (!mediaUri && !selectedAsset) {
       showAppAlert('Media Required', 'Please select a photo or video for your story first!');
@@ -544,13 +557,13 @@ export const CreateStoryScreen = ({ navigation }) => {
         </ScrollView>
 
         {/* Creator Publishing Notice if not subscribed */}
-        {currentUser?.hasPublishingSubscription === false ? (
+        {!isCreatorReady ? (
           <TouchableOpacity
             style={styles.upgradeNotice}
-            onPress={() => navigation.navigate('Subscription')}
+            onPress={() => setShowPayoutModal(true)}
           >
             <Crown size={14} color="#fbbf24" style={{ marginRight: 6 }} />
-            <Text style={styles.upgradeNoticeText}>Publishing Pass Required (Tap to Unlock)</Text>
+            <Text style={styles.upgradeNoticeText}>Activate Free Influencer Pass (₹0) • Tap to Earn</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -566,8 +579,14 @@ export const CreateStoryScreen = ({ navigation }) => {
         }}
         onUnlockMonetization={() => {
           setUploadSuccessModalVisible(false);
-          navigation.navigate('Subscription');
+          setShowPayoutModal(true);
         }}
+      />
+      <CreatorPayoutDetailsModal
+        visible={showPayoutModal}
+        isFreePlanActivation={true}
+        onClose={() => setShowPayoutModal(false)}
+        onSaved={() => setShowPayoutModal(false)}
       />
     </SafeAreaView>
   );

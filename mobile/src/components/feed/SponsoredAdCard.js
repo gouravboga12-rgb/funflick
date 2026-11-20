@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Sparkles, ExternalLink, Volume2, VolumeX, Play, Pause } from 'lucide-react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
+import { getManagedVideoSource } from '../../utils/videoPlayerPolicy';
 import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -40,7 +41,7 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
   const hasRecordedImpression = useRef(false);
   const webVideoRef = useRef(null);
 
-  if (!ad || isPaidInfluencer) return null;
+  const isHidden = !ad || isPaidInfluencer;
 
   const isVideo = Boolean(
     ad && (
@@ -58,7 +59,7 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
     return () => sub.remove();
   }, []);
 
-  const shouldPlay = Boolean(isVideo && isActive && isFocused && isAppActive && !isAdPaused && !activePopupAd);
+  const shouldPlay = Boolean(!isHidden && isVideo && isActive && isFocused && isAppActive && !isAdPaused && !activePopupAd);
 
   // Safe poster image URI that is NOT an mp4 video URL
   const validPoster = (() => {
@@ -71,7 +72,14 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
     return !isVideo && typeof ad?.mediaUrl === 'string' ? ad.mediaUrl : null;
   })();
 
-  const player = useVideoPlayer(isVideo && Platform.OS !== 'web' ? ad?.mediaUrl : null, p => {
+  const managedSource = getManagedVideoSource({
+    isVideo: isVideo && !isHidden,
+    mediaUrl: ad?.mediaUrl,
+    isActive,
+    isFocused,
+  });
+
+  const player = useVideoPlayer(managedSource, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
@@ -206,6 +214,9 @@ export const SponsoredAdCard = ({ ad, isActive = false, onPlayPress }) => {
       setIsAdPaused(true);
     }
   };
+
+  // Render guard after all hooks have resolved
+  if (isHidden) return null;
 
   // ==========================================
   // 1. VIDEO AD: Render like Reels / VideoPostCard

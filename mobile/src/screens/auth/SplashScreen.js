@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Sparkles, ArrowRight, Play } from 'lucide-react-native';
@@ -11,11 +11,29 @@ const { width } = Dimensions.get('window');
 export default function SplashScreen({ navigation }) {
   const { isLoadingAuth, isAuthenticated } = useApp();
 
-  // If already authenticated, jump straight to the feed
+  // If already authenticated, jump straight to the feed (unless opened via a specific deep link)
   useEffect(() => {
+    let isMounted = true;
     if (!isLoadingAuth && isAuthenticated) {
-      navigation.replace('MainTabs');
+      Linking.getInitialURL().then(url => {
+        if (!isMounted) return;
+        // If app opened via a specific deep link (video, profile, etc.), let React Navigation linking route to it
+        if (url && (
+          url.includes('/video/') || 
+          url.includes('/profile/') || 
+          url.includes('funflick://video') || 
+          url.includes('funflick://profile') ||
+          url.includes('/subscription') ||
+          url.includes('/messages')
+        )) {
+          return;
+        }
+        navigation.replace('MainTabs');
+      }).catch(() => {
+        if (isMounted) navigation.replace('MainTabs');
+      });
     }
+    return () => { isMounted = false; };
   }, [isLoadingAuth, isAuthenticated, navigation]);
 
   return (

@@ -5,11 +5,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Image, Video, Sparkles, X, ChevronRight, Crown, DollarSign, Heart, TrendingUp, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 export const CreateChooserModal = () => {
-  const { createModalOpen, setCreateModalOpen, currentUser } = useApp();
+  const { createModalOpen, setCreateModalOpen, currentUser, setPayoutModalOpen, setPendingCreatePath } = useApp();
   const navigate = useNavigate();
   const [showMonetizationExplainer, setShowMonetizationExplainer] = useState(false);
 
   if (!createModalOpen) return null;
+
+  const isCreatorReady = Boolean(
+    currentUser?.isInfluencer && 
+    (currentUser?.hasPayoutDetails || currentUser?.subscriptionPlan === 'Free Influencer Pass')
+  );
+
+  const handleOptionClick = (path) => {
+    if (!isCreatorReady) {
+      setCreateModalOpen(false);
+      if (setPendingCreatePath) setPendingCreatePath(path);
+      if (setPayoutModalOpen) setPayoutModalOpen(true);
+      return;
+    }
+    setCreateModalOpen(false);
+    navigate(path);
+  };
 
   const options = [
     {
@@ -64,10 +80,7 @@ export const CreateChooserModal = () => {
                 return (
                   <div
                     key={opt.title}
-                    onClick={() => {
-                      setCreateModalOpen(false);
-                      navigate(opt.path);
-                    }}
+                    onClick={() => handleOptionClick(opt.path)}
                     className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-pink-500/40 cursor-pointer transition group"
                   >
                     <div className="flex items-center gap-3.5">
@@ -183,7 +196,12 @@ export const CreateChooserModal = () => {
                 onClick={() => {
                   setCreateModalOpen(false);
                   setShowMonetizationExplainer(false);
-                  navigate('/subscription');
+                  if (!isCreatorReady) {
+                    if (setPendingCreatePath) setPendingCreatePath('/create/post');
+                    if (setPayoutModalOpen) setPayoutModalOpen(true);
+                  } else {
+                    navigate('/subscription');
+                  }
                 }}
                 className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:opacity-95 text-white font-extrabold text-xs shadow-lg shadow-pink-500/30 flex items-center justify-center gap-2 transition active:scale-95"
               >

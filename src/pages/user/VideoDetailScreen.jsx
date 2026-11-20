@@ -5,6 +5,7 @@ import { VideoPostCard } from '../../components/feed/VideoPostCard';
 import { StandardPostCard } from '../../components/feed/StandardPostCard';
 import { BottomNavigation } from '../../components/common/BottomNavigation';
 import { ChevronLeft, Share2, Loader2, AlertCircle, Home, RefreshCw } from 'lucide-react';
+import { openInAppOrStore, isAndroidDevice, isInAppBrowser } from '../../utils/appLinks';
 
 export const VideoDetailScreen = () => {
   const { id } = useParams();
@@ -102,11 +103,16 @@ export const VideoDetailScreen = () => {
     }
   }, [post?.id, setActivePlayingVideoId]);
 
-  // If opened via mobile share (?source=app), attempt deep linking to native app
+  // If opened on Android via mobile share / WhatsApp / Instagram / Facebook, trigger app launch with Play Store fallback
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('source') === 'app' || params.get('openApp') === 'true') {
+      const isExplicitAppRequest = params.get('source') === 'app' || params.get('openApp') === 'true';
+      const isFromSocialShare = isInAppBrowser() || isExplicitAppRequest;
+
+      if (isAndroidDevice() && (isFromSocialShare || isExplicitAppRequest)) {
+        openInAppOrStore(`video/${id}`);
+      } else if (isExplicitAppRequest) {
         window.location.href = `funflick://video/${id}`;
       }
     } catch (e) {}
@@ -213,14 +219,14 @@ export const VideoDetailScreen = () => {
       {/* App Smart Banner for mobile web visitors */}
       <div className="bg-gradient-to-r from-pink-600/20 via-purple-600/20 to-blue-600/20 border-b border-pink-500/20 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-pink-300 font-semibold">Have FunFlick App installed?</span>
+          <span className="text-xs text-pink-300 font-semibold">Watch on the FunFlick App</span>
         </div>
-        <a
-          href={`funflick://video/${id}`}
-          className="text-xs bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold px-3 py-1 rounded-full shadow hover:opacity-90 transition"
+        <button
+          onClick={() => openInAppOrStore(`video/${id}`)}
+          className="text-xs bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold px-3.5 py-1.5 rounded-full shadow hover:opacity-90 active:scale-95 transition cursor-pointer"
         >
           Open App
-        </a>
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar p-2">

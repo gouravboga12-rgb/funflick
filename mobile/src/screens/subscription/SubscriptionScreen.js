@@ -25,9 +25,28 @@ import { useApp } from '../../context/AppContext';
 import { apiRequest, setStoredUser, getToken, API_BASE_URL } from '../../services/api';
 import * as WebBrowser from 'expo-web-browser';
 import { colors } from '../../theme/colors';
+import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDetailsModal';
 
 // Default mock plans matching image copy 37.png and website
 const DEFAULT_PLANS = [
+  {
+    id: 'free_influencer',
+    name: 'Free Influencer Pass',
+    label: 'Free Starter',
+    price: 0,
+    formattedPrice: '₹0',
+    period: 'free',
+    durationDays: 3650,
+    description: 'Free access to influencer analytics & reward payouts',
+    popular: false,
+    savings: null,
+    features: [
+      'Official Influencer status badge',
+      'Eligible for Admin Performance & Video Cash Rewards',
+      'Performance analytics (Views, Likes, Comments)',
+      'Direct Bank & PhonePe UPI payouts',
+    ],
+  },
   {
     id: 'weekly',
     name: 'Weekly Influencer',
@@ -163,10 +182,62 @@ export const SubscriptionScreen = ({ navigation }) => {
     ? formatDate(subStatus.expiresAt)
     : (currentUser?.subscriptionExpiresAt ? formatDate(currentUser.subscriptionExpiresAt) : '');
 
+  const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const isPurchasingRef = useRef(false);
 
   const handlePurchase = async (plan) => {
     if (isPurchasingRef.current || processingPlanId) return;
+
+    // Free Influencer Pass handling
+    if (plan.id === 'free_influencer' || Number(plan.price) === 0) {
+      setSelectedPlanId(plan.id);
+
+      // If user has not yet entered payout details, open the modal
+      if (!currentUser?.hasPayoutDetails) {
+        setIsPayoutModalOpen(true);
+        return;
+      }
+
+      // If user already has payout details, activate immediately
+      isPurchasingRef.current = true;
+      setProcessingPlanId(plan.id);
+      try {
+        const actRes = await apiRequest('/subscriptions/activate-free', {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+
+        if (actRes && actRes.success) {
+          const updatedUser = {
+            ...currentUser,
+            isInfluencer: true,
+            hasPayoutDetails: true,
+            subscriptionPlan: actRes.subscription?.plan_name || 'Free Influencer Pass',
+            subscriptionExpiresAt: actRes.subscription?.expires_at || null,
+          };
+          setCurrentUser(updatedUser);
+          await setStoredUser(updatedUser);
+          await loadSubscriptionData();
+
+          Alert.alert(
+            '🎉 Free Influencer Pass Active!',
+            'Your Free Influencer Pass is active! You are eligible for Admin performance & video cash rewards based on your reels and engagement.',
+            [{ text: 'Awesome!', onPress: () => {} }]
+          );
+        } else {
+          throw new Error(actRes?.error || 'Failed to activate free plan');
+        }
+      } catch (e) {
+        Alert.alert('Activation Error', e.message || 'Could not activate free plan.');
+      } finally {
+        setProcessingPlanId(null);
+        setTimeout(() => {
+          isPurchasingRef.current = false;
+        }, 500);
+      }
+      return;
+    }
+
     isPurchasingRef.current = true;
     setSelectedPlanId(plan.id);
     setProcessingPlanId(plan.id);
@@ -290,12 +361,19 @@ export const SubscriptionScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              <View style={styles.daysRemainingBox}>
-                <Text style={styles.daysNumber}>{activeDaysRemaining}</Text>
-                <Text style={styles.daysText}>
-                  {activeDaysRemaining === 1 ? 'day remaining' : 'days remaining'}
-                </Text>
-              </View>
+              {activePlanName === 'Free Influencer Pass' || subStatus?.isFreePlan ? (
+                <View style={[styles.daysRemainingBox, { backgroundColor: 'rgba(52, 211, 153, 0.15)', borderColor: 'rgba(52, 211, 153, 0.3)' }]}>
+                  <Text style={[styles.daysNumber, { color: '#34d399', fontSize: 13 }]}>ACTIVE</Text>
+                  <Text style={[styles.daysText, { color: '#6ee7b7', fontSize: 9 }]}>Promotional</Text>
+                </View>
+              ) : (
+                <View style={styles.daysRemainingBox}>
+                  <Text style={styles.daysNumber}>{activeDaysRemaining}</Text>
+                  <Text style={styles.daysText}>
+                    {activeDaysRemaining === 1 ? 'day remaining' : 'days remaining'}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Dates row */}
@@ -307,23 +385,27 @@ export const SubscriptionScreen = ({ navigation }) => {
               <View style={[styles.dateCol, { alignItems: 'flex-end' }]}>
                 <Text style={styles.dateLabel}>Valid Until / Expiry:</Text>
                 <Text style={[styles.dateValue, { color: '#34d399' }]}>
-                  {activeExpiryDate || `${activeDaysRemaining} Days`}
+                  {activePlanName === 'Free Influencer Pass' || subStatus?.isFreePlan
+                    ? 'Promotional Tier'
+                    : (activeExpiryDate || `${activeDaysRemaining} Days`)}
                 </Text>
               </View>
             </View>
 
             {/* Extension Guarantee banner */}
-            <View style={styles.extensionBanner}>
-              <Sparkles size={16} color="#fbbf24" style={{ marginTop: 2, marginRight: 6 }} />
-              <Text style={styles.extensionText}>
-                <Text style={{ fontWeight: '800', color: '#fbbf24' }}>Plan Extension Guarantee:</Text>{' '}
-                Purchasing another plan while your subscription is active will{' '}
-                <Text style={{ textDecorationLine: 'underline', color: '#ffffff', fontWeight: '800' }}>
-                  extend your existing expiry date
-                </Text>{' '}
-                by adding the new days to your remaining {activeDaysRemaining} days!
-              </Text>
-            </View>
+            {activePlanName !== 'Free Influencer Pass' && !subStatus?.isFreePlan && (
+              <View style={styles.extensionBanner}>
+                <Sparkles size={16} color="#fbbf24" style={{ marginTop: 2, marginRight: 6 }} />
+                <Text style={styles.extensionText}>
+                  <Text style={{ fontWeight: '800', color: '#fbbf24' }}>Plan Extension Guarantee:</Text>{' '}
+                  Purchasing another plan while your subscription is active will{' '}
+                  <Text style={{ textDecorationLine: 'underline', color: '#ffffff', fontWeight: '800' }}>
+                    extend your existing expiry date
+                  </Text>{' '}
+                  by adding the new days to your remaining {activeDaysRemaining} days!
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -412,7 +494,7 @@ export const SubscriptionScreen = ({ navigation }) => {
                     activeOpacity={0.85}
                   >
                     <LinearGradient
-                      colors={['#ff007a', '#ff4b2b', '#7928ca']}
+                      colors={plan.price === 0 ? ['#10b981', '#059669'] : ['#ff007a', '#ff4b2b', '#7928ca']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.payGradient}
@@ -423,9 +505,11 @@ export const SubscriptionScreen = ({ navigation }) => {
                         <View style={styles.payBtnInner}>
                           <Zap size={14} color="#fbbf24" fill="#fbbf24" />
                           <Text style={styles.payBtnText}>
-                            {isUserSubscribed && activeDaysRemaining > 0
-                              ? `Extend (+${plan.durationDays}d) · ${plan.formattedPrice}`
-                              : `Pay ${plan.formattedPrice}`}
+                            {plan.price === 0
+                              ? (isUserSubscribed && activeDaysRemaining > 0 ? 'Influencer Active' : 'Activate Free Influencer')
+                              : (isUserSubscribed && activeDaysRemaining > 0
+                                ? `Extend (+${plan.durationDays}d) · ${plan.formattedPrice}`
+                                : `Pay ${plan.formattedPrice}`)}
                           </Text>
                           <ArrowRight size={14} color="#ffffff" />
                         </View>
@@ -476,6 +560,16 @@ export const SubscriptionScreen = ({ navigation }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <CreatorPayoutDetailsModal
+        isOpen={isPayoutModalOpen}
+        onClose={() => setIsPayoutModalOpen(false)}
+        onSuccess={() => {
+          setIsPayoutModalOpen(false);
+          loadSubscriptionData();
+        }}
+        initialPlanId="free_influencer"
+      />
     </SafeAreaView>
   );
 };

@@ -1004,8 +1004,11 @@ export async function getAdminInfluencerMedia(req, res) {
         WHERE status = 'Paid' AND video_id IS NOT NULL
         GROUP BY video_id
       ) ps ON ps.video_id = v.id
-      ORDER BY v.views_count DESC, v.created_at DESC
-      LIMIT 250
+      ORDER BY 
+        CASE WHEN u.is_influencer = 1 OR u.subscription_plan LIKE '%Influencer%' THEN 0 ELSE 1 END ASC,
+        v.views_count DESC, 
+        v.created_at DESC
+      LIMIT 1000
     `);
 
     const media = rows.map(r => {
@@ -1021,11 +1024,13 @@ export async function getAdminInfluencerMedia(req, res) {
       const safeAvatar = r.avatar_url || '/brand/default-avatar.svg';
       const safeThumbnail = r.thumbnail_url || r.video_url;
 
-      const isInfluencer = Boolean(r.is_influencer) && (
-        !r.subscription_expires_at || new Date(r.subscription_expires_at) > new Date()
+      const isInfluencer = Boolean(
+        (r.is_influencer || (r.subscription_plan && r.subscription_plan.includes('Influencer'))) && (
+          !r.subscription_expires_at || new Date(r.subscription_expires_at) > new Date()
+        )
       );
       const subscriptionPlan = isInfluencer 
-        ? (r.subscription_plan || 'Weekly Influencer') 
+        ? (r.subscription_plan || 'Free Influencer Pass') 
         : 'Free User';
 
       const settledViews = Number(r.settled_views) || 0;

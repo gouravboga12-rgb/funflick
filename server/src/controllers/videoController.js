@@ -3,7 +3,7 @@ import { sendPushNotification } from '../services/pushService.js';
 
 export async function listVideos(req, res) {
   try {
-    const { category, username, userId, creator_id, limit = 50, offset = 0 } = req.query;
+    const { category, username, userId, creator_id, limit = 50, offset = 0, seed } = req.query;
     const currentUserId = req.user?.id || 0;
 
     let query = `
@@ -44,11 +44,21 @@ export async function listVideos(req, res) {
       params.push(targetUserId);
     }
 
-    query += ' ORDER BY v.created_at DESC LIMIT ? OFFSET ?';
-    params.push(Number(limit), Number(offset));
+    const hasSeed = seed !== undefined && seed !== null && seed !== '';
+    const seedNum = hasSeed ? (parseInt(seed, 10) || 0) : null;
+
+    if (hasSeed) {
+      // Deterministic seeded shuffle for pull-to-refresh & paginating through all 200+ posts
+      query += ' ORDER BY RAND(?) LIMIT ? OFFSET ?';
+      params.push(seedNum, Number(limit), Number(offset));
+    } else {
+      // Default newest-first ordering (preserves exact behavior for web & profile pages)
+      query += ' ORDER BY v.created_at DESC LIMIT ? OFFSET ?';
+      params.push(Number(limit), Number(offset));
+    }
 
     const [rows] = await pool.query(query, params);
-    return res.json({ videos: rows });
+    return res.json({ videos: rows, seed: hasSeed ? seedNum : undefined });
   } catch (err) {
     console.error('List videos error:', err);
     return res.status(500).json({ error: 'Failed to fetch videos' });

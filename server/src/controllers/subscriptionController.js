@@ -51,7 +51,8 @@ export async function updatePlanAdmin(req, res) {
     const { id } = req.params;
     const { name, price, formatted_price, period, duration, label, description, savings, popular, active, features } = req.body;
 
-    const formattedPriceVal = formatted_price || (price !== undefined ? `₹${Number(price).toLocaleString()}` : null);
+    const numPrice = price !== undefined ? Number(price) : null;
+    const formattedPriceVal = formatted_price || (numPrice !== null ? (numPrice === 0 ? '₹0' : `₹${numPrice.toLocaleString()}`) : null);
     const featuresJson = features !== undefined
       ? (typeof features === 'string' ? features : JSON.stringify(features || []))
       : null;
@@ -72,8 +73,8 @@ export async function updatePlanAdmin(req, res) {
       WHERE id = ?`,
       [
         name !== undefined ? name : null,
-        price !== undefined ? Number(price) : null,
-        formattedPriceVal !== undefined ? formattedPriceVal : null,
+        numPrice !== null ? numPrice : null,
+        formattedPriceVal !== null ? formattedPriceVal : null,
         period !== undefined ? period : null,
         duration !== undefined ? duration : null,
         label !== undefined ? label : null,
@@ -81,15 +82,44 @@ export async function updatePlanAdmin(req, res) {
         savings !== undefined ? savings : null,
         popular !== undefined ? (popular ? 1 : 0) : null,
         active !== undefined ? (active ? 1 : 0) : null,
-        featuresJson !== undefined ? featuresJson : null,
+        featuresJson !== null ? featuresJson : null,
         id
       ]
     );
+
+    // If Admin set free_influencer active = 0, also revoke from users
+    if (id === 'free_influencer' && active === false) {
+      await pool.query(
+        "UPDATE users SET is_influencer = 0, subscription_plan = NULL, subscription_expires_at = NULL WHERE subscription_plan = 'Free Influencer Pass'"
+      );
+    }
 
     return res.json({ success: true, message: 'Subscription plan updated successfully' });
   } catch (err) {
     console.error('Update plan error:', err);
     return res.status(500).json({ error: 'Failed to update subscription plan: ' + err.message });
+  }
+}
+
+export async function deletePlanAdmin(req, res) {
+  try {
+    const { id } = req.params;
+    const [pRows] = await pool.query('SELECT name FROM subscription_plans WHERE id = ?', [id]);
+    const planName = pRows[0]?.name || '';
+
+    // If deleting free plan or any plan, revoke influencer status from all users with this plan
+    await pool.query(
+      `UPDATE users 
+       SET is_influencer = 0, subscription_plan = NULL, subscription_expires_at = NULL 
+       WHERE subscription_plan = ? OR subscription_plan = 'Free Influencer Pass' OR ? = 'free_influencer'`,
+      [planName, id]
+    );
+
+    await pool.query('DELETE FROM subscription_plans WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Plan deleted and influencer status revoked from all users on this plan' });
+  } catch (err) {
+    console.error('Delete plan error:', err);
+    return res.status(500).json({ error: 'Failed to delete plan' });
   }
 }
 
@@ -173,23 +203,12 @@ export async function resetTestSubscriptionsAdmin(req, res) {
   }
 }
 
-export async function deletePlanAdmin(req, res) {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM subscription_plans WHERE id = ?', [id]);
-    return res.json({ success: true, message: 'Plan deleted' });
-  } catch (err) {
-    console.error('Delete plan error:', err);
-    return res.status(500).json({ error: 'Failed to delete plan' });
-  }
-}
-
 async function executeSubscriptionActivation({ userId, planId, planName, price, durationDays: customDuration, paymentId }) {
   const finalPaymentId = paymentId || `PAY_${Date.now()}`;
 
   // 1. Determine duration in days from plan or lookup
   let durationDays = parseInt(customDuration, 10);
-  let planPrice = parseInt(price, 10) || 199;
+  let planPrice = (price !== undefined && price !== null && !isNaN(parseInt(price, 10))) ? parseInt(price, 10) : 199;
   let finalPlanName = planName;
 
   const [planRows] = await pool.query(
@@ -200,10 +219,11 @@ async function executeSubscriptionActivation({ userId, planId, planName, price, 
   if (planRows.length > 0) {
     const p = planRows[0];
     finalPlanName = p.name;
-    planPrice = p.price;
+    planPrice = Number(p.price) || 0;
     if (!durationDays || isNaN(durationDays)) {
       const dStr = (p.duration || '').toLowerCase();
-      if (dStr.includes('365') || dStr.includes('year')) durationDays = 365;
+      if (dStr.includes('lifetime')) durationDays = 3650;
+      else if (dStr.includes('365') || dStr.includes('year')) durationDays = 365;
       else if (dStr.includes('90') || dStr.includes('3 month') || dStr.includes('quarter')) durationDays = 90;
       else if (dStr.includes('7') || dStr.includes('week')) durationDays = 7;
       else durationDays = 30;
@@ -370,6 +390,23 @@ export async function createRazorpayOrder(req, res) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
+    const { planId = 'monthly', price } = req.body;
+
+    // Free Influencer Pass requires zero payment gateway
+    if (planId === 'free_influencer' || Number(price) === 0) {
+      const orderId = `free_order_${userId}_${Date.now()}`;
+      return res.json({
+        success: true,
+        isFree: true,
+        orderId,
+        amount: 0,
+        currency: 'INR',
+        keyId: 'free_plan',
+        planId: 'free_influencer',
+        planName: 'Free Influencer Pass'
+      });
+    }
+
     if (!isPaymentGatewayActive()) {
       return res.status(400).json({
         error: 'Online subscriptions are temporarily paused while payment gateway verification is in progress. Please check back shortly!'
@@ -378,8 +415,6 @@ export async function createRazorpayOrder(req, res) {
 
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
-
-    const { planId = 'monthly', price } = req.body;
 
     let planPrice = Number(price);
     let planName = 'Influencer Plan';
@@ -549,6 +584,165 @@ export async function verifyRazorpayPayment(req, res) {
 
 export async function renderCheckoutPage(req, res) {
   const { orderId, amount, planName, planId, token, name = '', email = '', phone = '' } = req.query;
+
+  // Handle Free Plan in-app checkout directly
+  if (amount == 0 || planId === 'free_influencer' || (orderId && String(orderId).startsWith('free_'))) {
+    const freeHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Activate Free Creator Pass</title>
+  <style>
+    body {
+      margin: 0;
+      background: #090514;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .card {
+      background: #140c26;
+      border: 1px solid rgba(255, 0, 122, 0.3);
+      border-radius: 24px;
+      padding: 24px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .header { text-align: center; margin-bottom: 20px; }
+    .logo { font-size: 24px; font-weight: 900; color: #ff007a; margin-bottom: 6px; }
+    .badge {
+      display: inline-block;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    h2 { font-size: 18px; margin: 8px 0 4px; }
+    p.sub { color: #94a3b8; font-size: 12px; margin: 0 0 16px; }
+    .form-group { margin-bottom: 12px; text-align: left; }
+    label { display: block; font-size: 11px; font-weight: 600; color: #cbd5e1; margin-bottom: 4px; }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      background: #090514;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 13px;
+    }
+    input:focus { outline: none; border-color: #ff007a; }
+    .or-divider { text-align: center; margin: 12px 0; font-size: 11px; color: #64748b; font-weight: bold; }
+    .note { font-size: 11px; color: #ff4da6; background: rgba(255,0,122,0.1); padding: 8px; border-radius: 8px; margin-bottom: 16px; text-align: center; }
+    .btn {
+      width: 100%;
+      background: linear-gradient(135deg, #ff007a 0%, #7928ca 100%);
+      color: #fff;
+      border: none;
+      padding: 14px;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn:disabled { opacity: 0.6; }
+    #err { color: #f87171; font-size: 11px; margin-top: 8px; text-align: center; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="logo">FunFlick</div>
+      <div class="badge">FREE CREATOR PASS (₹0)</div>
+      <h2>Creator Payout Details</h2>
+      <p class="sub">Enter your PhonePe UPI ID, Bank details, or both to receive view & like cash rewards.</p>
+    </div>
+    <form id="payoutForm">
+      <div class="form-group">
+        <label>PhonePe / Google Pay UPI ID</label>
+        <input type="text" id="upi_id" placeholder="e.g. mobile@ybl or username@upi" />
+      </div>
+      <div class="or-divider">— OR BANK ACCOUNT (OR BOTH) —</div>
+      <div class="form-group">
+        <label>Bank Name</label>
+        <input type="text" id="bank_name" placeholder="e.g. State Bank of India, HDFC" />
+      </div>
+      <div class="form-group">
+        <label>Bank Account Number</label>
+        <input type="text" id="account_number" placeholder="Enter account number" />
+      </div>
+      <div class="form-group">
+        <label>IFSC Code</label>
+        <input type="text" id="ifsc_code" placeholder="e.g. SBIN0001234" style="text-transform:uppercase" />
+      </div>
+      <div class="note">Enter at least PhonePe UPI or Bank details. Either is completely fine!</div>
+      <button type="submit" class="btn" id="subBtn">Activate & Start Earning</button>
+      <div id="err"></div>
+    </form>
+  </div>
+  <script>
+    const form = document.getElementById('payoutForm');
+    const errDiv = document.getElementById('err');
+    const subBtn = document.getElementById('subBtn');
+    const token = '${token || ''}';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errDiv.style.display = 'none';
+      const upi_id = document.getElementById('upi_id').value.trim();
+      const bank_name = document.getElementById('bank_name').value.trim();
+      const account_number = document.getElementById('account_number').value.trim();
+      const ifsc_code = document.getElementById('ifsc_code').value.trim().toUpperCase();
+
+      if (!upi_id && (!account_number || !ifsc_code)) {
+        errDiv.textContent = 'Please enter at least your PhonePe UPI ID or Bank details.';
+        errDiv.style.display = 'block';
+        return;
+      }
+
+      subBtn.disabled = true;
+      subBtn.textContent = 'Activating Free Pass...';
+
+      try {
+        const res = await fetch('/api/payouts/details', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+          },
+          body: JSON.stringify({ upi_id, bank_name, account_number, ifsc_code })
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Failed to save payout details');
+        
+        // Also call activate-free to complete subscription
+        await fetch('/api/subscriptions/activate-free', {
+          method: 'POST',
+          headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
+
+        window.location.href = 'funflick://payment-success?plan=Free+Influencer+Pass';
+      } catch (err) {
+        errDiv.textContent = err.message;
+        errDiv.style.display = 'block';
+        subBtn.disabled = false;
+        subBtn.textContent = 'Activate & Start Earning';
+      }
+    });
+  </script>
+</body>
+</html>`;
+    return res.send(freeHtml);
+  }
 
   if (!isPaymentGatewayActive()) {
     const pausedHtml = `<!DOCTYPE html>
@@ -838,9 +1032,13 @@ export async function getUserSubscriptionStatus(req, res) {
 
     const u = uRows[0];
     const now = new Date();
+    const isFreePlan = u.subscription_plan === 'Free Influencer Pass';
     const expiresAt = u.subscription_expires_at ? new Date(u.subscription_expires_at) : null;
-    const isActive = Boolean(u.is_influencer && expiresAt && expiresAt > now);
-    const daysRemaining = calculateISTDaysRemaining(expiresAt, now);
+    const isActive = Boolean(
+      (u.is_influencer && isFreePlan) ||
+      (u.is_influencer && expiresAt && expiresAt > now)
+    );
+    const daysRemaining = isFreePlan ? null : calculateISTDaysRemaining(expiresAt, now);
 
     // Fetch subscription purchase history from database
     const [historyRows] = await pool.query(
@@ -851,20 +1049,21 @@ export async function getUserSubscriptionStatus(req, res) {
       [userId]
     );
 
-    const hasStackedPacks = historyRows.length > 1 && isActive;
-    const futurePacksCount = historyRows.length > 1 ? historyRows.length - 1 : 0;
-    const totalDaysAdded = historyRows.reduce((acc, h) => acc + (Number(h.duration_days) || 0), 0);
-    const formattedExpiry = expiresAt ? formatISTDate(expiresAt) : null;
-    const formattedExpiryTime = expiresAt ? formatISTDateTime(expiresAt) : null;
+    const hasStackedPacks = !isFreePlan && historyRows.length > 1 && isActive;
+    const futurePacksCount = !isFreePlan && historyRows.length > 1 ? historyRows.length - 1 : 0;
+    const totalDaysAdded = isFreePlan ? 0 : historyRows.reduce((acc, h) => acc + (Number(h.duration_days) || 0), 0);
+    const formattedExpiry = isFreePlan ? 'Promotional Creator Tier (Active)' : (expiresAt ? formatISTDate(expiresAt) : null);
+    const formattedExpiryTime = isFreePlan ? 'Active while promotion is live' : (expiresAt ? formatISTDateTime(expiresAt) : null);
     const formattedStart = u.subscription_start ? formatISTDate(new Date(u.subscription_start)) : null;
 
     return res.json({
       isActive,
-      isExpired: Boolean(expiresAt && expiresAt <= now),
-      planName: u.subscription_plan || (isActive ? 'Monthly Influencer Pro' : 'Free Member'),
+      isFreePlan,
+      isExpired: Boolean(!isFreePlan && expiresAt && expiresAt <= now),
+      planName: u.subscription_plan || (isActive ? 'Free Influencer Pass' : 'Free Member'),
       startDate: u.subscription_start,
       formattedStart,
-      expiresAt: u.subscription_expires_at,
+      expiresAt: isFreePlan ? null : u.subscription_expires_at,
       formattedExpiry,
       formattedExpiryTime,
       daysRemaining,
@@ -889,5 +1088,57 @@ export async function getUserSubscriptionStatus(req, res) {
   } catch (err) {
     console.error('Get subscription status error:', err);
     return res.status(500).json({ error: 'Failed to fetch subscription status' });
+  }
+}
+
+export async function activateFreeSubscription(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Check if user has payout details in creator_payout_details
+    const [pRows] = await pool.query(
+      'SELECT id, bank_name, account_number, ifsc_code, upi_id FROM creator_payout_details WHERE user_id = ?',
+      [userId]
+    );
+
+    const hasBank = Boolean(pRows[0]?.account_number && pRows[0]?.ifsc_code);
+    const hasUpi = Boolean(pRows[0]?.upi_id && pRows[0]?.upi_id.includes('@'));
+    const hasPayoutDetails = hasBank || hasUpi;
+
+    if (!hasPayoutDetails) {
+      return res.json({
+        success: false,
+        requiresPayoutDetails: true,
+        message: 'Please provide your PhonePe UPI ID or Bank Account details to activate your Free Influencer Pass.'
+      });
+    }
+
+    // Activate Free Influencer Pass (Lifetime validity)
+    const result = await executeSubscriptionActivation({
+      userId,
+      planId: 'free_influencer',
+      planName: 'Free Influencer Pass',
+      price: 0,
+      paymentId: `free_act_${userId}_${Date.now()}`,
+      durationDays: 3650
+    });
+
+    await pool.query(
+      "UPDATE users SET has_payout_details = 1, is_influencer = 1, subscription_plan = 'Free Influencer Pass', subscription_expires_at = NULL WHERE id = ?",
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      requiresPayoutDetails: false,
+      message: '🎉 Free Influencer Pass activated successfully!',
+      ...result
+    });
+  } catch (err) {
+    console.error('Activate free subscription error:', err);
+    return res.status(500).json({ error: 'Failed to activate free subscription: ' + err.message });
   }
 }

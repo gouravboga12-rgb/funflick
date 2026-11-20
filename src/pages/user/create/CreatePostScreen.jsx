@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   ExternalLink,
   Crown,
+  ShieldCheck,
   Hash,
   Smile,
   Tag,
@@ -36,7 +37,12 @@ const SUGGESTED_LOCATIONS = [
 
 export const CreatePostScreen = () => {
   const navigate = useNavigate();
-  const { currentUser, posts, setSubscriptionGateModalOpen, showToast, fetchLiveVideos, fetchMyMedia } = useApp();
+  const { currentUser, posts, setSubscriptionGateModalOpen, setPayoutModalOpen, showToast, fetchLiveVideos, fetchMyMedia } = useApp();
+
+  const isCreatorReady = Boolean(
+    currentUser?.isInfluencer && 
+    (currentUser?.hasPayoutDetails || currentUser?.subscriptionPlan === 'Free Influencer Pass')
+  );
 
   const fileInputRef = useRef(null);
 
@@ -96,9 +102,22 @@ export const CreatePostScreen = () => {
     'funflick', 'post', 'comedy', 'bts', 'shootday', 'teluguhumor', 
     'memes', 'entertainment', 'photography', 'trending', 'creators'
   ];
-  const dynamicFeedTags = (posts || []).flatMap(p => 
-    (p.tags || []).map(t => t.replace(/^#/, '').toLowerCase())
-  );
+  const dynamicFeedTags = (posts || []).flatMap(p => {
+    if (!p) return [];
+    if (Array.isArray(p.tags)) {
+      return p.tags.map(t => typeof t === 'string' ? t.replace(/^#/, '').toLowerCase().trim() : '').filter(Boolean);
+    }
+    if (typeof p.tags === 'string') {
+      try {
+        const parsed = JSON.parse(p.tags);
+        if (Array.isArray(parsed)) {
+          return parsed.map(t => typeof t === 'string' ? t.replace(/^#/, '').toLowerCase().trim() : '').filter(Boolean);
+        }
+      } catch (e) {}
+      return p.tags.split(',').map(t => t.replace(/^#/, '').toLowerCase().trim()).filter(Boolean);
+    }
+    return [];
+  });
   const allAvailableTags = Array.from(new Set([...baseTrendingTags, ...dynamicFeedTags]));
   const cleanTagQuery = tagSearchInput.trim().replace(/^#/, '').toLowerCase().replace(/\s+/g, '');
   const filteredHashtagSuggestions = cleanTagQuery
@@ -176,10 +195,10 @@ export const CreatePostScreen = () => {
       return;
     }
 
-    // 1. Subscription Check
-    if (!currentUser.hasPublishingSubscription) {
-      setSubscriptionGateModalOpen(true);
-      showToast('⚠️ Creator Publishing Plan required to post media!', 'error');
+    // 1. Subscription & Payout Details Check
+    if (!isCreatorReady) {
+      if (setPayoutModalOpen) setPayoutModalOpen(true);
+      showToast('⚠️ Please activate your Free Influencer Pass & add payout details to post!', 'error');
       return;
     }
 
@@ -304,9 +323,9 @@ export const CreatePostScreen = () => {
       <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4">
         
         {/* Publishing Subscription Banner Guard */}
-        {!currentUser.hasPublishingSubscription ? (
+        {!isCreatorReady ? (
           <div 
-            onClick={() => setSubscriptionGateModalOpen(true)}
+            onClick={() => setPayoutModalOpen ? setPayoutModalOpen(true) : navigate('/subscription')}
             className="p-3.5 rounded-3xl bg-gradient-to-r from-pink-950/80 via-purple-950/70 to-amber-950/60 border border-pink-500/40 flex items-center justify-between cursor-pointer hover:border-pink-500 transition shadow-lg shadow-pink-500/10"
           >
             <div className="flex items-center gap-3">
@@ -315,10 +334,10 @@ export const CreatePostScreen = () => {
               </div>
               <div>
                 <span className="text-xs font-bold text-white font-heading block">
-                  Publishing Subscription Required
+                  Activate Free Influencer Pass (₹0)
                 </span>
                 <p className="text-[11px] text-pink-200">
-                  Tap to unlock creator post publishing & analytics.
+                  Add PhonePe UPI / Bank details & earn cash on likes and views.
                 </p>
               </div>
             </div>
@@ -328,7 +347,7 @@ export const CreatePostScreen = () => {
           <div className="p-2.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-300">
             <span className="flex items-center gap-1.5 font-semibold text-[11px]">
               <Crown className="w-4 h-4 text-amber-400" />
-              Publishing Plan Active ({currentUser.subscriptionPlan || 'Monthly'})
+              Publishing Plan Active ({currentUser?.subscriptionPlan || 'Free Influencer Pass'})
             </span>
             <span className="text-[10px] text-gray-400">Ready to Post</span>
           </div>

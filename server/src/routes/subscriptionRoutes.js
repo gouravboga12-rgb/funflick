@@ -9,6 +9,7 @@ import {
   getUserSubscriptionStatus,
   createRazorpayOrder,
   verifyRazorpayPayment,
+  activateFreeSubscription,
   renderCheckoutPage,
   resetTestSubscriptionsAdmin
 } from '../controllers/subscriptionController.js';
@@ -22,6 +23,7 @@ router.get('/plans', getActivePlans);
 // Razorpay Official Checkout & Verification (Mobile + Web)
 router.post('/create-order', authenticateToken, createRazorpayOrder);
 router.post('/verify-payment', authenticateToken, verifyRazorpayPayment);
+router.post('/activate-free', authenticateToken, activateFreeSubscription);
 router.get('/checkout-page', renderCheckoutPage);
 
 // User side: activate or extend subscription

@@ -2,7 +2,7 @@
   "expo": {
     "name": "FunFlick",
     "slug": "funflick",
-    "version": "1.0.17",
+    "version": "1.0.22",
     "scheme": "funflick",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,7 +24,8 @@
       }
     },
     "android": {
-      "versionCode": 18,
+      "versionCode": 23,
+      "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "package": "com.funflick.app",
       "adaptiveIcon": {
@@ -42,42 +43,41 @@
           "autoVerify": true,
           "data": [
             {
-              "scheme": "funflick"
-            },
-            {
               "scheme": "https",
               "host": "funflick.in",
-              "pathPrefix": "/video"
-            },
-            {
-              "scheme": "https",
-              "host": "funflick.in",
-              "pathPrefix": "/reels"
-            },
-            {
-              "scheme": "https",
-              "host": "funflick.in",
-              "pathPrefix": "/profile"
+              "pathPrefix": "/"
             },
             {
               "scheme": "https",
               "host": "www.funflick.in",
-              "pathPrefix": "/video"
+              "pathPrefix": "/"
             },
             {
-              "scheme": "https",
-              "host": "www.funflick.in",
-              "pathPrefix": "/reels"
+              "scheme": "http",
+              "host": "funflick.in",
+              "pathPrefix": "/"
             },
             {
-              "scheme": "https",
+              "scheme": "http",
               "host": "www.funflick.in",
-              "pathPrefix": "/profile"
+              "pathPrefix": "/"
             },
             {
               "scheme": "https",
               "host": "funflick-theta.vercel.app",
-              "pathPrefix": "/video"
+              "pathPrefix": "/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "funflick"
             }
           ],
           "category": [
@@ -126,10 +126,10 @@
         }
       ]
     ],
-    "owner": "alcgof",
+    "owner": "funflick",
     "extra": {
       "eas": {
-        "projectId": "a0f63df5-ed3e-433d-952f-93a752963e71"
+        "projectId": "19deb297-3b52-4a00-a17e-ce8b78ede1ae"
       }
     }
   }

@@ -53,8 +53,40 @@ export const SubscriptionScreen = () => {
     const token = localStorage.getItem('funflick_token') || sessionStorage.getItem('funflick_token');
     if (!token) {
       setProcessing(false);
-      showToast('Please log in to purchase an influencer subscription.', 'error');
+      showToast('Please log in to activate an influencer subscription.', 'error');
       navigate('/login');
+      return;
+    }
+
+    // Free Influencer Pass: activate directly or prompt payout details
+    if (selectedPlan.id === 'free_influencer' || Number(selectedPlan.price) === 0) {
+      try {
+        const freeRes = await fetch('/api/subscriptions/activate-free', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const freeData = await freeRes.json();
+        setProcessing(false);
+
+        if (freeData.requiresPayoutDetails) {
+          setShowPayoutModal(true);
+          showToast('Enter your PhonePe UPI ID or Bank details to activate your Free Influencer Pass.', 'info');
+        } else if (freeData.success) {
+          if (fetchUserSubscriptionStatus) await fetchUserSubscriptionStatus();
+          showToast('🎉 Free Influencer Pass activated successfully!', 'success');
+          try {
+            confetti({ particleCount: 120, spread: 90, origin: { y: 0.5 } });
+          } catch (e) {}
+        } else {
+          throw new Error(freeData.error || 'Failed to activate free pass');
+        }
+      } catch (fErr) {
+        setProcessing(false);
+        showToast(fErr.message || 'Error activating free pass', 'error');
+      }
       return;
     }
 
@@ -263,14 +295,25 @@ export const SubscriptionScreen = () => {
                 </div>
               </div>
 
-              <div className="text-right">
-                <span className="text-lg font-extrabold text-amber-300 font-mono block">
-                  {activeDaysRemaining}
-                </span>
-                <span className="text-[9px] text-gray-300 block -mt-1 font-medium">
-                  {activeDaysRemaining === 1 ? 'day remaining' : 'days remaining'}
-                </span>
-              </div>
+              {activePlanName === 'Free Influencer Pass' || subscriptionStatus?.isFreePlan ? (
+                <div className="text-right">
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 block">
+                    ACTIVE
+                  </span>
+                  <span className="text-[9px] text-gray-400 block mt-0.5">
+                    Promotional Tier
+                  </span>
+                </div>
+              ) : (
+                <div className="text-right">
+                  <span className="text-lg font-extrabold text-amber-300 font-mono block">
+                    {activeDaysRemaining}
+                  </span>
+                  <span className="text-[9px] text-gray-300 block -mt-1 font-medium">
+                    {activeDaysRemaining === 1 ? 'day remaining' : 'days remaining'}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Validity Timeline breakdown */}
@@ -286,15 +329,15 @@ export const SubscriptionScreen = () => {
               <div className="text-right">
                 <span className="text-gray-400 block text-[10px]">Valid Until / Expiry:</span>
                 <strong className="text-emerald-300">
-                  {activeExpiresAt 
-                    ? formatISTDate(activeExpiresAt)
-                    : `${activeDaysRemaining} Days`}
+                  {activePlanName === 'Free Influencer Pass' || subscriptionStatus?.isFreePlan
+                    ? 'Promotional Tier'
+                    : (activeExpiresAt ? formatISTDate(activeExpiresAt) : `${activeDaysRemaining} Days`)}
                 </strong>
               </div>
             </div>
 
             {/* Future Pack Stacked Activation Callout */}
-            {(subscriptionStatus?.hasStackedPacks || (subscriptionStatus?.history && subscriptionStatus.history.length > 1)) && (
+            {activePlanName !== 'Free Influencer Pass' && !subscriptionStatus?.isFreePlan && (subscriptionStatus?.hasStackedPacks || (subscriptionStatus?.history && subscriptionStatus.history.length > 1)) && (
               <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-pink-500/20 to-purple-500/20 border border-amber-400/40 text-[11px] text-amber-200 flex items-center justify-between gap-2 shadow-lg">
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-lg bg-amber-400 text-black font-extrabold flex items-center justify-center text-xs">
@@ -419,15 +462,17 @@ export const SubscriptionScreen = () => {
                     {processing && selectedPlanId === plan.id ? (
                       <div className="flex items-center gap-2">
                         <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Opening Razorpay...</span>
+                        <span>{plan.price === 0 ? 'Activating Free Pass...' : 'Opening Razorpay...'}</span>
                       </div>
                     ) : (
                       <>
                         <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
                         <span>
-                          {isUserSubscribed && activeDaysRemaining > 0 
-                            ? `Extend (+${getPlanDays(plan)}d) · ${plan.formattedPrice}`
-                            : `Pay ${plan.formattedPrice}`}
+                          {plan.price === 0
+                            ? 'Activate Free Pass (₹0)'
+                            : (isUserSubscribed && activeDaysRemaining > 0 
+                              ? `Extend (+${getPlanDays(plan)}d) · ${plan.formattedPrice}`
+                              : `Pay ${plan.formattedPrice}`)}
                         </span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </>
@@ -496,6 +541,10 @@ export const SubscriptionScreen = () => {
       {/* Creator Payout & Bank Details Registration Modal */}
       <CreatorPayoutDetailsModal
         isOpen={showPayoutModal}
+        isFreePlanActivation={selectedPlanId === 'free_influencer' || activePlans.find(p => p.id === selectedPlanId)?.price === 0}
+        onSaved={async () => {
+          if (fetchUserSubscriptionStatus) await fetchUserSubscriptionStatus();
+        }}
         onClose={() => setShowPayoutModal(false)}
       />
     </div>

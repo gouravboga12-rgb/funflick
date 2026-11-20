@@ -44,7 +44,9 @@ const linking = {
     prefix,
     'funflick://',
     'https://funflick.in',
+    'http://funflick.in',
     'https://www.funflick.in',
+    'http://www.funflick.in',
     'https://funflick-theta.vercel.app',
   ],
   config: {

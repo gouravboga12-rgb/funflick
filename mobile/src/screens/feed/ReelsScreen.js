@@ -12,6 +12,7 @@ import { apiRequest } from '../../services/api';
 import { CommentsModal } from '../../components/feed/CommentsModal';
 import { ReportModal } from '../../components/common/ReportModal';
 import { downloadMediaFile } from '../../services/mediaDownloadService';
+import { getManagedVideoSource } from '../../utils/videoPlayerPolicy';
 import { colors } from '../../theme/colors';
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
@@ -49,6 +50,7 @@ export const ReelItem = React.memo(function ReelItem({
   isActive,
   isScreenFocused,
   reelHeight,
+  shouldPreload = false,
   isReelsMuted: propMuted,
   toggleMute: propToggleMute,
   isReelsPaused: propPaused,
@@ -197,7 +199,15 @@ export const ReelItem = React.memo(function ReelItem({
 
   const shouldPlay = Boolean(isVideo && isActive && isScreenFocused && isAppActive && !isReelsPaused && !activePopupAd);
 
-  const player = useVideoPlayer(isVideo && Platform.OS !== 'web' ? (mediaUrl || null) : null, p => {
+  const managedSource = getManagedVideoSource({
+    isVideo,
+    mediaUrl,
+    isActive,
+    isFocused: isScreenFocused,
+    shouldPreload,
+  });
+
+  const player = useVideoPlayer(managedSource, p => {
     if (!p) return;
     p.loop = true;
     p.muted = isReelsMuted;
@@ -812,6 +822,10 @@ export const ReelsScreen = ({ navigation }) => {
   const [containerHeight, setContainerHeight] = useState(WINDOW_HEIGHT - 65);
   const [reelsData, setReelsData] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const reelsSeedRef = useRef(Date.now());
+  const reelsOffsetRef = useRef(0);
+  const hasMoreReelsRef = useRef(true);
+  const isLoadingMoreReelsRef = useRef(false);
 
   // Follow creator handler specifically updating reelsData optimistic state
   const handleToggleFollowInReels = useCallback(
@@ -835,12 +849,23 @@ export const ReelsScreen = ({ navigation }) => {
     [followingUsernames, toggleFollowCreator]
   );
 
-  // Fetch category-personalized and dynamically seeded video-only feed
-  const fetchDedicatedReels = useCallback(async (newSeed) => {
+  // Fetch category-personalized and dynamically seeded video-only feed with infinite pagination
+  const fetchDedicatedReels = useCallback(async ({ refresh = false, loadMore = false } = {}) => {
+    if (loadMore) {
+      if (isLoadingMoreReelsRef.current || !hasMoreReelsRef.current) return;
+      isLoadingMoreReelsRef.current = true;
+    }
+
     try {
-      const seedParam = newSeed || Date.now();
-      const res = await apiRequest(`/videos/reels?limit=25&seed=${seedParam}`);
-      if (res && res.videos && Array.isArray(res.videos) && res.videos.length > 0) {
+      if (refresh) {
+        reelsSeedRef.current = Date.now();
+        reelsOffsetRef.current = 0;
+        hasMoreReelsRef.current = true;
+      }
+      const seedParam = reelsSeedRef.current;
+      const currentOffset = loadMore ? reelsOffsetRef.current : 0;
+      const res = await apiRequest(`/videos/reels?limit=25&offset=${currentOffset}&seed=${seedParam}`);
+      if (res && res.videos && Array.isArray(res.videos)) {
         const mapped = res.videos.map(v => {
           const safePoster = v.thumbnail_url && !/\.(mp4|webm|mov|m4v)($|\?)/i.test(v.thumbnail_url) ? v.thumbnail_url : null;
           return {
@@ -866,12 +891,39 @@ export const ReelsScreen = ({ navigation }) => {
             },
           };
         });
-        setReelsData(mapped);
+
+        if (loadMore) {
+          setReelsData(prev => {
+            const existingIds = new Set(prev.map(r => String(r.id)));
+            const fresh = mapped.filter(r => !existingIds.has(String(r.id)));
+            if (fresh.length === 0 || mapped.length < 25) {
+              hasMoreReelsRef.current = false;
+            }
+            reelsOffsetRef.current = prev.length + fresh.length;
+            return [...prev, ...fresh];
+          });
+        } else {
+          setReelsData(mapped);
+          reelsOffsetRef.current = mapped.length;
+          if (mapped.length < 25) {
+            hasMoreReelsRef.current = false;
+          } else {
+            hasMoreReelsRef.current = true;
+          }
+        }
       }
     } catch (err) {
       console.warn('Could not fetch dedicated reels feed:', err);
+    } finally {
+      if (loadMore) {
+        isLoadingMoreReelsRef.current = false;
+      }
     }
   }, []);
+
+  const handleLoadMoreReels = useCallback(() => {
+    fetchDedicatedReels({ loadMore: true });
+  }, [fetchDedicatedReels]);
 
   useEffect(() => {
     fetchDedicatedReels();
@@ -880,8 +932,7 @@ export const ReelsScreen = ({ navigation }) => {
   const handlePullRefresh = async () => {
     setIsRefreshing(true);
     try {
-      // Regenerate seed to reshuffle and prioritize fresh/different videos
-      await fetchDedicatedReels(Date.now());
+      await fetchDedicatedReels({ refresh: true });
       setCurrentIndex(0);
     } finally {
       setIsRefreshing(false);
@@ -943,6 +994,7 @@ export const ReelsScreen = ({ navigation }) => {
             isActive={index === currentIndex}
             isScreenFocused={isFocused}
             reelHeight={containerHeight}
+            shouldPreload={index === currentIndex + 1}
             isReelsMuted={isReelsMuted}
             toggleMute={toggleMute}
             isReelsPaused={isReelsPaused}
@@ -974,8 +1026,11 @@ export const ReelsScreen = ({ navigation }) => {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         initialNumToRender={2}
-        maxToRenderPerBatch={3}
-        windowSize={5}
+        maxToRenderPerBatch={Platform.OS === 'android' ? 2 : 3}
+        windowSize={Platform.OS === 'android' ? 3 : 5}
+        removeClippedSubviews={Platform.OS === 'android'}
+        onEndReached={handleLoadMoreReels}
+        onEndReachedThreshold={0.5}
       />
     </View>
   );

@@ -5,6 +5,7 @@ import { CreatorSubscriptionModal } from '../../components/creator/CreatorSubscr
 import { BottomNavigation } from '../../components/common/BottomNavigation';
 import { FollowListModal } from '../../components/user/FollowListModal';
 import { EditProfileModal } from './EditProfileModal';
+import { openInAppOrStore, isAndroidDevice, isInAppBrowser } from '../../utils/appLinks';
 import { 
   ChevronLeft, 
   Share2, 
@@ -65,6 +66,17 @@ export const CreatorProfileScreen = () => {
       setActiveTab('Videos');
     }
   }, [isOwner, activeTab]);
+
+  // If opened on Android via mobile share / WhatsApp / Instagram / Facebook, trigger app launch with Play Store fallback
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const isExplicitAppRequest = params.get('source') === 'app' || params.get('openApp') === 'true';
+      if (username && isAndroidDevice() && (isInAppBrowser() || isExplicitAppRequest)) {
+        openInAppOrStore(`profile/${username}`);
+      }
+    } catch (e) {}
+  }, [username]);
 
   // Fetch follow counts
   const fetchLiveCounts = async () => {
@@ -273,6 +285,19 @@ export const CreatorProfileScreen = () => {
             <Share2 className="w-5 h-5" />
           </button>
         </div>
+      </div>
+
+      {/* App Smart Banner for mobile web visitors */}
+      <div className="bg-gradient-to-r from-pink-600/20 via-purple-600/20 to-blue-600/20 border-b border-pink-500/20 px-4 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-pink-300 font-semibold">View @{creator.username} on FunFlick App</span>
+        </div>
+        <button
+          onClick={() => openInAppOrStore(`profile/${creator.username}`)}
+          className="text-xs bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold px-3.5 py-1.5 rounded-full shadow hover:opacity-90 active:scale-95 transition cursor-pointer"
+        >
+          Open App
+        </button>
       </div>
 
       {/* Main Profile Scroll View */}

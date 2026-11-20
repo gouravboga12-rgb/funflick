@@ -200,8 +200,9 @@ export const VideoDetailScreen = ({ route, navigation }) => {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         initialNumToRender={2}
-        maxToRenderPerBatch={3}
-        windowSize={5}
+        maxToRenderPerBatch={Platform.OS === 'android' ? 2 : 3}
+        windowSize={Platform.OS === 'android' ? 3 : 5}
+        removeClippedSubviews={Platform.OS === 'android'}
         getItemLayout={(data, index) => ({
           length: containerHeight,
           offset: containerHeight * index,
@@ -242,6 +243,7 @@ export const VideoDetailScreen = ({ route, navigation }) => {
               isActive={currentIndex === index}
               isScreenFocused={isFocused}
               reelHeight={containerHeight}
+              shouldPreload={currentIndex + 1 === index}
               isReelsMuted={isReelsMuted}
               toggleMute={toggleMute}
               isReelsPaused={isReelsPaused}

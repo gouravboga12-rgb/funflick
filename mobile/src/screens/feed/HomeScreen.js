@@ -15,6 +15,8 @@ export const HomeScreen = ({ navigation }) => {
     posts,
     isLoadingFeed,
     fetchFeed,
+    loadMoreFeed,
+    isLoadingMoreFeed,
     fetchLiveStories,
     adsList,
     isPaidInfluencer,
@@ -38,7 +40,7 @@ export const HomeScreen = ({ navigation }) => {
 
   const handleRefresh = async () => {
     await Promise.all([
-      fetchFeed?.(),
+      fetchFeed?.({ refresh: true }),
       fetchLiveStories?.(),
     ]);
   };
@@ -152,6 +154,15 @@ export const HomeScreen = ({ navigation }) => {
         maxToRenderPerBatch={2}
         windowSize={3}
         removeClippedSubviews={Platform.OS === 'android'}
+        onEndReached={loadMoreFeed}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          isLoadingMoreFeed ? (
+            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : null
+        }
         ListHeaderComponent={
           <StoryBar
             onAddStory={() => navigation.navigate('CreateStory')}

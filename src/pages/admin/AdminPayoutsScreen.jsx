@@ -260,22 +260,22 @@ export const AdminPayoutsScreen = () => {
 
                       {/* Payout Details */}
                       <td className="py-3.5 px-4">
-                        {d ? (
-                          <div className="space-y-0.5">
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-pink-500/20 text-pink-300 border border-pink-500/30 uppercase inline-block">
-                              {d.payout_method === 'bank' || d.payout_type === 'bank' ? '🏦 Bank Account' : '📱 UPI ID'}
-                            </span>
-                            {d.payout_method === 'bank' || d.payout_type === 'bank' ? (
-                              <p className="text-[11px] text-gray-300 font-mono mt-1">
-                                {d.bank_name || 'Bank'} • {d.account_number} • {d.ifsc_code}
-                              </p>
-                            ) : (
-                              <p className="text-[11px] text-gray-300 font-mono mt-1">
-                                {d.upi_id}
-                              </p>
+                        {d && (d.account_number || d.upi_id) ? (
+                          <div className="space-y-1">
+                            {d.upi_id && (
+                              <div className="flex items-center gap-1.5 text-[11px] font-mono text-purple-300">
+                                <span className="px-1.5 py-0.2 rounded bg-purple-500/25 text-purple-300 text-[9px] font-bold">UPI</span>
+                                <span className="truncate max-w-[200px]">{d.upi_id}</span>
+                              </div>
+                            )}
+                            {d.account_number && (
+                              <div className="text-[11px] font-mono text-pink-300">
+                                <span className="px-1.5 py-0.2 rounded bg-pink-500/25 text-pink-300 text-[9px] font-bold mr-1.5">BANK</span>
+                                <span>{d.bank_name || 'Bank'} • {d.account_number} • {d.ifsc_code}</span>
+                              </div>
                             )}
                             <p className="text-[10px] text-gray-400">
-                              Tel: {d.contact_phone || d.phone || creator.phone}
+                              Tel: {d.contact_phone || d.phone || creator.phone || '—'}
                             </p>
                           </div>
                         ) : (

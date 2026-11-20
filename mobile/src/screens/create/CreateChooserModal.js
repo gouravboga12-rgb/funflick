@@ -23,6 +23,16 @@ export const CreateChooserModal = ({ visible, onClose, onSelect }) => {
     onClose();
   };
 
+  const handleOptionPress = (type) => {
+    setShowMonetizationExplainer(false);
+    onClose();
+    setTimeout(() => {
+      if (onSelect) {
+        onSelect(type);
+      }
+    }, 100);
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleModalClose}>
       <View style={styles.overlay}>
@@ -50,10 +60,7 @@ export const CreateChooserModal = ({ visible, onClose, onSelect }) => {
                 <TouchableOpacity
                   style={styles.optionCard}
                   activeOpacity={0.8}
-                  onPress={() => {
-                    handleModalClose();
-                    onSelect('CreatePost');
-                  }}
+                  onPress={() => handleOptionPress('CreatePost')}
                 >
                   <LinearGradient colors={['#ff007a', '#ff4b2b']} style={styles.iconBox}>
                     <Image size={22} color="#fff" />
@@ -69,10 +76,7 @@ export const CreateChooserModal = ({ visible, onClose, onSelect }) => {
                 <TouchableOpacity
                   style={styles.optionCard}
                   activeOpacity={0.8}
-                  onPress={() => {
-                    handleModalClose();
-                    onSelect('UploadReel');
-                  }}
+                  onPress={() => handleOptionPress('UploadReel')}
                 >
                   <LinearGradient colors={['#7928ca', '#0070f3']} style={styles.iconBox}>
                     <Video size={22} color="#fff" />
@@ -88,10 +92,7 @@ export const CreateChooserModal = ({ visible, onClose, onSelect }) => {
                 <TouchableOpacity
                   style={styles.optionCard}
                   activeOpacity={0.8}
-                  onPress={() => {
-                    handleModalClose();
-                    onSelect('CreateStory');
-                  }}
+                  onPress={() => handleOptionPress('CreateStory')}
                 >
                   <LinearGradient colors={['#ff8a00', '#ff007a']} style={styles.iconBox}>
                     <Sparkles size={22} color="#fff" />
@@ -208,10 +209,7 @@ export const CreateChooserModal = ({ visible, onClose, onSelect }) => {
               <TouchableOpacity
                 style={styles.ctaButtonWrap}
                 activeOpacity={0.85}
-                onPress={() => {
-                  handleModalClose();
-                  onSelect('Subscription');
-                }}
+                onPress={() => handleOptionPress('Subscription')}
               >
                 <LinearGradient
                   colors={['#f59e0b', '#ec4899', '#8b5cf6']}
@@ -220,7 +218,7 @@ export const CreateChooserModal = ({ visible, onClose, onSelect }) => {
                   style={styles.ctaButton}
                 >
                   <Crown size={18} color="#fff" style={{ marginRight: 6 }} />
-                  <Text style={styles.ctaButtonText}>Activate Influencer Pass & Payouts</Text>
+                  <Text style={styles.ctaButtonText}>Activate Free Influencer Pass & Payouts (₹0)</Text>
                   <ArrowRight size={16} color="#fff" style={{ marginLeft: 6 }} />
                 </LinearGradient>
               </TouchableOpacity>

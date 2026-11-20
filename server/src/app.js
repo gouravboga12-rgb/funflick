@@ -25,6 +25,24 @@ app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(morgan('dev'));
 
+// Android Digital Asset Links verification endpoint
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.json([
+    {
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: {
+        namespace: 'android_app',
+        package_name: 'com.funflick.app',
+        sha256_cert_fingerprints: [
+          '60:87:1C:41:34:1C:B3:AF:B3:CD:B2:FB:38:94:A0:78:19:E7:5B:29:DF:66:BD:D1:43:B6:2F:CA:CD:2F:CB:4D',
+        ],
+      },
+    },
+  ]);
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({

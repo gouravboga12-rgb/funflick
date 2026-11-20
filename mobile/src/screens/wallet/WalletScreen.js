@@ -37,6 +37,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { apiRequest } from '../../services/api';
 import { colors } from '../../theme/colors';
+import { CreatorPayoutDetailsModal } from '../../components/user/CreatorPayoutDetailsModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -53,15 +54,6 @@ export const WalletScreen = ({ navigation }) => {
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
 
-  // Payout form state
-  const [payoutMethod, setPayoutMethod] = useState('bank'); // 'bank' | 'upi'
-  const [payoutBankName, setPayoutBankName] = useState('');
-  const [payoutAccountNum, setPayoutAccountNum] = useState('');
-  const [payoutConfirmAccountNum, setPayoutConfirmAccountNum] = useState('');
-  const [payoutIfsc, setPayoutIfsc] = useState('');
-  const [payoutUpiId, setPayoutUpiId] = useState('');
-  const [isSavingPayout, setIsSavingPayout] = useState(false);
-
   // Filter states
   const [timeFilter, setTimeFilter] = useState('ALL'); // 'ALL' | 'TODAY' | '7D' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR'
   const [methodFilter, setMethodFilter] = useState('ALL'); // 'ALL' | 'UPI' | 'BANK'
@@ -69,8 +61,8 @@ export const WalletScreen = ({ navigation }) => {
   const [collapsedMonths, setCollapsedMonths] = useState({});
   const [copiedId, setCopiedId] = useState(null);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (showLoading = true) => {
+    if (showLoading) setIsLoading(true);
     try {
       const [histRes, detRes] = await Promise.all([
         apiRequest('/payouts/my-history').catch(() => null),
@@ -82,20 +74,16 @@ export const WalletScreen = ({ navigation }) => {
         if (histRes.walletBalance !== undefined) {
           setWalletBalance(histRes.walletBalance);
           if (setCurrentUser) {
-            setCurrentUser(prev => prev ? ({ ...prev, walletBalance: histRes.walletBalance }) : prev);
+            setCurrentUser(prev => {
+              if (!prev || prev.walletBalance === histRes.walletBalance) return prev;
+              return { ...prev, walletBalance: histRes.walletBalance };
+            });
           }
         }
       }
 
       if (detRes && detRes.payoutDetails) {
-        const d = detRes.payoutDetails;
-        setRegisteredDetails(d);
-        setPayoutMethod(d.payout_method || 'bank');
-        setPayoutBankName(d.bank_name || '');
-        setPayoutAccountNum(d.account_number || '');
-        setPayoutConfirmAccountNum(d.account_number || '');
-        setPayoutIfsc(d.ifsc_code || '');
-        setPayoutUpiId(d.upi_id || '');
+        setRegisteredDetails(detRes.payoutDetails);
       }
     } catch (err) {
       console.warn('Failed to load wallet data:', err);
@@ -105,8 +93,12 @@ export const WalletScreen = ({ navigation }) => {
   }, [setCurrentUser]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadData(true);
+    const unsub = navigation?.addListener ? navigation.addListener('focus', () => {
+      loadData(false);
+    }) : undefined;
+    return unsub;
+  }, [navigation, loadData]);
 
   const latestPaid = useMemo(
     () => payoutHistory.find(p => p.status === 'Paid'),
@@ -253,64 +245,6 @@ export const WalletScreen = ({ navigation }) => {
     }
   };
 
-  const handleSavePayoutDetails = async () => {
-    if (payoutMethod === 'bank') {
-      if (!payoutBankName.trim()) {
-        Alert.alert('Required', 'Please enter your bank name.');
-        return;
-      }
-      if (!payoutAccountNum.trim() || payoutAccountNum.length < 8) {
-        Alert.alert('Required', 'Please enter a valid bank account number (min 8 digits).');
-        return;
-      }
-      if (payoutAccountNum !== payoutConfirmAccountNum) {
-        Alert.alert('Mismatch', 'Bank account numbers do not match.');
-        return;
-      }
-      if (!payoutIfsc.trim() || payoutIfsc.trim().length !== 11) {
-        Alert.alert('Required', 'Please enter an 11-character valid IFSC code.');
-        return;
-      }
-    } else {
-      if (!payoutUpiId.trim() || !payoutUpiId.includes('@')) {
-        Alert.alert('Required', 'Please enter a valid UPI ID (e.g. mobile@upi).');
-        return;
-      }
-    }
-
-    setIsSavingPayout(true);
-    try {
-      const res = await apiRequest('/payouts/details', {
-        method: 'POST',
-        body: JSON.stringify({
-          payout_method: payoutMethod,
-          bank_name: payoutBankName.trim(),
-          account_number: payoutAccountNum.trim(),
-          ifsc_code: payoutIfsc.trim().toUpperCase(),
-          upi_id: payoutUpiId.trim(),
-          phone: currentUser?.phone || '',
-          email: currentUser?.email || '',
-        }),
-      });
-
-      const updated = res?.payoutDetails || res?.details || {
-        payout_method: payoutMethod,
-        payout_type: payoutMethod,
-        bank_name: payoutBankName.trim(),
-        account_number: payoutAccountNum.trim(),
-        ifsc_code: payoutIfsc.trim().toUpperCase(),
-        upi_id: payoutUpiId.trim(),
-      };
-      setRegisteredDetails(updated);
-      setIsPayoutModalOpen(false);
-      Alert.alert('Saved', 'Your payout destination details have been updated!');
-    } catch (e) {
-      Alert.alert('Error', e.message || 'Could not save payout details.');
-    } finally {
-      setIsSavingPayout(false);
-    }
-  };
-
   const totalPaidSum = payoutHistory
     .filter(p => p.status === 'Paid')
     .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
@@ -437,19 +371,20 @@ export const WalletScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {registeredDetails ? (
+          {registeredDetails && (registeredDetails.upi_id || registeredDetails.account_number) ? (
             <View style={styles.registeredDetailsBox}>
-              {registeredDetails.payout_method === 'bank' ? (
+              {registeredDetails.upi_id ? (
+                <Text style={styles.regText}>PhonePe / UPI: <Text style={styles.regVal}>{registeredDetails.upi_id}</Text></Text>
+              ) : null}
+              {registeredDetails.account_number ? (
                 <>
-                  <Text style={styles.regText}>Bank: <Text style={styles.regVal}>{registeredDetails.bank_name}</Text></Text>
+                  <Text style={styles.regText}>Bank: <Text style={styles.regVal}>{registeredDetails.bank_name || 'Bank Account'}</Text></Text>
                   <Text style={styles.regText}>Account: <Text style={styles.regVal}>{registeredDetails.account_number}</Text></Text>
                   <Text style={styles.regText}>IFSC: <Text style={styles.regVal}>{registeredDetails.ifsc_code}</Text></Text>
                 </>
-              ) : (
-                <Text style={styles.regText}>UPI ID: <Text style={styles.regVal}>{registeredDetails.upi_id}</Text></Text>
-              )}
+              ) : null}
               <Text style={styles.regPhoneNote}>
-                Alert Phone: {registeredDetails.phone || currentUser?.phone || 'On file'}
+                Alert Phone: {registeredDetails.phone || registeredDetails.phone_number || currentUser?.phone || 'On file'}
               </Text>
             </View>
           ) : (
@@ -602,7 +537,7 @@ export const WalletScreen = ({ navigation }) => {
           </Text>
         </View>
 
-        {isLoading ? (
+        {isLoading && payoutHistory.length === 0 ? (
           <View style={styles.centerLoading}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loadingText}>Loading ledger...</Text>
@@ -722,144 +657,15 @@ export const WalletScreen = ({ navigation }) => {
       </ScrollView>
 
       {/* 10. MODAL: Bank & UPI Payout Details */}
-      <Modal
+      {/* 10. MODAL: Unified Bank & UPI Payout Details */}
+      <CreatorPayoutDetailsModal
         visible={isPayoutModalOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setIsPayoutModalOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={styles.payoutHeaderIcon}>
-                  <Building2 size={18} color="#ffffff" />
-                </View>
-                <View>
-                  <Text style={styles.modalTitle}>Payout Settings</Text>
-                  <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '600' }}>
-                    Bank & UPI Payout Details
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => setIsPayoutModalOpen(false)}>
-                <X size={20} color="#cbd5e1" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-              {/* Method Switcher */}
-              <View style={styles.methodToggleBar}>
-                <TouchableOpacity
-                  style={[styles.toggleBtn, payoutMethod === 'bank' && styles.toggleBtnActive]}
-                  onPress={() => setPayoutMethod('bank')}
-                >
-                  <Text style={[styles.toggleBtnText, payoutMethod === 'bank' && styles.toggleBtnTextActive]}>
-                    🏦 Bank Account
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.toggleBtn, payoutMethod === 'upi' && styles.toggleBtnActive]}
-                  onPress={() => setPayoutMethod('upi')}
-                >
-                  <Text style={[styles.toggleBtnText, payoutMethod === 'upi' && styles.toggleBtnTextActive]}>
-                    ⚡ UPI ID
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {payoutMethod === 'bank' ? (
-                <View style={{ gap: 10, marginTop: 12 }}>
-                  <View style={styles.inputWrap}>
-                    <Text style={styles.inputLabel}>Bank Name</Text>
-                    <TextInput
-                      value={payoutBankName}
-                      onChangeText={setPayoutBankName}
-                      placeholder="e.g. State Bank of India, HDFC"
-                      placeholderTextColor="#64748b"
-                      style={styles.textInput}
-                    />
-                  </View>
-
-                  <View style={styles.inputWrap}>
-                    <Text style={styles.inputLabel}>Account Number</Text>
-                    <TextInput
-                      value={payoutAccountNum}
-                      onChangeText={setPayoutAccountNum}
-                      placeholder="Enter Bank Account Number"
-                      placeholderTextColor="#64748b"
-                      keyboardType="number-pad"
-                      secureTextEntry
-                      style={styles.textInput}
-                    />
-                  </View>
-
-                  <View style={styles.inputWrap}>
-                    <Text style={styles.inputLabel}>Confirm Account Number</Text>
-                    <TextInput
-                      value={payoutConfirmAccountNum}
-                      onChangeText={setPayoutConfirmAccountNum}
-                      placeholder="Re-enter Bank Account Number"
-                      placeholderTextColor="#64748b"
-                      keyboardType="number-pad"
-                      style={styles.textInput}
-                    />
-                  </View>
-
-                  <View style={styles.inputWrap}>
-                    <Text style={styles.inputLabel}>IFSC Code (11 Characters)</Text>
-                    <TextInput
-                      value={payoutIfsc}
-                      onChangeText={t => setPayoutIfsc(t.toUpperCase())}
-                      placeholder="e.g. SBIN0001234"
-                      placeholderTextColor="#64748b"
-                      autoCapitalize="characters"
-                      style={styles.textInput}
-                    />
-                  </View>
-                </View>
-              ) : (
-                <View style={{ gap: 10, marginTop: 12 }}>
-                  <View style={styles.inputWrap}>
-                    <Text style={styles.inputLabel}>UPI ID (VPA)</Text>
-                    <TextInput
-                      value={payoutUpiId}
-                      onChangeText={setPayoutUpiId}
-                      placeholder="yourname@oksbi or mobile@upi"
-                      placeholderTextColor="#64748b"
-                      autoCapitalize="none"
-                      style={styles.textInput}
-                    />
-                  </View>
-                  <Text style={styles.hintText}>
-                    Ensure your UPI ID is linked to your active bank account. Earnings rewards will be sent directly here.
-                  </Text>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={styles.saveSubmitBtn}
-                onPress={handleSavePayoutDetails}
-                disabled={isSavingPayout}
-              >
-                <LinearGradient
-                  colors={['#f59e0b', '#ec4899']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.saveSubmitGradient}
-                >
-                  {isSavingPayout ? (
-                    <ActivityIndicator color="#ffffff" size="small" />
-                  ) : (
-                    <Text style={styles.saveSubmitText}>Save Payout Details</Text>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setIsPayoutModalOpen(false)}
+        onSaved={() => {
+          setIsPayoutModalOpen(false);
+          loadData(false);
+        }}
+      />
     </SafeAreaView>
   );
 };
